@@ -1,0 +1,1010 @@
+import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { SavedPrompt, ExtractionMode } from "../types";
+
+const API_KEY = process.env.API_KEY;
+
+if (!API_KEY) {
+    throw new Error("API_KEY environment variable not set");
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+const model = 'gemini-2.5-flash';
+
+type ImagePayload = { imageBase64: string; mimeType: string };
+
+export interface PromptSuggestion {
+  type: 'ADDITION' | 'REPLACEMENT' | 'REMOVAL';
+  description: string;
+  data: {
+    text_to_add?: string;
+    text_to_remove?: string;
+    text_to_replace_with?: string;
+  };
+}
+
+const createImageAnalyzer = (systemInstruction: string, errorContext: string) => {
+    return async (images: ImagePayload[]): Promise<string> => {
+        if (images.length === 0) {
+            throw new Error("Se requiere al menos una imagen para analizar.");
+        }
+        try {
+            const imageParts = images.map(image => ({
+                inlineData: { data: image.imageBase64, mimeType: image.mimeType },
+            }));
+            const response = await ai.models.generateContent({
+                model: model,
+                config: { systemInstruction },
+                contents: {
+                    parts: [
+                        { text: `Analiza las siguientes imágenes y genera el prompt optimizado como se te indicó.` },
+                        ...imageParts,
+                    ],
+                },
+            });
+            const text = response.text;
+            if (!text) {
+                throw new Error("La API no devolvió ningún texto.");
+            }
+            return text.trim();
+        } catch (error) {
+            console.error(`Error calling Gemini API for ${errorContext}:`, error);
+            throw new Error("No se pudo obtener una respuesta del modelo de IA.");
+        }
+    };
+};
+
+const metadataResponseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING, description: 'Título corto y evocador para el estilo.' },
+    category: { type: Type.STRING, description: 'Categoría principal del estilo (ej. Cyberpunk Noir).' },
+    artType: { type: Type.STRING, description: 'Tipo de arte (ej. Digital Painting).' },
+    notes: { type: Type.STRING, description: 'Breve nota descriptiva sobre el estilo.' },
+  },
+  required: ['title', 'category', 'artType', 'notes'],
+};
+
+const createMetadataGenerator = (systemInstruction: string, errorContext: string) => {
+    return async (prompt: string, images: ImagePayload[]): Promise<Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>> => {
+        const imageParts = images.map(image => ({
+            inlineData: { data: image.imageBase64, mimeType: image.mimeType },
+        }));
+        try {
+            const response = await ai.models.generateContent({
+                model: model,
+                config: {
+                    systemInstruction,
+                    responseMimeType: "application/json",
+                    responseSchema: metadataResponseSchema,
+                },
+                contents: {
+                    parts: [
+                        { text: `Este es el prompt generado: "${prompt}". Estas son las imágenes de referencia:` },
+                        ...imageParts,
+                        { text: "Genera los metadatos en JSON como se te indicó." },
+                    ],
+                },
+            });
+            const jsonString = response.text.trim();
+            const metadata = JSON.parse(jsonString);
+            return metadata;
+        } catch (error) {
+            console.error(`Error generating metadata with Gemini API for ${errorContext}:`, error);
+            throw new Error(`No se pudo generar la categorización automática para ${errorContext}.`);
+        }
+    };
+};
+
+// System Instructions Maps
+const analysisSystemInstructions: Record<ExtractionMode, string> = {
+    style: `Eres un analista profesional de última tecnología. Tu tarea es analizar el conjunto de imágenes proporcionadas por el usuario para identificar un estilo visual cohesivo y unificado presente en ellas. Debes generar un prompt optimizado que describa únicamente este estilo visual consolidado.
+
+Propósito y Metas:
+
+*   Analizar meticulosamente los elementos visuales de las imágenes proporcionadas por el usuario para identificar un estilo cohesivo.
+*   Generar un 'prompt' conciso y completo, optimizado para la replicación del estilo artístico en modelos de generación de imágenes.
+*   Asegurar que el 'prompt' se centre exclusivamente en el estilo (técnica, atmósfera, composición, etc.), excluyendo contenido específico (personajes, objetos, escenas).
+
+Comportamientos y Reglas:
+
+1)  Análisis Inicial:
+    a) Asumir que el usuario ha subido una o más imágenes para analizar.
+    b) Si el usuario describe el estilo verbalmente, pedir la imagen para un análisis técnico preciso.
+
+2)  Generación del Prompt:
+    a) El 'prompt' generado debe ser altamente descriptivo, usando terminología técnica (ej. 'volumetric lighting', 'charcoal strokes', 'analogous color palette').
+    b) Incluir categorías esenciales como: Técnica de Dibujo/Pintura, Esquema de Color, Calidad de Iluminación, Nivel de Detalle y Estética General/Mood.
+    c) El 'prompt' final debe ser un bloque de texto único y coherente, con un equilibrio ideal entre detalle y concisión. Debe estar estructurado como una serie de descriptores y palabras clave de alta calidad, separados por comas.
+    d) Enfatizar la neutralidad de contenido; el 'prompt' no debe mencionar nada de la imagen fuente que no sea el estilo. El prompt final debe estar escrito exclusivamente en inglés.
+    e) Profundidad Técnica: El prompt debe incluir, cuando sea relevante, referencias a técnicas pictóricas específicas (ej. 'impasto', 'sfumato', 'chiaroscuro'), tipos de pinceladas (ej. 'bold expressive strokes', 'fine delicate lines', 'cross-hatching'), y calidades de textura (ej. 'rough canvas texture', 'smooth glossy enamel', 'weathered wood grain').
+    f) Optimización Universal: El prompt debe ser universalmente compatible y optimizado para funcionar eficazmente en las principales plataformas de generación de imágenes (como Midjourney, Stable Diffusion, DALL-E, etc.). Evita sintaxis específica de una sola plataforma.
+
+Tono General:
+
+*   Ser formal, profesional y de alta precisión técnica.
+*   Utilizar un vocabulario sofisticado y analítico, acorde a un experto en tecnología y arte visual.`,
+    subject: `Tu misión es analizar CADA sujeto principal (persona o personaje) en las imágenes proporcionadas y generar una descripción individual y optimizada para cada uno. Es CRÍTICO que captures tanto su identidad física como su ESTILO VISUAL individual. Si los sujetos provienen de imágenes con estilos diferentes (ej. una fotografía realista y un dibujo de cómic), debes preservar y describir fielmente el estilo único de CADA UNO.
+
+REGLAS:
+1.  **Identifica y Etiqueta:** Si hay más de un sujeto distinto en las imágenes, identifícalos y etiquétalos como "Subject 1:", "Subject 2:", etc. Si solo hay un sujeto (incluso si aparece en varias imágenes), no uses etiquetas.
+2.  **Descripción Individual y Estilo Específico:** Para CADA sujeto, crea una descripción optimizada, siempre en inglés, que comience con su estilo visual.
+    - **Estilo Visual e Identidad General (REGLA CRÍTICA):** COMIENZA SIEMPRE con el estilo visual (ej. 'photorealistic', 'comic book style', 'oil painting style') seguido de la identidad (ej. 'a young woman', 'an old warrior'). Esta es la parte más importante para mantener la coherencia del personaje.
+    - **Rasgos Faciales Clave:** (ej. sharp jawline, bright blue eyes, freckles across the nose).
+    - **Cabello:** (ej. long wavy blonde hair, short spiky black hair).
+    - **Complexión y Físico:** (ej. slender build, muscular frame).
+    - **Vestimenta:** Incluye una descripción de la ropa que lleva (ej. wearing simple peasant clothes, dressed in a suit of simple silver armor).
+    - **Expresión/Emoción Inferida:** Añade una descripción simple de la emoción o estado de ánimo aparente (ej. with a determined gaze, looking calm and serene).
+3.  **Consolidación:** Si varias imágenes muestran al MISMO sujeto, consolida sus características en una única descripción cohesiva para ese sujeto.
+4.  **Formato de Salida:** Tu salida debe ser el prompt en inglés, con cada descripción de sujeto en una nueva línea si hay más de uno. Sin explicaciones adicionales.
+
+EJEMPLO DE SALIDA (para dos sujetos de estilos distintos):
+Subject 1: photorealistic young woman with long wavy blonde hair, bright blue eyes, wearing simple peasant clothes, looking calm and serene.
+Subject 2: old warrior in a comic book character style, with a long white beard, a scar over the left eye, dressed in a suit of simple silver armor, with a determined gaze.
+
+Céntrate en las características físicas inherentes, vestimenta, expresión y el estilo visual de CADA sujeto. Ignora el fondo y la iluminación general de la escena.`,
+    pose: `Analiza exhaustivamente la pose corporal de TODOS los sujetos en la imagen. Tu objetivo es generar una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA de generación de imágenes pueda usar para replicar las poses con alta fidelidad.
+
+REGLAS ESTRICTAS:
+1.  **Neutralidad de Género:** NO incluyas género (ej. 'man', 'woman') en tu descripción. Utiliza términos neutrales como 'figure', 'person', 'subject'.
+2.  **Identifica Múltiples Sujetos:** Si hay más de un sujeto, identifica a cada uno por su posición o una característica visual neutra (ej. "the figure on the left", "the person in the red coat") y describe sus poses por separado dentro del mismo prompt.
+3.  **Descripción Individual:** Para CADA sujeto, la descripción de su pose debe ser un bloque de texto optimizado que incluya, en este orden:
+    a. **Identificador del Sujeto:** Describe brevemente al sujeto para diferenciarlo usando términos neutrales (ej. 'the figure in the dark clothing', 'the subject on the right').
+    b. **Verbo de Acción/Postura Principal:** Un verbo o frase que defina la acción (ej. sitting, leaping, kneeling).
+    c. **Detalles del Cuerpo:** Posición del torso, ángulo de la cabeza y mirada (ej. torso slightly tilted, looking over the shoulder).
+    d. **Posición de Extremidades:** Colocación de brazos, manos, piernas y pies (ej. arms crossed, one hand on the hip).
+    e. **Emoción/Energía Inferida:** La emoción o energía que transmite la pose (ej. confident and powerful stance, melancholic posture).
+4.  **Perspectiva General:** Al final del prompt, especifica el ángulo de la cámara si es notable para la escena completa (ej. low angle shot, full body view).
+5.  **Formato de Salida:** Tu salida debe ser un único prompt en inglés, sin etiquetas ni explicaciones adicionales. Une las descripciones de las poses con comas para formar un párrafo coherente.
+
+EJEMPLO DE SALIDA (para una imagen con dos personas):
+The figure on the left is leaning against a wall, arms crossed, looking thoughtful. The figure on the right is walking towards the camera, with a determined stride and hands in their pockets, confident and powerful stance, full body shot from a medium angle.
+
+Ignora por completo el estilo, el fondo (excepto para interacción de pose), y otros detalles que no sean estrictamente la pose del cuerpo y la emoción que transmite.`,
+    expression: `Analiza la expresión facial y el estado emocional del personaje principal en la imagen. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar inmediatamente para replicar la expresión y el tono emocional con alta fidelidad.
+
+La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+
+Emoción Principal y Detalle Facial: Un adjetivo emocional clave seguido de los rasgos faciales que lo definen (ej. serene expression, closed eyes and soft smile).
+
+Intensidad y Lenguaje Corporal Reinforzador: La fuerza del sentimiento y cualquier gesto complementario (ej. intense fury, furrowed brow and clenched jaw).
+
+Vibra Narrativa y Perspectiva: El tono general y el ángulo que mejor capturen la expresión (ej. vulnerable close-up shot, triumphant view).
+
+Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.
+Si hay varias imágenes, céntrate en el personaje principal y crea una descripción de expresión cohesiva que represente la emoción o estado de ánimo general. Ignora por completo el estilo, el fondo, la ropa y otros detalles que no sean estrictamente la expresión facial y emocional.`,
+    scene: `Analiza el entorno, la ambientación y la atmósfera que rodean al personaje principal. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar para replicar el escenario con alta fidelidad.
+
+La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+
+Entorno y Localización Principal: El tipo de lugar y elementos clave (ej. massive futuristic cityscape, dense foggy forest, vintage library interior).
+
+Iluminación y Hora: La cualidad de la luz y el momento del día (ej. cinematic low light, golden hour illumination, under harsh neon lights).
+
+Atmósfera y Tono Narrativo: El sentimiento o la vibra del entorno (ej. calm and ethereal atmosphere, chaotic and dramatic setting, melancholic mood).
+
+Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+    outfit: `Analiza y desglosa el vestuario, accesorios y estilo de diseño del personaje principal. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar para replicar el outfit con alta fidelidad.
+
+La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+
+Estilo y Tono General: Clasificación del estilo (ej. futuristic cyberpunk outfit, elegant vintage high fashion).
+
+Prendas Principales y Corte: Descripción de las piezas clave y su ajuste (ej. oversized denim jacket, slim-fit black leather pants, chunky combat boots).
+
+Materiales y Colores: Texturas, acabados y paleta de colores predominante (ej. shiny silk, matte black leather, vibrant green accents).
+
+Accesorios Cruciales: Detalles que completan el look (ej. gold chain belt, aviator sunglasses, elaborate feather hat).
+
+Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+    composition: `Analiza y describe la composición visual y la configuración de la toma de la imagen. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar para replicar la estructura visual de la imagen con alta fidelidad.
+
+La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+
+Tipo de Plano y Ángulo de Cámara: El encuadre y la perspectiva (ej. full body shot from a low angle, medium close-up from a bird's eye view).
+
+Regla de Composición y Dinámica: Cómo están organizados los elementos (ej. rule of thirds composition, strong diagonal lines, perfectly symmetrical framing).
+
+Foco y Profundidad: Control de nitidez y el desenfoque (ej. shallow depth of field with background blur, sharp focus on the face, high depth of field).
+
+Ubicación del Sujeto: Posición clave dentro del encuadre (ej. subject framed by a doorway, centered subject, leading lines composition).
+
+Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+    color: `Analiza el uso del color en la imagen. Tu tarea es generar una descripción única, concisa y optimizada, siempre en inglés, que especifique la paleta, su distribución y el impacto tonal de forma matizada. Omite códigos HEX y utiliza nombres de colores descriptivos (ej. 'deep cobalt blue', 'fiery crimson', 'muted beige').
+
+La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+
+1.  **Esquema de Color, Tono y Saturación:** El tipo de paleta, la temperatura dominante y el nivel de saturación general (ej. 'vibrant complementary palette', 'desaturated and muted analogous color scheme').
+
+2.  **Colores Dominantes y Variaciones Tonales:** Los tonos principales y sus matices o variaciones (ej. 'dominated by earthy tones, ranging from deep umber to light beige').
+
+3.  **Aplicación Contextual por Zonas (REGLA CRÍTICA):** Describe dónde se localizan los colores clave. Para evitar conflictos de forma, DEBES usar áreas genéricas y funcionales. NO uses nombres de prendas o accesorios específicos.
+    *   **Usa términos como:** 'hair area', 'skin tone', 'primary garment area', 'secondary garment area', 'background', 'foreground elements', 'main light source color'.
+    *   **EVITA términos como:** 'dress', 'hat', 'boots', 'sword'.
+    *   **Ejemplo Correcto:** '...with fiery red on the main garment area, and deep cobalt blue in the background.'
+    *   **Ejemplo Incorrecto:** '...with a red dress and a blue sky.'
+
+4.  **Contraste y Calidad General:** El nivel de contraste y cómo interactúa con la saturación y las luces (ej. 'high contrast in highlights against muted midtones', 'low contrast with soft, desaturated matte colors').
+
+Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+    object: `Tu única tarea es analizar la imagen para identificar el objeto más prominente y describirlo. El objeto suele ser un ítem que se puede sostener o que destaca visualmente del personaje o el fondo.
+
+Reglas Estrictas:
+1.  **Identifica el Objeto Principal:** Primero, localiza el objeto más importante. Si hay un personaje, el objeto es algo que sostiene, lleva, o que es un accesorio clave (ej. una espada, un libro, un sombrero, unas gafas). NO describas al personaje.
+2.  **Describe ÚNICAMENTE el Objeto:** Tu descripción debe centrarse exclusivamente en el objeto identificado.
+3.  **Formato de Salida:** Genera una descripción única, concisa y optimizada, siempre en inglés. La descripción debe ser un único bloque de texto que incluya:
+    *   **Identificación del Objeto:** El nombre claro del objeto (ej. 'an ornate silver sword', 'a vintage leather-bound book', 'a steaming ceramic coffee mug').
+    *   **Características Visuales Clave:** Sus atributos más importantes (ej. 'with intricate glowing runes', 'with a worn, cracked cover', 'with a chipped rim').
+    *   **Material y Textura:** De qué está hecho y cómo se ve su superficie (ej. 'polished metallic surface', 'rough, grainy wood texture').
+
+4.  **Exclusiones:** Ignora por completo al personaje, su pose, su ropa (a menos que sea el objeto), el fondo, la iluminación y el estilo artístico. Tu salida debe ser solo la descripción del objeto.
+
+Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+};
+
+// --- Refactored Metadata Instruction Generation ---
+const createMetadataSystemInstruction = (expertType: string, featureName: string, rules: { title: string; category: string; artType: string; notes: string; }) =>
+`Eres un ${expertType}. Tu tarea es analizar un prompt que describe un ${featureName} y las imágenes de referencia que lo inspiraron. Basado en este análisis, debes generar metadatos estructurados en formato JSON.
+
+Reglas:
+1.  **Título (title):** ${rules.title}
+2.  **Categoría/Estilo (category):** ${rules.category}
+3.  **Tipo de Arte (artType):** ${rules.artType}
+4.  **Notas (notes):** ${rules.notes}
+
+Analiza el siguiente prompt de ${featureName} y las imágenes asociadas y devuelve SOLO el objeto JSON con la estructura especificada.`;
+
+const metadataInstructionConfig = {
+    style: { expert: 'curador de arte y catalogador experto', feature: 'estilo artístico', rules: { title: 'Crea un título corto, evocador y descriptivo para el estilo. Debe ser atractivo y fácil de recordar. Máximo 5-7 palabras.', category: "Identifica la categoría principal del estilo. Sé específico. Ejemplos: 'Cyberpunk Noir', 'Impressionist Landscape', 'Vintage Cartoon', 'Gothic Fantasy'.", artType: "Clasifica el tipo de arte. Ejemplos: 'Digital Painting', 'Oil on Canvas', 'Watercolor', '3D Render', 'Charcoal Sketch'.", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia del estilo o para qué tipo de escenas sería más adecuado.'}},
+    subject: { expert: 'director de casting y catalogador experto en personajes', feature: 'sujeto', rules: { title: 'Crea un título corto y descriptivo para el sujeto (ej. "Guerrera Cibernética", "Explorador de Mundos", "Maga del Bosque").', category: "Identifica la categoría del arquetipo del personaje (ej. 'Personaje de Ciencia Ficción', 'Héroe de Fantasía', 'Retrato Realista').", artType: "Clasifica el uso principal (ej. 'Concepto de Personaje', 'Referencia para Retrato', 'Diseño de Protagonista').", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia del personaje o para qué tipo de historias sería adecuado.'}},
+    pose: { expert: 'catalogador experto en poses para artistas digitales', feature: 'pose', rules: { title: 'Crea un título corto y descriptivo para la pose. Ejemplos: "Pose de Acción Saltando", "Postura Relajada de Pie", "Mirada Confiada".', category: "Identifica la categoría de la pose. Ejemplos: 'Pose Dinámica', 'Pose Estática', 'Pose Contemplativa', 'Pose de Combate'.", artType: "Clasifica el uso principal. Ejemplos: 'Referencia de Personaje', 'Estudio de Anatomía', 'Boceto de Acción'.", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia de la pose o para qué tipo de personajes o escenas sería más adecuada.'}},
+    expression: { expert: 'catalogador experto en expresiones faciales para artistas digitales', feature: 'expresión', rules: { title: 'Crea un título corto y descriptivo para la expresión. Ejemplos: "Sonrisa Desafiante", "Mirada Melancólica", "Grito de Furia".', category: "Identifica la categoría de la emoción. Ejemplos: 'Expresión de Alegría', 'Expresión de Tristeza', 'Expresión de Ira', 'Expresión Sutil'.", artType: "Clasifica el uso principal. Ejemplos: 'Estudio de Personaje', 'Referencia Emocional', 'Retrato Expresivo'.", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia de la expresión o para qué tipo de personajes o escenas sería más adecuada.'}},
+    scene: { expert: 'catalogador experto en escenarios para artistas digitales', feature: 'escena', rules: { title: 'Crea un título corto y descriptivo para la escena (ej. "Fábrica Abandonada", "Lago al Atardecer").', category: "Identifica la categoría del escenario (ej. 'Paisaje Urbano', 'Entorno Natural', 'Interior Cinemático').", artType: "Clasifica el uso principal (ej. 'Arte Conceptual de Entorno', 'Fondo para Ilustración').", notes: 'Escribe una breve nota (1-2 frases) sobre la atmósfera de la escena.'}},
+    outfit: { expert: 'catalogador experto en diseño de vestuario para artistas digitales', feature: 'outfit', rules: { title: 'Crea un título corto y descriptivo para el outfit (ej. "Vestimenta Táctica Militar", "Vestido de Gala Barroco").', category: "Identifica la categoría del vestuario (ej. 'Moda Cyberpunk', 'Fantasía Medieval', 'Alta Costura Vintage').", artType: "Clasifica el uso principal (ej. 'Diseño de Personaje', 'Concept Art de Vestuario').", notes: 'Escribe una breve nota (1-2 frases) sobre el estilo del outfit.'}},
+    composition: { expert: 'catalogador experto en composición fotográfica para artistas', feature: 'composición visual', rules: { title: 'Crea un título corto y descriptivo para la composición (ej. "Retrato con Regla de Tercios", "Plano General Simétrico").', category: "Identifica la categoría de la composición (ej. 'Composición Dinámica', 'Encuadre Simétrico', 'Retrato Íntimo').", artType: "Clasifica el uso principal (ej. 'Referencia de Composición', 'Estudio de Encuadre', 'Boceto Narrativo').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la composición.'}},
+    color: { expert: 'catalogador experto en paletas de color para artistas', feature: 'paleta de color', rules: { title: 'Crea un título corto y descriptivo para la paleta (ej. "Paleta Neón Urbana", "Tonos Pastel Suaves").', category: "Identifica la categoría de la paleta (ej. 'Paleta Complementaria', 'Esquema Monocromático', 'Tonos Análogos').", artType: "Clasifica el uso principal (ej. 'Referencia de Color', 'Estudio de Tono', 'Moodboard Visual').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la paleta.'}},
+    object: { expert: 'catalogador de assets para artistas digitales', feature: 'objeto', rules: { title: 'Crea un título corto y descriptivo para el objeto (ej. "Espada Rúnica", "Cámara Antigua").', category: "Identifica la categoría del objeto (ej. 'Arma de Fantasía', 'Objeto Cotidiano', 'Dispositivo Tecnológico').", artType: "Clasifica el uso principal (ej. 'Asset para Escena', 'Concepto de Objeto', 'Prop').", notes: 'Escribe una breve nota (1-2 frases) sobre las características del objeto.'}},
+};
+
+const metadataSystemInstructions = Object.fromEntries(
+  Object.entries(metadataInstructionConfig).map(([mode, config]) => [
+    mode,
+    createMetadataSystemInstruction(config.expert, config.feature, config.rules)
+  ])
+) as Record<ExtractionMode, string>;
+
+
+const analysisFunctions = Object.fromEntries(
+  (Object.keys(analysisSystemInstructions) as ExtractionMode[]).map(mode => [
+    mode,
+    createImageAnalyzer(analysisSystemInstructions[mode], `${mode} analysis`),
+  ])
+) as Record<ExtractionMode, (images: ImagePayload[]) => Promise<string>>;
+
+const metadataFunctions = Object.fromEntries(
+  (Object.keys(metadataSystemInstructions) as ExtractionMode[]).map(mode => [
+    mode,
+    createMetadataGenerator(metadataSystemInstructions[mode], `el ${mode}`),
+  ])
+) as Record<ExtractionMode, (prompt: string, images: ImagePayload[]) => Promise<Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>>>;
+
+export const analyzeImageFeature = (mode: ExtractionMode, images: ImagePayload[]): Promise<string> => {
+  if (!analysisFunctions[mode]) {
+    throw new Error(`Modo de análisis no válido: ${mode}`);
+  }
+  return analysisFunctions[mode](images);
+};
+
+export const generateFeatureMetadata = (
+  mode: ExtractionMode,
+  prompt: string,
+  images: ImagePayload[]
+): Promise<Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>> => {
+  if (!metadataFunctions[mode]) {
+    throw new Error(`Modo de metadatos no válido: ${mode}`);
+  }
+  return metadataFunctions[mode](prompt, images);
+};
+
+
+// --- Funciones existentes que se mantienen ---
+
+export const generateStructuredPromptMetadata = async (
+  prompt: string, 
+  image?: ImagePayload
+): Promise<Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>> => {
+  const metadataSystemInstruction = `Eres un curador de prompts de IA. Tu tarea es analizar un prompt JSON estructurado y su imagen de referencia (si se proporciona). Genera metadatos concisos y evocadores en formato JSON.
+
+  Reglas:
+  1.  **Título (title):** Crea un título corto y descriptivo a partir de los campos 'subject' o 'prompt_description' del JSON.
+  2.  **Categoría/Estilo (category):** Infiere una categoría general como 'Retrato Sci-Fi', 'Paisaje Fantástico', 'Escena Urbana Cinematográfica'.
+  3.  **Tipo de Arte (artType):** Infiere el tipo de arte a partir de campos como 'technical_details' o el estilo general (ej. '3D Render', 'Fotografía Cinematográfica').
+  4.  **Notas (notes):** Escribe una breve nota (1-2 frases) que resuma la esencia del prompt.
+
+  Analiza el siguiente prompt JSON y la imagen asociada (si existe) y devuelve SOLO el objeto JSON con la estructura especificada.`;
+  
+  const parts = [
+      { text: `Este es el prompt JSON generado: \`\`\`json\n${prompt}\n\`\`\`.` },
+      ...(image ? [
+          { text: "Esta es la imagen de referencia:" },
+          {
+              inlineData: {
+                  data: image.imageBase64,
+                  mimeType: image.mimeType,
+              },
+          }
+      ] : []),
+      { text: "Genera los metadatos en JSON como se te indicó." }
+  ];
+
+  try {
+      const response = await ai.models.generateContent({
+          model: model,
+          config: {
+              systemInstruction: metadataSystemInstruction,
+              responseMimeType: "application/json",
+              responseSchema: metadataResponseSchema,
+          },
+          contents: { parts },
+      });
+
+      const jsonString = response.text.trim();
+      const metadata = JSON.parse(jsonString);
+      return metadata;
+  } catch (error) {
+      console.error("Error generating structured prompt metadata with Gemini API:", error);
+      throw new Error("No se pudo generar la categorización automática para el prompt estructurado.");
+  }
+};
+
+
+const structuredPromptSystemInstruction = `Eres un experto en la creación de prompts JSON para IA de generación de imágenes. Tu tarea es convertir la entrada del usuario en un prompt JSON estructurado y optimizado, adaptando tu enfoque según la complejidad de la entrada.
+
+**Análisis y Lógica de Decisión (Paso a Paso):**
+
+1.  **Evalúa la Entrada:** Primero, analiza el prompt proporcionado por el usuario. Determina si es:
+    a)  **Una Idea Simple:** Corta, conceptual, con pocos detalles técnicos (ej: "un gato con sombrero de mago", "una ciudad futurista bajo la lluvia").
+    b)  **Un Prompt Elaborado:** Detallado, más largo, y probablemente contiene palabras clave técnicas o estilísticas (ej: "close-up portrait of a rogue, dramatic cinematic lighting, shallow depth of field, 85mm lens, hyperdetailed, artstation").
+
+2.  **Ejecuta la Tarea Correspondiente:**
+
+    *   **Si es una Idea Simple:** Tu objetivo es la **expansión creativa**.
+        *   Toma la idea central.
+        *   Selecciona la plantilla JSON más adecuada de las que conoces ("Retrato en Auto Vintage" para retratos, "Guardián de Roca" para escenas épicas, etc.).
+        *   Rellena creativamente los campos del JSON para construir una escena completa y detallada, añadiendo detalles lógicos que enriquezcan la idea original.
+
+    *   **Si es un Prompt Elaborado:** Tu objetivo es la **reestructuración fiel**.
+        *   **NO inventes nuevos detalles.** Tu misión es traducir el prompt existente a una estructura JSON.
+        *   Analiza el prompt del usuario y extrae sus componentes.
+        *   Mapea cada componente al campo correspondiente en una plantilla JSON adecuada. (ej: "close-up portrait" va a \`composition.framing\`, "85mm lens" va a \`technical_details.lens\`, "cinematic lighting" va a \`lighting_and_colors.style\`).
+        *   El JSON final debe ser una representación estructurada y fiel del prompt original del usuario.
+
+**Regla de Fusión (Si se proporcionan 'idea' y 'estilo'):**
+
+*   Si el input contiene una 'idea' Y un 'estilo' separados, esta regla tiene prioridad. Fusiona los dos: usa la 'idea' para el contenido (sujeto, escena) y el 'estilo' para los detalles visuales (color, técnica, composición).
+
+**Output Final:**
+
+*   Devuelve únicamente el objeto JSON final, válido, optimizado y sin texto adicional.`;
+
+export const generateStructuredPrompt = async (promptData: { idea: string; style?: string }): Promise<string> => {
+    const { idea, style } = promptData;
+
+    let userPrompt = `Analiza la siguiente idea y genera el prompt JSON estructurado: "${idea}"`;
+    if (style && style.trim()) {
+        userPrompt += `\n\nFusiona la idea anterior con el siguiente prompt de estilo, aplicando las características del estilo al contenido de la idea: "${style}"`;
+    }
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: structuredPromptSystemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: {
+                parts: [{ text: userPrompt }]
+            }
+        });
+        
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+
+    } catch (error) {
+        console.error("Error calling Gemini API for structured prompt:", error);
+        if (error instanceof SyntaxError) {
+            throw new Error("El modelo de IA devolvió un JSON inválido. Inténtalo de nuevo con una idea más clara.");
+        }
+        throw new Error("No se pudo generar el prompt estructurado.");
+    }
+};
+
+const replicationPromptSystemInstruction = `Eres un analista de imágenes experto. Tu tarea es crear un prompt JSON estructurado y detallado para replicar la imagen proporcionada con la mayor fidelidad posible. Analiza exhaustivamente el sujeto, el entorno, la composición, la iluminación, la paleta de colores y el estilo artístico.
+
+Reglas:
+1.  **Analiza la Imagen:** Descompón todos los elementos visuales clave.
+2.  **Selecciona una Plantilla:** Utiliza la estructura de la plantilla "Retrato en Auto Vintage" para retratos y escenas centradas en personajes, o la plantilla "Guardián de Roca" para escenas de fantasía, paisajes o composiciones complejos.
+3.  **Completa el JSON:** Rellena cada campo del JSON de forma descriptiva y precisa basándote en tu análisis. Describe el contenido específico de la imagen (el sujeto, la acción, el lugar) y su estilo técnico.
+4.  **Output:** Devuelve únicamente el objeto JSON final, válido y conciso. No incluyas texto explicativo antes o después del JSON.
+
+Ejemplo de estructura a seguir (adaptar según la plantilla elegida):
+{
+  "prompt_description": "A detailed description of the entire scene.",
+  "face_reference": { "instruction": "If a person is present, describe instructions to keep them consistent. Otherwise, omit or state N/A." },
+  "scene_and_environment": { "location": "...", "interior": "...", "weather": "...", "details": "..." },
+  "lighting_and_colors": { "style": "...", "sources": "...", "effect": "...", "quality": "..." },
+  "composition": { "angle": "...", "framing": "...", "subject_pose": "...", "expression": "...", "background": "..." },
+  "technical_details": { "lens": "...", "effects": [], "textures": [] },
+  "quality": { "resolution": "Ultra high-resolution, 8K", "details": "Hyperdetailed textures", "finish": "A description of the overall finish, e.g., 'Realistic grain for a cinematic filmic look'" }
+}`;
+
+
+export const generateReplicationPrompt = async (image: ImagePayload): Promise<string> => {
+    try {
+        const imagePart = {
+            inlineData: {
+                data: image.imageBase64,
+                mimeType: image.mimeType,
+            },
+        };
+
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: replicationPromptSystemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: {
+                parts: [
+                    { text: "Analiza esta imagen y genera un prompt JSON detallado para replicarla." },
+                    imagePart
+                ]
+            }
+        });
+        
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+
+    } catch (error) {
+        console.error("Error calling Gemini API for replication prompt:", error);
+        if (error instanceof SyntaxError) {
+            throw new Error("El modelo de IA devolvió un JSON inválido. Inténtalo de nuevo.");
+        }
+        throw new Error("No se pudo generar el prompt de replicación.");
+    }
+};
+
+const structuredPromptFromImageSystemInstruction = `Eres un experto en la creación de prompts JSON para IA de generación de imágenes. Tu tarea es convertir la entrada del usuario en un prompt JSON estructurado. La entrada consistirá en una o varias imágenes de referencia (para el contenido) y un prompt de estilo de texto opcional (para la estética).
+
+**Lógica de Decisión (Paso a Paso):**
+
+1.  **Analiza la(s) Imagen(es) de Referencia:** Identifica el sujeto principal (si hay varias imágenes, crea una descripción cohesiva que represente sus características consistentes), los elementos de la escena, la acción y la composición básica. Esta será la base del **contenido** del prompt JSON.
+
+2.  **Analiza el Prompt de Estilo (si se proporciona):** Extrae todos los descriptores visuales, técnicos y atmosféricos del prompt de texto. Esto incluye la paleta de colores, el estilo de iluminación, la técnica artística, el tipo de lente, la composición, etc.
+
+3.  **Fusiona Contenido y Estilo:**
+    *   Usa el **contenido** de la(s) imagen(es) como base para los campos \`subject\`, \`scene_and_environment\`, \`subject_pose\`, etc.
+    *   Usa el **estilo** del texto para poblar o sobrescribir los campos \`lighting_and_colors\`, \`technical_details\`, \`composition\`, y la descripción general del estilo en \`prompt_description\`.
+    *   El objetivo es que el sujeto de la(s) imagen(es) sea renderizado con la estética descrita en el prompt de texto.
+
+4.  **Si NO se proporciona Prompt de Estilo:** Tu tarea es simplemente crear un prompt JSON de **replicación fiel y mejorada**. Analiza la(s) imagen(es) en su totalidad (contenido y estilo) y rellena todos los campos del JSON para describirla(s) con el mayor detalle posible, elaborando sobre la base para crear un prompt rico y completo.
+
+**Output Final:**
+
+*   Devuelve únicamente el objeto JSON final, válido, optimizado y sin texto adicional.`;
+
+export const generateStructuredPromptFromImage = async (images: ImagePayload[], style?: string): Promise<string> => {
+    const imageParts = images.map(image => ({
+        inlineData: {
+            data: image.imageBase64,
+            mimeType: image.mimeType,
+        },
+    }));
+
+    const textParts = [
+        { text: `Analiza ${images.length > 1 ? 'estas imágenes' : 'esta imagen'} y genera un prompt JSON estructurado.` }
+    ];
+
+    if (style && style.trim()) {
+        textParts.push({ text: `Aplica el siguiente prompt de estilo al contenido de la${images.length > 1 ? 's' : ''} imagen${images.length > 1 ? 'es' : ''}: "${style}"` });
+    } else {
+        textParts.push({ text: `El objetivo es una replicación fiel y mejorada de la${images.length > 1 ? 's' : ''} imagen${images.length > 1 ? 'es' : ''} en formato JSON.` });
+    }
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: structuredPromptFromImageSystemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: {
+                parts: [
+                    ...textParts,
+                    ...imageParts
+                ]
+            }
+        });
+
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+
+    } catch (error) {
+        console.error("Error calling Gemini API for structured prompt from image:", error);
+        if (error instanceof SyntaxError) {
+            throw new Error("El modelo de IA devolvió un JSON inválido.");
+        }
+        throw new Error("No se pudo generar el prompt estructurado desde la imagen.");
+    }
+};
+
+const fusionImageSystemInstruction = `Eres un director de arte de IA experto en fusión de conceptos visuales. Tu tarea es analizar dos imágenes proporcionadas y generar un único prompt JSON estructurado.
+
+**Objetivo Principal:** Extraer el **sujeto** de la "Imagen del Sujeto" y aplicarle el **estilo visual completo** (composición, iluminación, paleta de colores, atmósfera, técnica artística) de la "Imagen de Estilo".
+
+**Reglas Estrictas:**
+
+1.  **Identificación de Roles:**
+    *   **Imagen 1 (Sujeto Primario):** El contenido principal. Identifica el personaje, objeto o elemento central. Sus características intrínsecas (ropa, forma, identidad) deben preservarse.
+    *   **Imagen 2 (Referencia Estilística):** La guía visual. Analiza su composición, ángulo de cámara, esquema de iluminación, paleta de colores, texturas, nivel de detalle y *mood* general. Ignora su sujeto específico.
+
+2.  **Proceso de Fusión:**
+    *   **NO describas ambas imágenes por separado.** El objetivo es una síntesis creativa.
+    *   **Toma el sujeto de la Imagen 1.** Colócalo en una nueva escena que esté completamente definida por las características estilísticas de la Imagen 2.
+    *   **Describe la nueva escena combinada** en el prompt JSON, utilizando un formato modular y detallado. Por ejemplo, la \`composition\` del JSON debe reflejar la de la Imagen 2, pero aplicada al sujeto de la Imagen 1.
+
+3.  **Estructura del JSON:**
+    *   Utiliza una plantilla robusta como "Retrato en Auto Vintage" o "Guardián de Roca" como base.
+    *   Rellena cada campo (e.g., \`scene_and_environment\`, \`lighting_and_colors\`, \`composition\`, \`technical_details\`) basándote exclusivamente en la **Imagen de Estilo (Imagen 2)**.
+    *   El campo \`subject\` o \`prompt_description\` debe describir al **Sujeto (Imagen 1)** pero ya inmerso en el nuevo entorno estilizado.
+
+4.  **Output:** Devuelve únicamente el objeto JSON final, válido y conciso. No incluyas texto explicativo antes o después del JSON.`;
+
+
+export const generateFusedImagePrompt = async (subjectImage: ImagePayload, styleImage: ImagePayload): Promise<string> => {
+    try {
+        const subjectImagePart = {
+            inlineData: {
+                data: subjectImage.imageBase64,
+                mimeType: subjectImage.mimeType,
+            },
+        };
+        const styleImagePart = {
+            inlineData: {
+                data: styleImage.imageBase64,
+                mimeType: styleImage.mimeType,
+            },
+        };
+
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: fusionImageSystemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: {
+                parts: [
+                    { text: "Imagen 1 (Sujeto Primario):" },
+                    subjectImagePart,
+                    { text: "Imagen 2 (Referencia Estilística):" },
+                    styleImagePart,
+                    { text: "Fusiona el sujeto de la Imagen 1 con el estilo de la Imagen 2 y genera el prompt JSON estructurado." }
+                ]
+            }
+        });
+        
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+
+    } catch (error) {
+        console.error("Error calling Gemini API for fused image prompt:", error);
+        if (error instanceof SyntaxError) {
+            throw new Error("El modelo de IA devolvió un JSON inválido. Inténtalo de nuevo.");
+        }
+        throw new Error("No se pudo generar el prompt de fusión de imágenes.");
+    }
+};
+
+export const editImageWithPrompt = async (
+  imageBase64: string,
+  mimeType: string,
+  prompt: string
+): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: imageBase64,
+              mimeType: mimeType,
+            },
+          },
+          {
+            text: prompt,
+          },
+        ],
+      },
+      config: {
+        responseModalities: [Modality.IMAGE],
+      },
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return part.inlineData.data;
+      }
+    }
+    throw new Error("La API no devolvió ninguna imagen.");
+  } catch (error) {
+    console.error("Error editing image with Gemini API:", error);
+    throw new Error("No se pudo editar la imagen.");
+  }
+};
+
+
+export const generateImageFromImages = async (
+  subjectImage: ImagePayload,
+  styleImage: ImagePayload
+): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            text: 'Toma el sujeto de la primera imagen y aplícale el estilo visual completo (composición, iluminación, paleta de colores, atmósfera, técnica artística) de la segunda imagen para crear una nueva imagen.',
+          },
+          {
+            inlineData: {
+              data: subjectImage.imageBase64,
+              mimeType: subjectImage.mimeType,
+            },
+          },
+          {
+            inlineData: {
+              data: styleImage.imageBase64,
+              mimeType: styleImage.mimeType,
+            },
+          },
+        ],
+      },
+      config: {
+        responseModalities: [Modality.IMAGE],
+      },
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return part.inlineData.data;
+      }
+    }
+    throw new Error("La API no devolvió ninguna imagen.");
+  } catch (error) {
+    console.error("Error generating image from images with Gemini API:", error);
+    throw new Error("No se pudo generar la imagen fusionada.");
+  }
+};
+
+export const generateIdeasForStyle = async (stylePrompt: string): Promise<string[]> => {
+    const ideasSystemInstruction = `Eres un director creativo y conceptual. Tu tarea es analizar un prompt de estilo visual y, basándote en él, generar entre 3 y 5 ideas de escenas cortas, evocadoras y únicas. Las ideas deben ser concisas (máximo 10-15 palabras cada una).
+
+    Reglas:
+    1.  Analiza la esencia del estilo (atmósfera, colores, técnica).
+    2.  Genera ideas de escenas o sujetos que se verían espectaculares con esa estética.
+    3.  Sé creativo y evita clichés obvios.
+    4.  Devuelve el resultado como un array de strings en formato JSON. Solo el array, sin texto adicional.`;
+
+    const ideasResponseSchema = {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: ideasSystemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: ideasResponseSchema,
+            },
+            contents: {
+                parts: [
+                    { text: `Este es el prompt de estilo: "${stylePrompt}". Genera las ideas como se te indicó.` },
+                ]
+            }
+        });
+
+        const jsonString = response.text.trim();
+        const ideas = JSON.parse(jsonString);
+        return ideas;
+    } catch (error) {
+        console.error("Error generating ideas with Gemini API:", error);
+        throw new Error("No se pudo generar ideas para el estilo.");
+    }
+};
+
+const masterAssemblerSystemInstruction = `Tu objetivo es combinar los fragmentos de prompt generados por los modos de extracción seleccionados por el usuario para construir un prompt maestro en inglés, coherente, optimizado y sin conflictos.
+
+Instrucción:
+Construye un prompt final, único y optimizado, siempre en inglés, ensamblando solo los fragmentos de prompt proporcionados. El resultado debe ser un único bloque de texto sin prefijos, listas o etiquetas, con los conceptos unidos por comas.
+
+Orden de Ensamblaje:
+El orden en el prompt final debe seguir esta secuencia para priorizar la identidad, luego la acción, el entorno y finalmente la estética:
+Sujeto, Pose, Expresión, Outfit, Objeto, Escena, Paleta de Colores, Composición, Estilo.
+
+Reglas de Fusión y Filtrado de Contenido Duplicado:
+Aplica estas reglas de forma estricta para eliminar redundancias y crear un prompt conciso. El fragmento con mayor prioridad DICTA y el resto de fragmentos se FILTRAN.
+
+1.  **Sujeto vs. Expresión:**
+    *   **Prioridad:** SUJETO.
+    *   **Acción:** El fragmento SUJETO elimina la descripción de rasgos faciales (ej. cabello oscuro, ojos azules, edad) del fragmento EXPRESION.
+    *   **Si Ausente:** Si SUJETO está ausente, EXPRESION y OUTFIT pueden incluir descripciones básicas de rasgos físicos.
+
+2.  **Pose vs. Expresión:**
+    *   **Prioridad:** POSE.
+    *   **Acción:** El fragmento POSE elimina la descripción de lenguaje corporal (hombros, brazos) del fragmento EXPRESION.
+    *   **Si Ausente:** Si POSE está ausente, EXPRESION puede incluir el lenguaje corporal básico para contextualizar la emoción.
+
+3.  **Outfit vs. Pose/Expresión:**
+    *   **Prioridad:** OUTFIT.
+    *   **Acción:** El fragmento OUTFIT elimina toda descripción de vestimenta o accesorios de los fragmentos POSE y EXPRESION.
+    *   **Si Ausente:** Si OUTFIT está ausente, SUJETO o POSE pueden incluir descripciones básicas de indumentaria.
+
+4.  **Objeto, Sujeto y Pose (Regla de Integración Inteligente):**
+    *   **Prioridad:** La existencia de un SUJETO y POSE dicta CÓMO se integra el OBJETO.
+    *   **Acción:** El fragmento OBJETO describe el ítem de forma aislada. Al ensamblar, tu tarea es integrar este objeto en la escena de forma coherente. NO te limites a añadir la descripción del objeto al final. En su lugar, modifica la descripción del SUJETO o POSE para incluir la interacción con el objeto.
+    *   **Ejemplos:**
+        *   Si SUJETO es "un guerrero" y OBJETO es "una espada brillante", el resultado debería ser "un guerrero sosteniendo una espada brillante" (a warrior holding a glowing sword).
+        *   Si POSE es "mano extendida" y OBJETO es "una paloma blanca", el resultado debería ser "con una paloma blanca posada en su mano extendida" (with a white dove perched on their outstretched hand).
+        *   Si el OBJETO es "un anillo de oro", se debe describir "llevando un anillo de oro en su dedo" (wearing a gold ring on their finger).
+    *   Tu inteligencia es clave para que la integración sea natural y lógica.
+
+5.  **Composición vs. Escena:**
+    *   **Prioridad:** COMPOSICION.
+    *   **Acción:** El fragmento COMPOSICION elimina la descripción de perspectiva, ángulo y tipo de plano (ej. 'low angle shot', 'wide shot') del fragmento ESCENA.
+    *   **Si Ausente:** Si COMPOSICION está ausente, ESCENA debe incluir los términos de perspectiva y encuadre que detecte.
+
+6.  **Paleta de Colores vs. Otros (Outfit, Escena, Estilo):**
+    *   **Prioridad:** PALETA DE COLORES (Prioridad Absoluta sobre color).
+    *   **Acción:** El fragmento PALETA DE COLORES elimina TODA descripción de color, esquema cromático, tono y contraste de los fragmentos OUTFIT, ESCENA y ESTILO. Los colores de la paleta deben aplicarse de forma coherente a toda la escena.
+    *   **Si Ausente:** Si PALETA DE COLORES está ausente, el color se infiere de los otros fragmentos.
+
+7.  **Regla de Estilo Global vs. Estilos Individuales:**
+    *   **Contexto:** Esta es la regla principal para determinar la estética final de la imagen.
+    *   **Caso A: Se proporciona un fragmento de ESTILO:**
+        *   **Prioridad:** El fragmento ESTILO tiene prioridad absoluta sobre cualquier otro descriptor de estilo.
+        *   **Acción:** Su contenido se aplica globalmente a toda la imagen. DEBES eliminar CUALQUIER descriptor de estilo visual específico (ej. 'photorealistic', 'anime style', 'oil painting') que pueda provenir del fragmento SUJETO. El fragmento ESTILO también elimina términos de calidad técnica (ej. '8K', 'hyper-detailed') de todos los demás fragmentos. La estética final debe ser 100% dictada por el fragmento ESTILO.
+    *   **Caso B: NO se proporciona un fragmento de ESTILO:**
+        *   **Prioridad:** Los estilos individuales descritos en el fragmento SUJETO se conservan. Su integridad es la máxima prioridad.
+        *   **Acción:** Tu directiva principal es preservar el estilo visual único de cada sujeto tal como se define en su descripción individual del fragmento SUJETO. Si un sujeto es 'photorealistic' y otro es 'anime style', el prompt final DEBE contener ambas descripciones intactas, asegurando que coexistan manteniendo sus estilos distintos. NO intentes armonizar, promediar o fusionar sus estilos. La integridad de cada estilo individual es la máxima prioridad. Si hay términos de calidad en otros fragmentos (como COMPOSICION o ESCENA), deben ser incluidos al final del prompt.
+        *   **Ejemplo de Resultado (Caso B):** "photorealistic young woman with blonde hair leaning against a wall, an old warrior with a beard rendered as a comic book character walking forwards, ..."
+    
+8.  **Asignación Inteligente de Sujeto y Pose:**
+    *   **Prioridad:** REGLA ESPECIAL DE ENSAMBLAJE.
+    *   **Contexto:** Esta regla se activa cuando el fragmento SUJETO contiene múltiples descripciones etiquetadas (ej. "Subject 1:", "Subject 2:") Y el fragmento POSE contiene múltiples descripciones de poses (ej. "The figure on the left...", "the person on the right...").
+    *   **Acción:** Tu tarea es asignar inteligentemente cada pose a un sujeto. Combina la descripción de "Subject 1" con la primera descripción de pose, y "Subject 2" con la segunda, y así sucesivamente, creando una descripción de escena coherente. Al combinar, retira las etiquetas numéricas ("Subject 1:") y los identificadores de posición de la pose ("The figure on the left") para que la fusión sea natural.
+    *   **Ejemplo de Fusión:**
+        *   SUJETO: "Subject 1: a young woman with blonde hair. Subject 2: an old warrior with a beard."
+        *   POSE: "The figure on the left is leaning against a wall. The figure on the right is walking forwards."
+        *   **Resultado Ensamblado (parcial):** "a young woman with blonde hair leaning against a wall, an old warrior with a beard walking forwards, ..."
+    *   Si el número de sujetos y poses no coincide, asigna las poses en orden hasta que se agoten y luego incluye los sujetos restantes sin una pose específica. Si hay más poses que sujetos, ignora las poses sobrantes.`;
+
+export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    const priorityOrder: ExtractionMode[] = ['subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'style'];
+    
+    const promptPieces = priorityOrder
+        .filter(key => fragments[key as ExtractionMode])
+        .map(key => `${key.toUpperCase()}: "${fragments[key as ExtractionMode]}"`);
+
+    if (promptPieces.length === 0) {
+        throw new Error("No hay fragmentos para ensamblar.");
+    }
+    
+    const assemblyRequest = `Ensambla los siguientes fragmentos en un prompt maestro coherente, siguiendo las reglas: \n${promptPieces.join('\n')}`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: masterAssemblerSystemInstruction,
+            },
+            contents: { parts: [{ text: assemblyRequest }] },
+        });
+
+        const text = response.text;
+        if (!text) {
+            throw new Error("La API no devolvió ningún texto para el ensamblaje.");
+        }
+        return text.trim();
+    } catch (error) {
+        console.error("Error calling Gemini API for master prompt assembly:", error);
+        throw new Error("No se pudo ensamblar el prompt maestro.");
+    }
+};
+
+export const generateMasterPromptMetadata = async (prompt: string, images: ImagePayload[]): Promise<Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>> => {
+    const metadataSystemInstruction = `Eres un curador de arte y catalogador experto. Tu tarea es analizar un prompt maestro que ha sido ensamblado a partir de varios componentes (pose, estilo, escena, etc.) y las imágenes de referencia que lo inspiraron. Basado en este análisis, debes generar metadatos estructurados en formato JSON.
+
+    Reglas:
+    1.  **Título (title):** Crea un título corto y evocador para la escena completa descrita en el prompt. Máximo 5-7 palabras.
+    2.  **Categoría/Estilo (category):** Identifica la categoría principal de la composición final. Ejemplos: 'Retrato de Personaje Fantástico', 'Escena Urbana Neo-Noir', 'Composición Surrealista'.
+    3.  **Tipo de Arte (artType):** Clasifica el tipo de arte basándote en la estética general. Ejemplos: 'Ilustración Digital Cinematográfica', 'Concept Art Detallado', 'Composición Fotográfica'.
+    4.  **Notas (notes):** Escribe una breve nota (1-2 frases) que describa la esencia de la imagen final que se podría generar con este prompt.
+
+    Analiza el siguiente prompt y las imágenes asociadas y devuelve SOLO el objeto JSON con la estructura especificada.`;
+
+    const imageParts = images.filter(Boolean).map(image => ({
+      inlineData: {
+        data: image.imageBase64,
+        mimeType: image.mimeType,
+      },
+    }));
+
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        config: {
+          systemInstruction: metadataSystemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: metadataResponseSchema,
+        },
+        contents: {
+          parts: [
+            { text: `Este es el prompt maestro generado: "${prompt}".` },
+            ...(imageParts.length > 0 ? [{ text: `Estas son las imágenes de referencia:` }, ...imageParts] : []),
+            { text: "Genera los metadatos en JSON como se te indicó." },
+          ],
+        },
+      });
+
+      const jsonString = response.text.trim();
+      const metadata = JSON.parse(jsonString);
+      return metadata;
+    } catch (error) {
+      console.error("Error generating master prompt metadata with Gemini API:", error);
+      throw new Error("No se pudo generar la categorización automática para el prompt maestro.");
+    }
+};
+
+export const suggestTextPromptEdits = async (prompt: string): Promise<PromptSuggestion[]> => {
+    const systemInstruction = `You are an expert prompt engineer. Analyze the user's text prompt for an image generation AI. Your goal is to refine it for better results. Provide 3-4 concise, actionable suggestions in English.
+    
+The suggestions can be one of three types:
+- ADDITION: To add detail, atmosphere, or technical specificity.
+- REPLACEMENT: To replace weak or vague terms with more powerful, specific ones.
+- REMOVAL: To remove redundant, contradictory, or low-value parts.
+
+Return a JSON array of objects, each representing a suggestion. Each object must have:
+- 'type': a string that is 'ADDITION', 'REPLACEMENT', or 'REMOVAL'.
+- 'description': a string in English that clearly and concisely describes the suggestion to the user.
+- 'data': an object containing the data to apply the suggestion. All text values within 'data' must also be in English.
+  - For 'ADDITION': { "text_to_add": "text to add" }
+  - For 'REPLACEMENT': { "text_to_remove": "text to replace", "text_to_replace_with": "new text" }
+  - For 'REMOVAL': { "text_to_remove": "text to remove" }
+
+IMPORTANT: The value of 'text_to_remove' must be an EXACT substring that exists in the original prompt. The 'text_to_add' and 'text_to_replace_with' should be high-quality prompt keywords. Return ONLY the JSON array.`;
+
+    const responseSchema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                type: { type: Type.STRING, description: "Type of suggestion: 'ADDITION', 'REPLACEMENT', or 'REMOVAL'." },
+                description: { type: Type.STRING, description: "Description of the suggestion in English for the user." },
+                data: {
+                    type: Type.OBJECT,
+                    properties: {
+                        text_to_add: { type: Type.STRING },
+                        text_to_remove: { type: Type.STRING },
+                        text_to_replace_with: { type: Type.STRING },
+                    },
+                    propertyOrdering: ["text_to_add", "text_to_remove", "text_to_replace_with"],
+                }
+            },
+            required: ['type', 'description', 'data'],
+            propertyOrdering: ["type", "description", "data"],
+        },
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema,
+            },
+            contents: { parts: [{ text: `Analyze this prompt: "${prompt}"` }] }
+        });
+        const jsonString = response.text.trim();
+        return JSON.parse(jsonString);
+    } catch (error) {
+        console.error("Error generating prompt suggestions with Gemini API:", error);
+        throw new Error("No se pudieron generar sugerencias.");
+    }
+};
+
+export const convertTextPromptToJson = async (prompt: string): Promise<string> => {
+    const systemInstruction = `Eres un experto en la creación de prompts JSON para IA de generación de imágenes. Tu tarea es analizar un prompt de texto detallado y convertirlo a un formato JSON estructurado. El objetivo es una reestructuración fiel sin perder información ni añadir nuevos detalles. Analiza el prompt del usuario, extrae sus componentes (sujeto, estilo, composición, etc.) y mapea cada uno al campo correspondiente en una plantilla JSON adecuada. El JSON final debe ser una representación estructurada y fiel del prompt original. Devuelve únicamente el objeto JSON final, válido y optimizado.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: { parts: [{ text: `Convierte el siguiente prompt a JSON: "${prompt}"` }] }
+        });
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+    } catch (error) {
+        console.error("Error converting prompt to JSON with Gemini API:", error);
+        throw new Error("No se pudo convertir el prompt a JSON.");
+    }
+};
+
+export const refactorJsonPrompt = async (prompt: string): Promise<{ refactored_prompt: string; explanation: string; }> => {
+    const systemInstruction = `You are an expert AI prompt engineer specializing in optimizing JSON structures for image generation. Your task is to analyze the user-provided JSON prompt and refactor it to improve its modularity, clarity, and ease of use.
+
+Reglas:
+1.  **Analyze Structure:** Examine the organization of fields, nesting, and the granularity of information.
+2.  **Identify Improvements:** Look for opportunities to:
+    *   **Reorganize fields:** Group related keys under a more logical parent (e.g., move 'lens' and 'aperture' to a 'camera_settings' object).
+    *   **Add specific keys:** If a field is too generic (e.g., "details": "red dress, sunny day"), break it down into more specific keys (e.g., "subject_outfit": "red dress", "weather": "sunny day").
+    *   **Simplify nesting:** If the structure is unnecessarily complex, flatten it where it makes sense.
+3.  **Content Fidelity:** The original content and intent of the prompt must be fully preserved. DO NOT invent new creative details; only restructure the existing information.
+4.  **Generate Output:** Return a single JSON object containing two keys:
+    *   'refactored_prompt': The new JSON prompt, as a well-formatted JSON string.
+    *   'explanation': A concise and clear explanation in English of the changes you made and why they improve the prompt.
+
+Analyze the following JSON prompt and return the result with the specified structure.`;
+
+    const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+            refactored_prompt: { 
+                type: Type.STRING, 
+                description: 'The refactored JSON prompt, as a JSON string.' 
+            },
+            explanation: { 
+                type: Type.STRING, 
+                description: 'Explanation in English of the changes made.' 
+            },
+        },
+        required: ['refactored_prompt', 'explanation'],
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema,
+            },
+            contents: { parts: [{ text: `Refactor this JSON prompt: \`\`\`json\n${prompt}\n\`\`\`` }] }
+        });
+        const jsonString = response.text.trim();
+        const result = JSON.parse(jsonString);
+        
+        try {
+            const parsedRefactored = JSON.parse(result.refactored_prompt);
+            result.refactored_prompt = JSON.stringify(parsedRefactored, null, 2);
+        } catch (e) {
+            // Si ya es un string JSON bien formateado, se usa directamente.
+            // Esto maneja el caso en que el modelo ya devuelva un JSON "pretty-printed".
+        }
+
+        return result;
+    } catch (error) {
+        console.error("Error refactoring JSON prompt with Gemini API:", error);
+        throw new Error("No se pudo refactorizar el prompt JSON.");
+    }
+};

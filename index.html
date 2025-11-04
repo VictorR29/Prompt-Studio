@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Generador de Prompts de Estilo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --font-sans: 'Inter', sans-serif;
+        --glass-bg: rgba(13, 29, 31, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.1);
+      }
+      body {
+        font-family: var(--font-sans);
+        background-color: #0A0814;
+        background-image: radial-gradient(at 27% 37%, hsla(190, 98%, 61%, 0.08) 0px, transparent 50%),
+                          radial-gradient(at 97% 21%, hsla(175, 98%, 72%, 0.1) 0px, transparent 50%),
+                          radial-gradient(at 52% 99%, hsla(45, 98%, 76%, 0.1) 0px, transparent 50%),
+                          radial-gradient(at 10% 29%, hsla(186, 96%, 68%, 0.08) 0px, transparent 50%),
+                          radial-gradient(at 97% 96%, hsla(38, 60%, 74%, 0.1) 0px, transparent 50%),
+                          radial-gradient(at 33% 50%, hsla(200, 67%, 73%, 0.1) 0px, transparent 50%),
+                          radial-gradient(at 79% 53%, hsla(25, 68%, 79%, 0.1) 0px, transparent 50%);
+        background-attachment: fixed;
+      }
+      .glass-pane {
+        background-color: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+      }
+       /* Scrollbar styles for webkit browsers */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background-color: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(45, 212, 191, 0.15);
+        border-radius: 4px;
+        border: 1px solid rgba(45, 212, 191, 0.1);
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(45, 212, 191, 0.25);
+      }
+      @keyframes scale-in-center {
+        0% {
+          transform: scale(0.9);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .animate-scale-in-center {
+        animation: scale-in-center 0.3s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+      }
+      @keyframes fade-slide-in-up {
+        0% {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fade-slide-in-up {
+        animation: fade-slide-in-up 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+      }
+      @keyframes suggestion-flash {
+        0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+        50% { box-shadow: 0 0 8px 4px rgba(20, 184, 166, 0.4); }
+        100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+      }
+      .animate-suggestion-flash {
+        animation: suggestion-flash 0.7s ease-in-out;
+      }
+      @keyframes fade-in-subtle {
+        from { opacity: 0.8; transform: scale(0.99); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fade-in-subtle {
+        animation: fade-in-subtle 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

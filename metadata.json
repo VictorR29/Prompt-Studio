@@ -1,0 +1,5 @@
+{
+  "name": "Generador de Prompts de Estilo",
+  "description": "Una aplicación que analiza el estilo artístico de una imagen subida y genera un prompt de texto optimizado para replicar ese estilo en IAs de generación de imágenes.",
+  "requestFramePermissions": []
+}
