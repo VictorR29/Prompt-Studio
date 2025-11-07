@@ -1,21 +1,23 @@
 import React from 'react';
 import { SavedPrompt } from '../types';
 import { PROMPT_TYPE_CONFIG } from '../config';
+import { CheckIcon } from './icons/CheckIcon';
 
 interface PromptCardProps {
   promptData: SavedPrompt;
   onClick: () => void;
+  isSelected?: boolean;
 }
 
-export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick }) => {
+export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isSelected = false }) => {
   const { className: typeBadgeClass, text: typeText } = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
 
   return (
     <div
-      className="group cursor-pointer mb-6 break-inside-avoid"
+      className="group cursor-pointer mb-6 break-inside-avoid relative"
       onClick={onClick}
     >
-      <div className="relative w-full rounded-xl shadow-lg overflow-hidden bg-gray-800 transition-all duration-300 group-hover:shadow-2xl group-hover:shadow-teal-500/10 group-hover:-translate-y-1">
+      <div className={`relative w-full rounded-xl shadow-lg overflow-hidden bg-gray-800 transition-all duration-300 group-hover:shadow-2xl group-hover:shadow-teal-500/10 group-hover:-translate-y-1 ${isSelected ? 'ring-2 ring-offset-2 ring-offset-gray-900 ring-teal-400' : ''}`}>
         {promptData.coverImage ? (
           <img 
             src={promptData.coverImage} 
@@ -39,6 +41,13 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick }) =
               </p>
             </div>
         </div>
+        {isSelected && (
+          <div className="absolute inset-0 bg-teal-500/30 rounded-xl flex items-center justify-center pointer-events-none">
+            <div className="bg-teal-500 rounded-full p-2">
+              <CheckIcon className="w-8 h-8 text-white" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

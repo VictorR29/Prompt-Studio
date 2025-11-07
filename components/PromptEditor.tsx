@@ -1,11 +1,12 @@
 
 
 
+
 // FIX: Import 'useState' and 'useEffect' from React to resolve hook usage and type inference errors.
 import React, { useState, useEffect } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
-import { modularizePrompt, assembleMasterPrompt, optimizePromptFragment, mergeModulesIntoJsonTemplate, createJsonTemplate, generateStructuredPromptMetadata } from '../services/geminiService';
+import { modularizePrompt, assembleMasterPrompt, optimizePromptFragment, mergeModulesIntoJsonTemplate, createJsonTemplate, generateStructuredPromptMetadata, adaptFragmentToContext } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -130,11 +131,50 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setGalleryModalFor(mode);
     };
 
-    const handleSelectFromGalleryForModule = (selectedPrompt: SavedPrompt) => {
-        if (galleryModalFor) {
-            handleFragmentChange(galleryModalFor, selectedPrompt.prompt);
+    const handleSelectFromGalleryForModule = async (selectedPrompts: SavedPrompt | SavedPrompt[]) => {
+        const targetModule = galleryModalFor;
+        if (targetModule) {
+            setGalleryModalFor(null);
+
+            if (targetModule === 'subject') {
+                const promptsToProcess = Array.isArray(selectedPrompts) ? selectedPrompts : [selectedPrompts];
+                if (promptsToProcess.length === 0) return;
+
+                const existingSubjects = fragments.subject
+                    ? fragments.subject.split('\n').filter(s => s.trim().startsWith('Subject ')).map(s => s.replace(/Subject \d+:\s*/, '').trim())
+                    : (fragments.subject ? [fragments.subject.trim()] : []);
+                
+                const newSubjects = promptsToProcess.map(p => p.prompt);
+                const combinedSubjects = [...existingSubjects, ...newSubjects].slice(0, 3);
+    
+                let finalSubjectString: string;
+                if (combinedSubjects.length > 1) {
+                    finalSubjectString = combinedSubjects.map((s, i) => `Subject ${i + 1}: ${s}`).join('\n');
+                } else {
+                    finalSubjectString = combinedSubjects[0] || '';
+                }
+                handleFragmentChange('subject', finalSubjectString);
+                addToast(`${promptsToProcess.length} sujeto(s) añadido(s).`, 'success');
+            } else {
+                // Handle single select for other modules
+                const selectedPrompt = Array.isArray(selectedPrompts) ? selectedPrompts[0] : selectedPrompts as SavedPrompt;
+                 if (!selectedPrompt) return;
+
+                setOptimizingModule(targetModule);
+                try {
+                    const adaptedFragment = await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments);
+                    handleFragmentChange(targetModule, adaptedFragment);
+                    addToast(`Fragmento adaptado e insertado en '${EXTRACTION_MODE_MAP[targetModule].label}'`, 'success');
+                } catch (err) {
+                    const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+                    addToast(`Error al adaptar: ${errorMessage}`, 'error');
+                    // Fallback to direct insertion on error
+                    handleFragmentChange(targetModule, selectedPrompt.prompt);
+                } finally {
+                    setOptimizingModule(null);
+                }
+            }
         }
-        setGalleryModalFor(null);
     };
 
     const handleOptimizeModule = async (mode: ExtractionMode) => {
@@ -411,7 +451,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     prompts={savedPrompts}
                     onSelect={handleSelectFromGalleryForModule}
                     onClose={() => setGalleryModalFor(null)}
-                    filter={[galleryModalFor]}
+                    filter={galleryModalFor === 'subject' ? ['subject'] : [galleryModalFor]}
+                    multiSelect={galleryModalFor === 'subject'}
+                    maxSelection={3}
                 />
             )}
             {isTemplateSelectorOpen && (

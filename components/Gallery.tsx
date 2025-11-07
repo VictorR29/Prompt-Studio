@@ -7,6 +7,8 @@ import { PROMPT_TYPE_CONFIG } from '../config';
 interface GalleryProps {
   prompts: SavedPrompt[];
   onSelect: (prompt: SavedPrompt) => void;
+  selection?: SavedPrompt[];
+  multiSelect?: boolean;
 }
 
 const filterOptions: { id: SavedPrompt['type']; label: string; className: string }[] = Object.entries(PROMPT_TYPE_CONFIG)
@@ -17,7 +19,7 @@ const filterOptions: { id: SavedPrompt['type']; label: string; className: string
     }));
 
 
-export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect }) => {
+export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, multiSelect = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Set<SavedPrompt['type']>>(new Set());
 
@@ -110,13 +112,17 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect }) => {
 
       {filteredPrompts.length > 0 && (
         <div className="columns-2 md:columns-3 lg:columns-4 gap-6">
-            {filteredPrompts.map((prompt) => (
-            <PromptCard 
-                key={prompt.id} 
-                promptData={prompt} 
-                onClick={() => onSelect(prompt)} 
-            />
-            ))}
+            {filteredPrompts.map((prompt) => {
+              const isSelected = multiSelect && selection ? selection.some(p => p.id === prompt.id) : false;
+              return (
+                <PromptCard 
+                    key={prompt.id} 
+                    promptData={prompt} 
+                    onClick={() => onSelect(prompt)}
+                    isSelected={isSelected} 
+                />
+              );
+            })}
         </div>
       )}
     </>

@@ -477,7 +477,7 @@ Reglas:
 3.  **Completa el JSON:** Rellena cada campo del JSON de forma descriptiva y precisa basándote en tu análisis. Describe el contenido específico de la imagen (el sujeto, la acción, el lugar) y su estilo técnico.
 4.  **Output:** Devuelve únicamente el objeto JSON final, válido y conciso. No incluyas texto explicativo antes o después del JSON.
 
-Ejemplo de estructura a seguir (adaptar según la plantilla elegida):
+Ejemplo de estructura a seguir (adaptar según la plantilla elelección):
 {
   "prompt_description": "A detailed description of the entire scene.",
   "face_reference": { "instruction": "If a person is present, describe instructions to keep them consistent. Otherwise, omit or state N/A." },
@@ -1131,16 +1131,16 @@ export const modularizePrompt = async (prompt: string): Promise<Record<Extractio
     }
 };
 
-const optimizeFragmentSystemInstruction = `You are a contextual prompt engineering expert. Your task is to analyze a specific prompt module within the context of a full prompt being built and provide 3 suggestions to optimize it.
+const optimizeFragmentSystemInstruction = `You are a contextual prompt engineering expert. Your task is to analyze a specific prompt module within the context of a full prompt being built and provide 3 suggestions to enhance or expand upon it.
 
 Rules:
 1.  **Global Coherence:** The suggestions for the module being optimized must be coherent and synergistic with the context provided by the other modules.
 2.  **Conflict Avoidance:** Do not suggest anything that contradicts existing information (e.g., do not suggest "close-up" if the "outfit" module describes boots).
-3.  **Output Format (CRITICAL):**
-    *   Each suggestion MUST be a direct, applicable text fragment (a string of keywords or a descriptive phrase) that can be used to REPLACE the current content of the module.
+3.  **Build Upon Existing Text:** Suggestions should improve the fragment by ADDING more detail, specificity, or creative direction to the existing text. They should not be simple replacements, but rather richer, more complete versions of the original text. For example, if the current text is 'photorealistic', a good suggestion would be 'photorealistic, cinematic lighting, sharp focus, 85mm lens'.
+4.  **Output Format (CRITICAL):**
+    *   Each suggestion MUST be a direct, applicable text fragment (the full, enhanced string of keywords or descriptive phrase) that can be used to REPLACE the current content of the module.
     *   Suggestions must be in ENGLISH.
-    *   DO NOT provide instructions, explanations, or conversational text. For example, instead of suggesting "Add 'anime style' for more coherence," the suggestion should be just "anime style". Instead of "A close-up shot of the character's face," suggest "close-up portrait".
-4.  **Improvement and Specificity:** Suggestions should improve the fragment, making it more descriptive, technical, or creatively aligned with the rest of the prompt.
+    *   DO NOT provide instructions, explanations, or conversational text.
 5.  **Final Output:** Return a JSON array of 3 strings. Only the array, with no additional text.`;
 
 const optimizeFragmentResponseSchema = {
@@ -1164,7 +1164,7 @@ export const optimizePromptFragment = async (targetMode: ExtractionMode, allFrag
 The full context of the other modules is:
 ${otherFragmentsContext || "No additional context."}
 
-Generate 3 concise suggestions to improve the '${targetMode.toUpperCase()}' module based on this global context.`;
+Generate 3 concise suggestions to enhance and expand the '${targetMode.toUpperCase()}' module based on this global context.`;
     
     try {
         // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
@@ -1183,6 +1183,61 @@ Generate 3 concise suggestions to improve the '${targetMode.toUpperCase()}' modu
     } catch (error) {
         console.error("Error optimizing fragment contextually with Gemini API:", error);
         throw new Error("No se pudieron generar sugerencias contextuales para el fragmento.");
+    }
+};
+
+const adaptFragmentSystemInstruction = `You are a prompt engineering expert. A user is importing a pre-written prompt fragment into a module. Your task is to intelligently adapt this fragment to fit the existing context of the other modules.
+
+Rules:
+1.  **Analyze Context:** Carefully review the other modules to understand the overall scene, subject, and style.
+2.  **Identify Conflicts:** Compare the fragment to be adapted with the existing context. Identify any direct contradictions or stylistic clashes.
+3.  **Rewrite, Don't Just Combine:** Your goal is to REWRITE the fragment to be coherent with the context. Preserve the original INTENT of the fragment as much as possible. The final rewritten fragment should read as if it were written specifically for the current prompt.
+4.  **Output:** Return ONLY the rewritten, adapted text fragment as a single string. Do not include explanations or conversational text.
+
+**SPECIAL RULE for 'pose' Module Adaptation (CRITICAL):**
+*   First, determine the number of distinct subjects described in the 'subject' module context. Count subjects by looking for prefixes like "Subject 1:", "Subject 2:", or by identifying distinct character descriptions on new lines.
+*   Then, analyze the number of figures whose poses are described in the imported 'pose' fragment.
+*   **If Subject Count > Pose Figure Count:** You MUST creatively and logically extrapolate poses for the subjects that are missing a pose. The new poses must be thematically consistent with the existing ones and the overall context. For example, if two subjects are in a 'confrontational stance', the third might be a 'tense observer in the background'. The final description must account for all subjects.
+*   **If Pose Figure Count > Subject Count:** Condense the poses. Select the most relevant or primary pose descriptions from the fragment that match the number of subjects and discard the rest, or intelligently merge their actions into a cohesive description for the available subjects.
+*   **The goal is to always produce a 'pose' description that perfectly matches the number of subjects in the 'subject' module.**
+*   **Example:** If the 'subject' module has "Subject 1: a king. Subject 2: a jester. Subject 3: a guard." and the imported 'pose' fragment is "The first figure sits on a throne, the second figure juggles balls.", you must invent a pose for the guard, like: "The king sits on a throne, the jester juggles balls nearby, and the guard stands at attention by the door."`;
+
+export const adaptFragmentToContext = async (targetMode: ExtractionMode, fragmentToAdapt: string, allFragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    
+    const otherFragmentsContext = Object.entries(allFragments)
+        .filter(([key, value]) => key !== targetMode && value && value.trim())
+        .map(([key, value]) => `- ${key.toUpperCase()}: "${value}"`)
+        .join('\n');
+
+    if (!otherFragmentsContext) {
+        return fragmentToAdapt; // No context to adapt to, return original
+    }
+
+    const userPrompt = `The user is importing the following fragment into the '${targetMode.toUpperCase()}' module: "${fragmentToAdapt}".
+
+The full context of the other modules is:
+${otherFragmentsContext}
+
+Please rewrite the fragment to make it perfectly coherent with the provided context.`;
+
+    try {
+        const response = await callApiThrottled(() => ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: adaptFragmentSystemInstruction,
+            },
+            contents: { parts: [{ text: userPrompt }] },
+        })) as GenerateContentResponse;
+        const text = response.text;
+        if (!text) {
+            // If API fails, return the original fragment as a fallback
+            return fragmentToAdapt;
+        }
+        return text.trim();
+    } catch (error) {
+        console.error("Error adapting fragment with Gemini API:", error);
+        // Fallback to the original fragment in case of error
+        return fragmentToAdapt;
     }
 };
 
@@ -1263,13 +1318,35 @@ The 9 modules are: 'subject', 'pose', 'expression', 'outfit', 'object', 'scene',
 7.  **Output:** Return ONLY the final JSON template as a valid JSON object. Do not include any explanatory text.`;
 
 export const createJsonTemplate = async (jsonPrompt: string): Promise<string> => {
+    let validJsonString = '';
     try {
-        // Validate if input is a valid JSON
+        // First, try to parse the user's input directly.
         JSON.parse(jsonPrompt);
+        validJsonString = jsonPrompt;
     } catch (e) {
-        throw new Error("El texto proporcionado no es un JSON válido.");
+        // If parsing fails, ask the AI to correct the syntax.
+        console.warn("Initial JSON.parse failed. Attempting AI correction.", e);
+        const systemInstruction = `The following text is intended to be a valid JSON string, but it contains syntax errors. Please correct the syntax (e.g., fix quotes, remove trailing commas, etc.) and return ONLY the raw, corrected JSON string. Do not add explanations, markdown, or any other text outside of the JSON object. If it's impossible to fix, return an empty JSON object: {}.`;
+        
+        try {
+            const response = await callApiThrottled(() => ai.models.generateContent({
+                model: model,
+                config: { systemInstruction },
+                contents: { parts: [{ text: jsonPrompt }] },
+            })) as GenerateContentResponse;
+            const cleanedJsonText = response.text.trim();
+            
+            // Validate the AI's output before proceeding.
+            JSON.parse(cleanedJsonText);
+            validJsonString = cleanedJsonText;
+
+        } catch (aiError) {
+            console.error("AI failed to clean JSON or returned invalid JSON.", aiError);
+            throw new Error("El texto proporcionado no es un JSON válido y no pudo ser corregido automáticamente.");
+        }
     }
 
+    // If we have a valid JSON string (either original or corrected), proceed to templatize it.
     try {
         const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
@@ -1277,7 +1354,7 @@ export const createJsonTemplate = async (jsonPrompt: string): Promise<string> =>
                 systemInstruction: createJsonTemplateSystemInstruction,
                 responseMimeType: "application/json",
             },
-            contents: { parts: [{ text: `Analiza este JSON y crea una plantilla: ${jsonPrompt}` }] }
+            contents: { parts: [{ text: `Analiza este JSON y crea una plantilla: ${validJsonString}` }] }
         })) as GenerateContentResponse;
         
         const jsonString = response.text.trim();
