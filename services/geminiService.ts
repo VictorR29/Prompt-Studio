@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { SavedPrompt, ExtractionMode } from "../types";
 
@@ -1130,13 +1131,17 @@ export const modularizePrompt = async (prompt: string): Promise<Record<Extractio
     }
 };
 
-const optimizeFragmentSystemInstruction = `Eres un experto en ingeniería de prompts contextuales. Tu tarea es analizar un módulo de prompt específico dentro del contexto de un prompt completo que se está construyendo, y proporcionar 3 sugerencias para optimizarlo.
+const optimizeFragmentSystemInstruction = `You are a contextual prompt engineering expert. Your task is to analyze a specific prompt module within the context of a full prompt being built and provide 3 suggestions to optimize it.
 
-Reglas:
-1.  **Coherencia Global:** Las sugerencias para el módulo que se está optimizando deben ser coherentes y sinérgicas con el contexto proporcionado por los otros módulos.
-2.  **Evitar Conflictos:** No sugieras nada que contradiga la información existente (ej. no sugieras un "close-up" si el módulo "outfit" describe botas).
-3.  **Mejora y Especificidad:** Las sugerencias deben mejorar el fragmento, haciéndolo más descriptivo, técnico o creativamente alineado con el resto del prompt.
-4.  **Formato de Salida:** Devuelve un array de 3 strings en formato JSON. Solo el array, sin texto adicional.`;
+Rules:
+1.  **Global Coherence:** The suggestions for the module being optimized must be coherent and synergistic with the context provided by the other modules.
+2.  **Conflict Avoidance:** Do not suggest anything that contradicts existing information (e.g., do not suggest "close-up" if the "outfit" module describes boots).
+3.  **Output Format (CRITICAL):**
+    *   Each suggestion MUST be a direct, applicable text fragment (a string of keywords or a descriptive phrase) that can be used to REPLACE the current content of the module.
+    *   Suggestions must be in ENGLISH.
+    *   DO NOT provide instructions, explanations, or conversational text. For example, instead of suggesting "Add 'anime style' for more coherence," the suggestion should be just "anime style". Instead of "A close-up shot of the character's face," suggest "close-up portrait".
+4.  **Improvement and Specificity:** Suggestions should improve the fragment, making it more descriptive, technical, or creatively aligned with the rest of the prompt.
+5.  **Final Output:** Return a JSON array of 3 strings. Only the array, with no additional text.`;
 
 const optimizeFragmentResponseSchema = {
     type: Type.ARRAY,
@@ -1154,12 +1159,12 @@ export const optimizePromptFragment = async (targetMode: ExtractionMode, allFrag
         .map(([key, value]) => `- ${key.toUpperCase()}: "${value}"`)
         .join('\n');
 
-    const userPrompt = `Estoy optimizando el módulo '${targetMode.toUpperCase()}', que actualmente contiene: "${targetFragmentText}".
+    const userPrompt = `I am optimizing the '${targetMode.toUpperCase()}' module, which currently contains: "${targetFragmentText}".
 
-El contexto completo de los otros módulos es:
-${otherFragmentsContext || "No hay contexto adicional."}
+The full context of the other modules is:
+${otherFragmentsContext || "No additional context."}
 
-Genera 3 sugerencias concisas para mejorar el módulo '${targetMode.toUpperCase()}' basándote en este contexto global.`;
+Generate 3 concise suggestions to improve the '${targetMode.toUpperCase()}' module based on this global context.`;
     
     try {
         // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
@@ -1181,15 +1186,27 @@ Genera 3 sugerencias concisas para mejorar el módulo '${targetMode.toUpperCase(
     }
 };
 
-const mergeModulesIntoJsonTemplateSystemInstruction = `Eres un experto en ingeniería de prompts que fusiona contenido modular en una plantilla JSON existente. Tu tarea es integrar de manera inteligente el contenido de los 9 módulos en la plantilla JSON proporcionada por el usuario.
+const mergeModulesIntoJsonTemplateSystemInstruction = `Eres un experto en ingeniería de prompts que fusiona contenido modular en una plantilla JSON existente. Tu tarea es integrar de manera inteligente el contenido de los 9 módulos de usuario en la plantilla JSON proporcionada.
 
-Reglas Estrictas:
-1.  **Prioridad de la Plantilla:** La estructura, sintaxis, y cualquier valor o peso preexistente en la plantilla JSON es la máxima prioridad. DEBES PRESERVAR LA ESTRUCTURA ORIGINAL de la plantilla.
-2.  **Mapeo Inteligente:** Analiza el contenido de cada módulo (subject, pose, style, etc.) y encuentra la clave más apropiada dentro de la plantilla JSON para insertar esa información. No te limites a un mapeo 1 a 1 por nombre. Entiende la intención.
-    *   Ejemplo: El contenido del módulo 'subject' podría ir en una clave llamada 'character_description' o 'main_subject' en la plantilla. El contenido de 'style' podría ir en 'artistic_style' o 'technical_details'.
-3.  **Combinación y Fusión:** Si la plantilla ya tiene un valor en una clave donde vas a insertar contenido, combina los dos de forma coherente. Generalmente, añade el contenido del módulo al valor existente, separado por una coma.
-4.  **Omisión de Módulos Vacíos:** Si un módulo está vacío, simplemente ignóralo. No añadas claves vacías a la plantilla.
-5.  **Output Final:** Devuelve únicamente el objeto JSON final, válido, optimizado y que respete la estructura de la plantilla original. No incluyas texto adicional.`;
+**Objetivo Principal:** Utilizar la plantilla JSON como una **estructura base**, reemplazando su contenido temático con el contenido de los módulos del usuario. Los elementos estructurales, sintaxis especial y campos extra de la plantilla deben ser preservados.
+
+**Reglas Estrictas:**
+
+1.  **La Plantilla dicta la Estructura:** La estructura de claves, el anidamiento, la sintaxis (como pesos \`::1.5\`) y cualquier campo que no se corresponda directamente con un módulo (ej. \`"seed": 12345\`) DEBEN ser preservados fielmente. Esta es la máxima prioridad.
+
+2.  **Los Módulos dictan el Contenido:** El contenido de los 9 módulos de usuario (\`subject\`, \`pose\`, \`style\`, etc.) es la fuente de verdad para el contenido temático.
+
+3.  **Mapeo y REEMPLAZO Inteligente:**
+    *   Analiza el contenido de cada módulo de usuario.
+    *   Encuentra la clave más apropiada dentro de la plantilla JSON para insertar esa información (ej. el módulo 'subject' podría ir en una clave llamada 'character_description').
+    *   **REEMPLAZA COMPLETAMENTE** el valor existente en esa clave de la plantilla con el contenido del módulo correspondiente. **NO combines ni fusiones** el contenido antiguo con el nuevo. El contenido del módulo de usuario siempre tiene la prioridad.
+    *   Si una clave de la plantilla parece contener información de múltiples módulos (ej. \`"description": "a knight in shining armor, photorealistic"\`), reemplázala con una combinación coherente de los módulos de usuario relevantes (ej. \`"description": "{{subject}} in {{outfit}}, {{style}}"\`).
+
+4.  **Manejo de Placeholders:** Si la plantilla ya contiene placeholders como \`{{module_name}}\`, reemplázalos directamente con el contenido del módulo correspondiente.
+
+5.  **Omisión de Módulos Vacíos:** Si un módulo de usuario está vacío, y encuentras un placeholder para él en la plantilla, reemplázalo con un string vacío (\`""\`) o elimina la clave si es más apropiado para la estructura. Si no hay placeholder, simplemente ignora el módulo vacío.
+
+6.  **Output Final:** Devuelve únicamente el objeto JSON final, válido, que refleje la estructura de la plantilla pero con el contenido de los módulos del usuario. No incluyas texto adicional.`;
 
 export const mergeModulesIntoJsonTemplate = async (modules: Partial<Record<ExtractionMode, string>>, jsonTemplate: string): Promise<string> => {
     

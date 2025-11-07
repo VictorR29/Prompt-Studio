@@ -14,8 +14,15 @@ import { SavedPrompt, ExtractionMode } from './types';
 import { ExtractorModeSelector } from './components/ExtractorModeSelector';
 import { PromptModal } from './components/PromptModal';
 import { EXTRACTION_MODE_MAP } from './config';
+import { Toast } from './components/Toast';
 
 export type AppView = 'generator' | 'gallery' | 'structurer' | 'assembler' | 'editor';
+
+interface ToastMessage {
+  id: number;
+  message: string;
+  type: 'success' | 'error';
+}
 
 const App: React.FC = () => {
   const [images, setImages] = useState<{ url: string; base64: string; mimeType: string; }[]>([]);
@@ -30,6 +37,7 @@ const App: React.FC = () => {
   const [promptForEditor, setPromptForEditor] = useState<SavedPrompt | null>(null);
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>('style');
   const [selectedPromptForModal, setSelectedPromptForModal] = useState<SavedPrompt | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -41,6 +49,15 @@ const App: React.FC = () => {
         setPromptForEditor(null);
     }
     setView(newView);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
+  };
+
+  const addToast = (message: string, type: 'success' | 'error' = 'success') => {
+    const id = Date.now();
+    setToasts(prevToasts => [...prevToasts, { id, message, type }]);
   };
 
   useEffect(() => {
@@ -153,7 +170,9 @@ const App: React.FC = () => {
             ...metadata,
         };
         addPromptToGallery(newPrompt);
-        handleSetView('gallery');
+        addToast('Prompt guardado en la galería', 'success');
+        setImages([]);
+        setPrompt('');
 
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -170,7 +189,7 @@ const App: React.FC = () => {
         ...promptToSave,
     };
     addPromptToGallery(newPrompt);
-    handleSetView('gallery');
+    addToast('Prompt guardado en la galería', 'success');
   };
   
   const handleSaveMasterPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
@@ -179,7 +198,7 @@ const App: React.FC = () => {
       ...promptToSave,
     };
     addPromptToGallery(newPrompt);
-    handleSetView('gallery');
+    addToast('Prompt guardado en la galería', 'success');
   };
 
   const handleDeletePrompt = (id: string) => {
@@ -314,6 +333,7 @@ const App: React.FC = () => {
                     savedPrompts={savedPrompts}
                     setView={handleSetView}
                     onNavigateToGallery={() => handleSetView('gallery')}
+                    addToast={addToast}
                 />
             </div>
         )}
@@ -329,6 +349,16 @@ const App: React.FC = () => {
           onEdit={handleEditPrompt}
         />
       )}
+      <div aria-live="assertive" className="fixed inset-0 pointer-events-none p-4 flex flex-col items-end justify-end space-y-2 z-[100]">
+        {toasts.map(toast => (
+            <Toast
+                key={toast.id}
+                message={toast.message}
+                type={toast.type}
+                onClose={() => removeToast(toast.id)}
+            />
+        ))}
+      </div>
     </div>
   );
 };

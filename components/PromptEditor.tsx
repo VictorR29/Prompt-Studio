@@ -1,4 +1,7 @@
 
+
+
+// FIX: Import 'useState' and 'useEffect' from React to resolve hook usage and type inference errors.
 import React, { useState, useEffect } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
@@ -14,6 +17,7 @@ import { PromptModule } from './PromptModule';
 import { UndoIcon } from './icons/UndoIcon';
 import { GalleryModal } from './GalleryModal';
 import { JsonIcon } from './icons/JsonIcon';
+import { CloseIcon } from './icons/CloseIcon';
 
 interface PromptEditorProps {
     initialPrompt: SavedPrompt | null;
@@ -21,6 +25,7 @@ interface PromptEditorProps {
     savedPrompts: SavedPrompt[];
     setView: (view: AppView) => void;
     onNavigateToGallery: () => void;
+    addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
 const initialFragments: Partial<Record<ExtractionMode, string>> = {
@@ -28,12 +33,13 @@ const initialFragments: Partial<Record<ExtractionMode, string>> = {
     scene: '', color: '', composition: '', style: ''
 };
 
-export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSavePrompt, savedPrompts, setView, onNavigateToGallery }) => {
+export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSavePrompt, savedPrompts, setView, onNavigateToGallery, addToast }) => {
     const [viewMode, setViewMode] = useState<'selection' | 'editor'>('selection');
     const [fragments, setFragments] = useState<Partial<Record<ExtractionMode, string>>>(initialFragments);
     const [pastedText, setPastedText] = useState('');
     const [pastedJson, setPastedJson] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [loadingAction, setLoadingAction] = useState<'analyze' | 'import' | null>(null);
+    const [isLoading, setIsLoading] = useState(false); // For editor-mode actions
     const [error, setError] = useState<string | null>(null);
     const [finalPrompt, setFinalPrompt] = useState('');
     const [outputType, setOutputType] = useState<'text' | 'json' | null>(null);
@@ -42,6 +48,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const [optimizingModule, setOptimizingModule] = useState<ExtractionMode | null>(null);
     const [suggestions, setSuggestions] = useState<Partial<Record<ExtractionMode, string[]>>>({});
     const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
+    const [isJsonChoiceModalOpen, setIsJsonChoiceModalOpen] = useState(false);
     
     useEffect(() => {
         if (initialPrompt) {
@@ -50,7 +57,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     }, [initialPrompt]);
     
     const handleLoadPrompt = async (promptText: string) => {
-        setIsLoading(true);
+        setLoadingAction('analyze');
         setError(null);
         try {
             const modularized = await modularizePrompt(promptText);
@@ -60,14 +67,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al modularizar: ${errorMessage}`);
         } finally {
-            setIsLoading(false);
+            setLoadingAction(null);
         }
     };
 
     const handleImportTemplate = async () => {
         if (!pastedJson.trim()) return;
 
-        setIsLoading(true);
+        setLoadingAction('import');
         setError(null);
         try {
             const templateJson = await createJsonTemplate(pastedJson);
@@ -85,14 +92,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             };
 
             onSavePrompt(newTemplatePrompt);
-            alert(`Plantilla "${metadata.title}" guardada en la galería!`);
+            addToast(`Plantilla "${metadata.title}" guardada!`, 'success');
             setPastedJson('');
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al importar plantilla: ${errorMessage}`);
         } finally {
-            setIsLoading(false);
+            setLoadingAction(null);
         }
     };
     
@@ -111,6 +118,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setOutputType(null);
         setCopied(false);
         setIsLoading(false);
+        setLoadingAction(null);
         setViewMode('selection');
     };
 
@@ -163,32 +171,36 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setIsLoading(false);
         }
     };
-
+    
     const handleGenerateJson = () => {
+        const activeFragments = Object.values(fragments).some(v => v && v.trim() !== '');
+        if (!activeFragments) {
+            setError("No hay contenido en los módulos para generar un JSON.");
+            return;
+        }
+        setError(null);
+        setIsJsonChoiceModalOpen(true);
+    };
+
+    const handleDirectJsonGeneration = () => {
+        setIsJsonChoiceModalOpen(false);
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
             if (value && value.trim() !== '') {
                 acc[key as ExtractionMode] = value;
             }
             return acc;
         }, {} as Partial<Record<ExtractionMode, string>>);
-
-        if (Object.keys(activeFragments).length === 0) {
-            setError("No hay contenido en los módulos para generar un JSON.");
-            return;
-        }
-        setError(null);
-
-        const jsonTemplates = savedPrompts.filter(p => p.type === 'structured');
-
-        if (jsonTemplates.length > 0) {
-            setIsTemplateSelectorOpen(true);
-        } else {
-            const jsonString = JSON.stringify(activeFragments, null, 2);
-            setFinalPrompt(jsonString);
-            setOutputType('json');
-        }
+        
+        const jsonString = JSON.stringify(activeFragments, null, 2);
+        setFinalPrompt(jsonString);
+        setOutputType('json');
     };
-    
+
+    const handleTemplateJsonGeneration = () => {
+        setIsJsonChoiceModalOpen(false);
+        setIsTemplateSelectorOpen(true);
+    };
+
     const handleSelectJsonTemplate = async (template: SavedPrompt) => {
         setIsTemplateSelectorOpen(false);
         setIsLoading(true);
@@ -230,7 +242,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 notes: 'Generado desde el Editor Modular como texto plano.'
             };
             onSavePrompt(newPrompt);
-            setView('gallery');
+            addToast('Prompt guardado en la galería', 'success');
         } else if (outputType === 'json') {
             const newPrompt: SavedPrompt = {
                 id: Date.now().toString(),
@@ -243,7 +255,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 notes: 'Generado desde el Editor Modular como JSON.'
             };
             onSavePrompt(newPrompt);
-            setView('gallery');
+            addToast('Prompt guardado en la galería', 'success');
         }
     };
 
@@ -265,7 +277,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     <p className="mt-2 text-gray-400">Elige cómo quieres empezar a construir tu próximo gran prompt.</p>
                 </div>
 
-                {isLoading && <div className="flex justify-center my-4"><Loader /></div>}
+                {loadingAction && <div className="flex justify-center my-4"><Loader /></div>}
                 {error && <div className="my-4 text-center text-red-400 bg-red-500/10 p-3 rounded-lg"><p>{error}</p></div>}
                 
                 <div className="space-y-6">
@@ -292,8 +304,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 placeholder="Pega tu prompt de texto aquí..."
                                 className="w-full mt-4 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
                             />
-                            <button onClick={() => handleLoadPrompt(pastedText)} disabled={!pastedText.trim() || isLoading} className="w-full mt-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
-                                Analizar y Modularizar
+                            <button onClick={() => handleLoadPrompt(pastedText)} disabled={!pastedText.trim() || loadingAction !== null} className="w-full mt-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                                {loadingAction === 'analyze' ? 'Analizando...' : 'Analizar y Modularizar'}
                             </button>
                         </div>
                          <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
@@ -306,8 +318,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 placeholder="Pega tu prompt JSON aquí..."
                                 className="w-full mt-4 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
                             />
-                            <button onClick={handleImportTemplate} disabled={!pastedJson.trim() || isLoading} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
-                                {isLoading ? 'Analizando...' : 'Analizar y Guardar Plantilla'}
+                            <button onClick={handleImportTemplate} disabled={!pastedJson.trim() || loadingAction !== null} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                                {loadingAction === 'import' ? 'Analizando...' : 'Analizar y Guardar Plantilla'}
                             </button>
                         </div>
                     </div>
@@ -344,6 +356,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                         onOptimize={handleOptimizeModule}
                         isOptimizing={optimizingModule === (key as ExtractionMode)}
                         suggestions={suggestions[key as ExtractionMode] || []}
+                        addToast={addToast}
                     />
                 ))}
             </div>
@@ -409,6 +422,47 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     onClose={() => setIsTemplateSelectorOpen(false)}
                     filter={['structured']}
                 />
+            )}
+             {isJsonChoiceModalOpen && (
+                <div
+                className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-subtle"
+                style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                onClick={() => setIsJsonChoiceModalOpen(false)}
+                >
+                <div
+                    className="glass-pane rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-scale-in-center p-6"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-white">Generar como JSON</h2>
+                        <button
+                            onClick={() => setIsJsonChoiceModalOpen(false)}
+                            className="bg-transparent text-gray-500 hover:text-white rounded-full p-1 transition-colors"
+                            aria-label="Cerrar"
+                        >
+                            <CloseIcon className="w-6 h-6" />
+                        </button>
+                    </div>
+                    <p className="text-gray-400 mb-6 text-sm">Elige cómo quieres crear tu prompt JSON.</p>
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleDirectJsonGeneration}
+                            className="w-full text-center p-4 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400"
+                        >
+                            <h3 className="font-semibold text-gray-200">Generar JSON Directo</h3>
+                            <p className="text-xs text-gray-500 mt-1">Crea un JSON simple a partir del contenido de los módulos activos.</p>
+                        </button>
+                        <button
+                            onClick={handleTemplateJsonGeneration}
+                            disabled={!savedPrompts.some(p => p.type === 'structured')}
+                            className="w-full text-center p-4 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-purple-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:ring-white/10"
+                        >
+                            <h3 className="font-semibold text-gray-200">Usar Plantilla de la Galería</h3>
+                            <p className="text-xs text-gray-500 mt-1">Fusiona los módulos en una plantilla JSON guardada para una estructura más compleja.</p>
+                        </button>
+                    </div>
+                </div>
+                </div>
             )}
         </div>
     );

@@ -18,6 +18,7 @@ interface PromptModuleProps {
     onOptimize: (mode: ExtractionMode) => void;
     isOptimizing: boolean;
     suggestions: string[];
+    addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
 const SmallLoader: React.FC = () => (
@@ -36,7 +37,8 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     onOpenGallery,
     onOptimize,
     isOptimizing,
-    suggestions 
+    suggestions,
+    addToast
 }) => {
 
     const handleSaveFragment = () => {
@@ -52,7 +54,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             notes: `Fragmento de tipo '${config.label}' guardado desde el Editor Modular.`
         };
         onSavePrompt(newPrompt);
-        alert(`'${config.label}' guardado en la galería!`);
+        addToast(`'${config.label}' guardado en la galería!`, 'success');
     };
 
     return (
