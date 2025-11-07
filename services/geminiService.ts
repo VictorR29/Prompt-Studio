@@ -1,4 +1,5 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+
+import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { SavedPrompt, ExtractionMode } from "../types";
 
 const API_KEY = process.env.API_KEY;
@@ -9,6 +10,48 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 const model = 'gemini-2.5-flash';
+
+// --- Throttling Logic to prevent 429 errors ---
+const requestQueue: Array<{
+    apiCall: () => Promise<any>;
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
+}> = [];
+let isProcessingQueue = false;
+// Set interval to ~55 requests per minute to stay safely below the 60 RPM free tier limit.
+const MIN_REQUEST_INTERVAL = 1100; 
+
+async function processApiQueue() {
+    if (requestQueue.length === 0) {
+        isProcessingQueue = false;
+        return;
+    }
+
+    isProcessingQueue = true;
+    const request = requestQueue.shift();
+    if (!request) return; // Should not happen, but for type safety
+
+    try {
+        const result = await request.apiCall();
+        request.resolve(result);
+    } catch (error) {
+        request.reject(error);
+    }
+
+    // Wait for the interval before processing the next request.
+    setTimeout(processApiQueue, MIN_REQUEST_INTERVAL);
+}
+
+function callApiThrottled<T>(apiCall: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+        requestQueue.push({ apiCall, resolve, reject });
+        if (!isProcessingQueue) {
+            processApiQueue();
+        }
+    });
+}
+// --- End Throttling Logic ---
+
 
 type ImagePayload = { imageBase64: string; mimeType: string };
 
@@ -31,7 +74,8 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
             const imageParts = images.map(image => ({
                 inlineData: { data: image.imageBase64, mimeType: image.mimeType },
             }));
-            const response = await ai.models.generateContent({
+            // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+            const response = await callApiThrottled(() => ai.models.generateContent({
                 model: model,
                 config: { systemInstruction },
                 contents: {
@@ -40,7 +84,7 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
                         ...imageParts,
                     ],
                 },
-            });
+            })) as GenerateContentResponse;
             const text = response.text;
             if (!text) {
                 throw new Error("La API no devolvió ningún texto.");
@@ -70,7 +114,8 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
             inlineData: { data: image.imageBase64, mimeType: image.mimeType },
         }));
         try {
-            const response = await ai.models.generateContent({
+            // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+            const response = await callApiThrottled(() => ai.models.generateContent({
                 model: model,
                 config: {
                     systemInstruction,
@@ -84,9 +129,10 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
                         { text: "Genera los metadatos en JSON como se te indicó." },
                     ],
                 },
-            });
+            })) as GenerateContentResponse;
             const jsonString = response.text.trim();
-            const metadata = JSON.parse(jsonString);
+            // FIX: Add type assertion to JSON.parse to ensure type safety.
+            const metadata = JSON.parse(jsonString) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
             return metadata;
         } catch (error) {
             console.error(`Error generating metadata with Gemini API for ${errorContext}:`, error);
@@ -315,10 +361,10 @@ export const generateStructuredPromptMetadata = async (
   const metadataSystemInstruction = `Eres un curador de prompts de IA. Tu tarea es analizar un prompt JSON estructurado y su imagen de referencia (si se proporciona). Genera metadatos concisos y evocadores en formato JSON.
 
   Reglas:
-  1.  **Título (title):** Crea un título corto y descriptivo a partir de los campos 'subject' o 'prompt_description' del JSON.
-  2.  **Categoría/Estilo (category):** Infiere una categoría general como 'Retrato Sci-Fi', 'Paisaje Fantástico', 'Escena Urbana Cinematográfica'.
-  3.  **Tipo de Arte (artType):** Infiere el tipo de arte a partir de campos como 'technical_details' o el estilo general (ej. '3D Render', 'Fotografía Cinematográfica').
-  4.  **Notas (notes):** Escribe una breve nota (1-2 frases) que resuma la esencia del prompt.
+  1.  **Título (title):** Crea un título corto y descriptivo a partir de los campos 'subject' o 'prompt_description' del JSON. Si es una plantilla con placeholders, dale un título que refleje su propósito (ej. "Plantilla de Personaje Cinemático").
+  2.  **Categoría/Estilo (category):** Infiere una categoría general como 'Retrato Sci-Fi', 'Paisaje Fantástico', 'Escena Urbana Cinematográfica'. Para plantillas, usa 'Plantilla'.
+  3.  **Tipo de Arte (artType):** Infiere el tipo de arte a partir de campos como 'technical_details' o el estilo general (ej. '3D Render', 'Fotografía Cinematográfica'). Para plantillas, usa 'Plantilla JSON'.
+  4.  **Notas (notes):** Escribe una breve nota (1-2 frases) que resuma la esencia del prompt o el propósito de la plantilla.
 
   Analiza el siguiente prompt JSON y la imagen asociada (si existe) y devuelve SOLO el objeto JSON con la estructura especificada.`;
   
@@ -337,7 +383,8 @@ export const generateStructuredPromptMetadata = async (
   ];
 
   try {
-      const response = await ai.models.generateContent({
+      // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+      const response = await callApiThrottled(() => ai.models.generateContent({
           model: model,
           config: {
               systemInstruction: metadataSystemInstruction,
@@ -345,10 +392,11 @@ export const generateStructuredPromptMetadata = async (
               responseSchema: metadataResponseSchema,
           },
           contents: { parts },
-      });
+      })) as GenerateContentResponse;
 
       const jsonString = response.text.trim();
-      const metadata = JSON.parse(jsonString);
+      // FIX: Add type assertion to JSON.parse to ensure type safety.
+      const metadata = JSON.parse(jsonString) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
       return metadata;
   } catch (error) {
       console.error("Error generating structured prompt metadata with Gemini API:", error);
@@ -395,7 +443,8 @@ export const generateStructuredPrompt = async (promptData: { idea: string; style
     }
 
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction: structuredPromptSystemInstruction,
@@ -404,7 +453,7 @@ export const generateStructuredPrompt = async (promptData: { idea: string; style
             contents: {
                 parts: [{ text: userPrompt }]
             }
-        });
+        })) as GenerateContentResponse;
         
         const jsonString = response.text.trim();
         const parsedJson = JSON.parse(jsonString);
@@ -448,7 +497,8 @@ export const generateReplicationPrompt = async (image: ImagePayload): Promise<st
             },
         };
 
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction: replicationPromptSystemInstruction,
@@ -460,7 +510,7 @@ export const generateReplicationPrompt = async (image: ImagePayload): Promise<st
                     imagePart
                 ]
             }
-        });
+        })) as GenerateContentResponse;
         
         const jsonString = response.text.trim();
         const parsedJson = JSON.parse(jsonString);
@@ -513,7 +563,8 @@ export const generateStructuredPromptFromImage = async (images: ImagePayload[], 
     }
 
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction: structuredPromptFromImageSystemInstruction,
@@ -525,7 +576,7 @@ export const generateStructuredPromptFromImage = async (images: ImagePayload[], 
                     ...imageParts
                 ]
             }
-        });
+        })) as GenerateContentResponse;
 
         const jsonString = response.text.trim();
         const parsedJson = JSON.parse(jsonString);
@@ -578,7 +629,8 @@ export const generateFusedImagePrompt = async (subjectImage: ImagePayload, style
             },
         };
 
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction: fusionImageSystemInstruction,
@@ -593,7 +645,7 @@ export const generateFusedImagePrompt = async (subjectImage: ImagePayload, style
                     { text: "Fusiona el sujeto de la Imagen 1 con el estilo de la Imagen 2 y genera el prompt JSON estructurado." }
                 ]
             }
-        });
+        })) as GenerateContentResponse;
         
         const jsonString = response.text.trim();
         const parsedJson = JSON.parse(jsonString);
@@ -614,7 +666,8 @@ export const editImageWithPrompt = async (
   prompt: string
 ): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
+    // FIX: Cast the response to GenerateContentResponse to access the 'candidates' property.
+    const response = await callApiThrottled(() => ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
@@ -632,7 +685,7 @@ export const editImageWithPrompt = async (
       config: {
         responseModalities: [Modality.IMAGE],
       },
-    });
+    })) as GenerateContentResponse;
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
@@ -652,7 +705,8 @@ export const generateImageFromImages = async (
   styleImage: ImagePayload
 ): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
+    // FIX: Cast the response to GenerateContentResponse to access the 'candidates' property.
+    const response = await callApiThrottled(() => ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
@@ -676,7 +730,7 @@ export const generateImageFromImages = async (
       config: {
         responseModalities: [Modality.IMAGE],
       },
-    });
+    })) as GenerateContentResponse;
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
@@ -705,7 +759,8 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
     };
 
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction: ideasSystemInstruction,
@@ -717,10 +772,11 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
                     { text: `Este es el prompt de estilo: "${stylePrompt}". Genera las ideas como se te indicó.` },
                 ]
             }
-        });
+        })) as GenerateContentResponse;
 
         const jsonString = response.text.trim();
-        const ideas = JSON.parse(jsonString);
+        // FIX: Add type assertion to JSON.parse to ensure type safety.
+        const ideas = JSON.parse(jsonString) as string[];
         return ideas;
     } catch (error) {
         console.error("Error generating ideas with Gemini API:", error);
@@ -808,13 +864,14 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
     const assemblyRequest = `Ensambla los siguientes fragmentos en un prompt maestro coherente, siguiendo las reglas: \n${promptPieces.join('\n')}`;
 
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction: masterAssemblerSystemInstruction,
             },
             contents: { parts: [{ text: assemblyRequest }] },
-        });
+        })) as GenerateContentResponse;
 
         const text = response.text;
         if (!text) {
@@ -846,7 +903,8 @@ export const generateMasterPromptMetadata = async (prompt: string, images: Image
     }));
 
     try {
-      const response = await ai.models.generateContent({
+      // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+      const response = await callApiThrottled(() => ai.models.generateContent({
         model: model,
         config: {
           systemInstruction: metadataSystemInstruction,
@@ -860,10 +918,11 @@ export const generateMasterPromptMetadata = async (prompt: string, images: Image
             { text: "Genera los metadatos en JSON como se te indicó." },
           ],
         },
-      });
+      })) as GenerateContentResponse;
 
       const jsonString = response.text.trim();
-      const metadata = JSON.parse(jsonString);
+      // FIX: Add type assertion to JSON.parse to ensure type safety.
+      const metadata = JSON.parse(jsonString) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
       return metadata;
     } catch (error) {
       console.error("Error generating master prompt metadata with Gemini API:", error);
@@ -912,7 +971,8 @@ IMPORTANT: The value of 'text_to_remove' must be an EXACT substring that exists 
     };
 
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction,
@@ -920,9 +980,10 @@ IMPORTANT: The value of 'text_to_remove' must be an EXACT substring that exists 
                 responseSchema,
             },
             contents: { parts: [{ text: `Analyze this prompt: "${prompt}"` }] }
-        });
+        })) as GenerateContentResponse;
         const jsonString = response.text.trim();
-        return JSON.parse(jsonString);
+        // FIX: Add type assertion to JSON.parse to ensure type safety.
+        return JSON.parse(jsonString) as PromptSuggestion[];
     } catch (error) {
         console.error("Error generating prompt suggestions with Gemini API:", error);
         throw new Error("No se pudieron generar sugerencias.");
@@ -933,14 +994,15 @@ export const convertTextPromptToJson = async (prompt: string): Promise<string> =
     const systemInstruction = `Eres un experto en la creación de prompts JSON para IA de generación de imágenes. Tu tarea es analizar un prompt de texto detallado y convertirlo a un formato JSON estructurado. El objetivo es una reestructuración fiel sin perder información ni añadir nuevos detalles. Analiza el prompt del usuario, extrae sus componentes (sujeto, estilo, composición, etc.) y mapea cada uno al campo correspondiente en una plantilla JSON adecuada. El JSON final debe ser una representación estructurada y fiel del prompt original. Devuelve únicamente el objeto JSON final, válido y optimizado.`;
     
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction,
                 responseMimeType: "application/json",
             },
             contents: { parts: [{ text: `Convierte el siguiente prompt a JSON: "${prompt}"` }] }
-        });
+        })) as GenerateContentResponse;
         const jsonString = response.text.trim();
         const parsedJson = JSON.parse(jsonString);
         return JSON.stringify(parsedJson, null, 2);
@@ -982,7 +1044,8 @@ Analyze the following JSON prompt and return the result with the specified struc
     };
 
     try {
-        const response = await ai.models.generateContent({
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
             model: model,
             config: {
                 systemInstruction,
@@ -990,9 +1053,10 @@ Analyze the following JSON prompt and return the result with the specified struc
                 responseSchema,
             },
             contents: { parts: [{ text: `Refactor this JSON prompt: \`\`\`json\n${prompt}\n\`\`\`` }] }
-        });
+        })) as GenerateContentResponse;
         const jsonString = response.text.trim();
-        const result = JSON.parse(jsonString);
+        // FIX: Add type assertion to JSON.parse to ensure type safety.
+        const result = JSON.parse(jsonString) as { refactored_prompt: string; explanation: string; };
         
         try {
             const parsedRefactored = JSON.parse(result.refactored_prompt);
@@ -1006,5 +1070,208 @@ Analyze the following JSON prompt and return the result with the specified struc
     } catch (error) {
         console.error("Error refactoring JSON prompt with Gemini API:", error);
         throw new Error("No se pudo refactorizar el prompt JSON.");
+    }
+};
+
+const modularizePromptSystemInstruction = `Eres un experto en ingeniería de prompts para IA de generación de imágenes. Tu tarea es analizar un prompt (que puede ser texto plano o un JSON stringificado) y descomponerlo en 9 componentes modulares clave. Devuelve un objeto JSON con exactamente las siguientes 9 claves: 'subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'style'.
+
+Reglas:
+1.  **Analiza Holísticamente:** Lee el prompt completo para entender la intención general.
+2.  **Extrae y Asigna:** Identifica las frases y palabras clave que correspondan a cada una de las 9 categorías y asígnalas al campo correspondiente en el JSON.
+3.  **Completa Todos los Campos:** TODOS los 9 campos deben estar presentes en el JSON de salida.
+4.  **Manejo de Campos Vacíos:** Si un componente no se encuentra explícitamente en el prompt, deja el valor del campo como un string vacío (""). NO inventes contenido.
+5.  **Evita la Redundancia:** Una vez que una parte del prompt se asigna a una categoría, intenta no repetirla en otra, a menos que sea fundamental para ambas (por ejemplo, el color de una prenda).
+6.  **Definición de Categorías:**
+    *   **subject:** Describe al personaje o sujeto principal (ej. "a young woman", "an old warrior").
+    *   **pose:** Describe la postura corporal y la acción (ej. "sitting on a throne", "leaping through the air").
+    *   **expression:** Describe la emoción facial (ej. "a determined gaze", "a soft smile").
+    *   **outfit:** Describe la vestimenta y accesorios (ej. "wearing a suit of simple silver armor", "dressed in a futuristic cyberpunk outfit").
+    *   **object:** Describe un objeto clave que el sujeto sostiene o que es prominente en la escena (ej. "holding a glowing sword", "an ornate silver pocket watch").
+    *   **scene:** Describe el entorno y la ambientación (ej. "in a dense foggy forest", "massive futuristic cityscape").
+    *   **color:** Describe la paleta de colores, el esquema cromático y el tono (ej. "vibrant complementary palette", "desaturated and muted analogous color scheme").
+    *   **composition:** Describe el encuadre, ángulo y foco (ej. "full body shot from a low angle", "rule of thirds composition, shallow depth of field").
+    *   **style:** Describe el estilo artístico general y los detalles técnicos (ej. "digital painting", "photorealistic", "8k, hyperdetailed").
+7.  **Salida:** Devuelve únicamente el objeto JSON. Sin explicaciones adicionales.`;
+
+const modularizeResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        subject: { type: Type.STRING, description: "Descripción del sujeto principal." },
+        pose: { type: Type.STRING, description: "Descripción de la pose corporal." },
+        expression: { type: Type.STRING, description: "Descripción de la expresión facial." },
+        outfit: { type: Type.STRING, description: "Descripción de la vestimenta." },
+        object: { type: Type.STRING, description: "Descripción de un objeto clave." },
+        scene: { type: Type.STRING, description: "Descripción de la escena o entorno." },
+        color: { type: Type.STRING, description: "Descripción de la paleta de colores." },
+        composition: { type: Type.STRING, description: "Descripción de la composición visual." },
+        style: { type: Type.STRING, description: "Descripción del estilo artístico y técnico." },
+    },
+    required: ['subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'style'],
+};
+
+export const modularizePrompt = async (prompt: string): Promise<Record<ExtractionMode, string>> => {
+    try {
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: modularizePromptSystemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: modularizeResponseSchema,
+            },
+            contents: { parts: [{ text: `Analiza y modulariza el siguiente prompt: "${prompt}"` }] },
+        })) as GenerateContentResponse;
+        const jsonString = response.text.trim();
+        // FIX: Add type assertion to JSON.parse to ensure type safety. This resolves the downstream errors in PromptEditor.tsx.
+        return JSON.parse(jsonString) as Record<ExtractionMode, string>;
+    } catch (error) {
+        console.error("Error calling Gemini API for prompt modularization:", error);
+        throw new Error("No se pudo modularizar el prompt.");
+    }
+};
+
+const optimizeFragmentSystemInstruction = `Eres un experto en ingeniería de prompts contextuales. Tu tarea es analizar un módulo de prompt específico dentro del contexto de un prompt completo que se está construyendo, y proporcionar 3 sugerencias para optimizarlo.
+
+Reglas:
+1.  **Coherencia Global:** Las sugerencias para el módulo que se está optimizando deben ser coherentes y sinérgicas con el contexto proporcionado por los otros módulos.
+2.  **Evitar Conflictos:** No sugieras nada que contradiga la información existente (ej. no sugieras un "close-up" si el módulo "outfit" describe botas).
+3.  **Mejora y Especificidad:** Las sugerencias deben mejorar el fragmento, haciéndolo más descriptivo, técnico o creativamente alineado con el resto del prompt.
+4.  **Formato de Salida:** Devuelve un array de 3 strings en formato JSON. Solo el array, sin texto adicional.`;
+
+const optimizeFragmentResponseSchema = {
+    type: Type.ARRAY,
+    items: { type: Type.STRING },
+};
+
+export const optimizePromptFragment = async (targetMode: ExtractionMode, allFragments: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
+    const targetFragmentText = allFragments[targetMode] || '';
+    if (!targetFragmentText.trim()) {
+        return [];
+    }
+
+    const otherFragmentsContext = Object.entries(allFragments)
+        .filter(([key, value]) => key !== targetMode && value && value.trim())
+        .map(([key, value]) => `- ${key.toUpperCase()}: "${value}"`)
+        .join('\n');
+
+    const userPrompt = `Estoy optimizando el módulo '${targetMode.toUpperCase()}', que actualmente contiene: "${targetFragmentText}".
+
+El contexto completo de los otros módulos es:
+${otherFragmentsContext || "No hay contexto adicional."}
+
+Genera 3 sugerencias concisas para mejorar el módulo '${targetMode.toUpperCase()}' basándote en este contexto global.`;
+    
+    try {
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: optimizeFragmentSystemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: optimizeFragmentResponseSchema,
+            },
+            contents: { parts: [{ text: userPrompt }] }
+        })) as GenerateContentResponse;
+        const jsonString = response.text.trim();
+        // FIX: Add type assertion to JSON.parse to ensure type safety.
+        return JSON.parse(jsonString) as string[];
+    } catch (error) {
+        console.error("Error optimizing fragment contextually with Gemini API:", error);
+        throw new Error("No se pudieron generar sugerencias contextuales para el fragmento.");
+    }
+};
+
+const mergeModulesIntoJsonTemplateSystemInstruction = `Eres un experto en ingeniería de prompts que fusiona contenido modular en una plantilla JSON existente. Tu tarea es integrar de manera inteligente el contenido de los 9 módulos en la plantilla JSON proporcionada por el usuario.
+
+Reglas Estrictas:
+1.  **Prioridad de la Plantilla:** La estructura, sintaxis, y cualquier valor o peso preexistente en la plantilla JSON es la máxima prioridad. DEBES PRESERVAR LA ESTRUCTURA ORIGINAL de la plantilla.
+2.  **Mapeo Inteligente:** Analiza el contenido de cada módulo (subject, pose, style, etc.) y encuentra la clave más apropiada dentro de la plantilla JSON para insertar esa información. No te limites a un mapeo 1 a 1 por nombre. Entiende la intención.
+    *   Ejemplo: El contenido del módulo 'subject' podría ir en una clave llamada 'character_description' o 'main_subject' en la plantilla. El contenido de 'style' podría ir en 'artistic_style' o 'technical_details'.
+3.  **Combinación y Fusión:** Si la plantilla ya tiene un valor en una clave donde vas a insertar contenido, combina los dos de forma coherente. Generalmente, añade el contenido del módulo al valor existente, separado por una coma.
+4.  **Omisión de Módulos Vacíos:** Si un módulo está vacío, simplemente ignóralo. No añadas claves vacías a la plantilla.
+5.  **Output Final:** Devuelve únicamente el objeto JSON final, válido, optimizado y que respete la estructura de la plantilla original. No incluyas texto adicional.`;
+
+export const mergeModulesIntoJsonTemplate = async (modules: Partial<Record<ExtractionMode, string>>, jsonTemplate: string): Promise<string> => {
+    
+    const activeModules = Object.entries(modules)
+        .filter(([, value]) => value && value.trim())
+        .map(([key, value]) => `- Módulo ${key.toUpperCase()}: "${value}"`)
+        .join('\n');
+    
+    if (!activeModules) {
+        return jsonTemplate; // No hay nada que fusionar, devuelve la plantilla original
+    }
+
+    const userPrompt = `Aquí tienes la plantilla JSON maestra:
+\`\`\`json
+${jsonTemplate}
+\`\`\`
+
+Y aquí está el contenido de los módulos activos que debes fusionar en ella:
+${activeModules}
+
+Sigue las reglas para integrar el contenido de los módulos en la plantilla JSON.`;
+
+    try {
+        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
+        const response = await callApiThrottled(() => ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: mergeModulesIntoJsonTemplateSystemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: { parts: [{ text: userPrompt }] },
+        })) as GenerateContentResponse;
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+    } catch (error) {
+        console.error("Error merging modules into JSON template with Gemini API:", error);
+        throw new Error("No se pudo fusionar el contenido en la plantilla JSON.");
+    }
+};
+
+const createJsonTemplateSystemInstruction = `You are an expert system that converts concrete JSON image generation prompts into reusable templates. Your task is to analyze a user-provided JSON prompt, separate its structure (the "Fórmula") from its specific content, and create a new JSON template. This template must preserve the original structure and syntax while replacing content with placeholders corresponding to 9 predefined modules.
+
+The 9 modules are: 'subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'style'.
+
+**Rules:**
+
+1.  **Preserve Structure:** The output JSON template MUST have the exact same keys, nesting, and syntax (like weights, e.g., \`::1.5\`) as the input JSON. This is the highest priority.
+2.  **Analyze Content:** For each value in the input JSON, determine which of the 9 modules it primarily belongs to.
+3.  **Create Placeholders:** Replace the specific content values in the original JSON with placeholders of the format \`{{module_name}}\`.
+4.  **Intelligent Combination:** If a single value contains information from multiple modules, combine the placeholders. For example, if a \`description\` key has the value \`"a knight in shining armor, photorealistic"\`, the new value in the template should be \`"{{subject}} in {{outfit}}, {{style}}"\`.
+5.  **Handle Unmapped Content:** If a key's value in the input JSON does not clearly map to any of the 9 modules (e.g., a specific seed number, a unique flag), **preserve that original value** in the template. This is crucial for advanced templates.
+6.  **Integrate All Modules:** The final template should try to incorporate ALL 9 module placeholders in the most logical locations, even if the original prompt didn't contain content for them. For example, you might change a key's value from \`"{{subject}}"\` to \`"{{subject}}, {{pose}}, {{expression}}"\` to make the template more comprehensive.
+7.  **Output:** Return ONLY the final JSON template as a valid JSON object. Do not include any explanatory text.`;
+
+export const createJsonTemplate = async (jsonPrompt: string): Promise<string> => {
+    try {
+        // Validate if input is a valid JSON
+        JSON.parse(jsonPrompt);
+    } catch (e) {
+        throw new Error("El texto proporcionado no es un JSON válido.");
+    }
+
+    try {
+        const response = await callApiThrottled(() => ai.models.generateContent({
+            model: model,
+            config: {
+                systemInstruction: createJsonTemplateSystemInstruction,
+                responseMimeType: "application/json",
+            },
+            contents: { parts: [{ text: `Analiza este JSON y crea una plantilla: ${jsonPrompt}` }] }
+        })) as GenerateContentResponse;
+        
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        return JSON.stringify(parsedJson, null, 2);
+
+    } catch (error) {
+        console.error("Error calling Gemini API for JSON template creation:", error);
+        if (error instanceof SyntaxError) {
+            throw new Error("El modelo de IA devolvió un JSON inválido al crear la plantilla.");
+        }
+        throw new Error("No se pudo crear la plantilla JSON.");
     }
 };

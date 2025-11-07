@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<AppView>('generator');
+  const [view, setView] = useState<AppView>('editor');
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [styleToStructure, setStyleToStructure] = useState<string | null>(null);
   const [ideaToStructure, setIdeaToStructure] = useState<string | null>(null);
@@ -35,6 +35,13 @@ const App: React.FC = () => {
     extractionMode === 'style' ? 5 :
     extractionMode === 'subject' ? 3 :
     1;
+
+  const handleSetView = (newView: AppView) => {
+    if (view === 'editor' && newView !== 'editor') {
+        setPromptForEditor(null);
+    }
+    setView(newView);
+  };
 
   useEffect(() => {
     try {
@@ -67,7 +74,6 @@ const App: React.FC = () => {
 
   const addPromptToGallery = useCallback((newPrompt: SavedPrompt) => {
     setSavedPrompts(prev => [newPrompt, ...prev]);
-    setView('gallery');
   }, []);
 
 
@@ -147,6 +153,7 @@ const App: React.FC = () => {
             ...metadata,
         };
         addPromptToGallery(newPrompt);
+        handleSetView('gallery');
 
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -157,40 +164,13 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveEditedPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
-    let promptDataWithVersioning = { ...promptToSave };
-
-    // Apply versioning only when editing a prompt that is not a temporary one.
-    if (promptForEditor && !promptForEditor.id.startsWith('temp-')) {
-      // Establish the base title by removing any existing " v[number]" suffix.
-      const baseTitle = promptForEditor.title.replace(/ v\d+$/, '');
-      
-      let highestVersion = 0;
-      // Find all related prompts to determine the next version number.
-      savedPrompts.forEach(p => {
-        // Find prompts with the same base title
-        if (p.title.startsWith(baseTitle)) {
-           // If it's the base title itself, it's considered version 1.
-          if (p.title === baseTitle) {
-            highestVersion = Math.max(highestVersion, 1);
-          }
-          // Check for numbered versions like "Title v2".
-          const match = p.title.match(/ v(\d+)$/);
-          if (match) {
-            highestVersion = Math.max(highestVersion, parseInt(match[1], 10));
-          }
-        }
-      });
-
-      // Set the new title with the incremented version number.
-      promptDataWithVersioning.title = `${baseTitle} v${highestVersion + 1}`;
-    }
-
+  const handleSaveStructuredPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
     const newPrompt: SavedPrompt = {
         id: Date.now().toString(),
-        ...promptDataWithVersioning,
+        ...promptToSave,
     };
     addPromptToGallery(newPrompt);
+    handleSetView('gallery');
   };
   
   const handleSaveMasterPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
@@ -199,6 +179,7 @@ const App: React.FC = () => {
       ...promptToSave,
     };
     addPromptToGallery(newPrompt);
+    handleSetView('gallery');
   };
 
   const handleDeletePrompt = (id: string) => {
@@ -207,19 +188,19 @@ const App: React.FC = () => {
 
   const handleUseStyleInStructurer = useCallback((style: string) => {
     setStyleToStructure(style);
-    setView('structurer');
+    handleSetView('structurer');
   }, []);
   
   const handleUseIdeaAndStyleInStructurer = useCallback((idea: string, style: string) => {
     setIdeaToStructure(idea);
     setStyleToStructure(style);
-    setView('structurer');
+    handleSetView('structurer');
   }, []);
   
   const handleUseFeatureInStructurer = useCallback((featurePrompt: string) => {
     setIdeaToStructure(featurePrompt);
     setStyleToStructure(null);
-    setView('structurer');
+    handleSetView('structurer');
   }, []);
 
   const clearStyleToStructure = useCallback(() => {
@@ -232,10 +213,10 @@ const App: React.FC = () => {
 
   const handleEditPrompt = useCallback((promptToLoad: SavedPrompt) => {
     setPromptForEditor(promptToLoad);
-    setView('editor');
+    handleSetView('editor');
   }, []);
-
-  const handleGoToEditor = useCallback((promptString: string) => {
+  
+  const handleGoToEditorFromStructurer = useCallback((promptString: string) => {
     const tempPrompt: SavedPrompt = {
       id: `temp-${Date.now()}`,
       type: 'structured',
@@ -247,7 +228,7 @@ const App: React.FC = () => {
       notes: 'Editando un nuevo prompt desde el estructurador.'
     };
     setPromptForEditor(tempPrompt);
-    setView('editor');
+    handleSetView('editor');
   }, []);
 
   const handleSelectPromptForModal = useCallback((prompt: SavedPrompt) => {
@@ -260,7 +241,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent text-gray-200 font-sans flex flex-col">
-      <Header view={view} setView={setView} />
+      <Header view={view} setView={handleSetView} />
       <main className="flex-grow container mx-auto p-4 md:p-8 w-full pb-24 md:pb-8">
         {view === 'generator' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-slide-in-up">
@@ -312,8 +293,8 @@ const App: React.FC = () => {
               onClearInitialStyle={clearStyleToStructure}
               initialIdea={ideaToStructure}
               onClearInitialIdea={clearIdeaToStructure}
-              onSaveEditedPrompt={handleSaveEditedPrompt}
-              onGoToEditor={handleGoToEditor}
+              onSaveStructuredPrompt={handleSaveStructuredPrompt}
+              onGoToEditor={handleGoToEditorFromStructurer}
             />
           </div>
         )}
@@ -327,8 +308,12 @@ const App: React.FC = () => {
         {view === 'editor' && (
             <div className="animate-fade-slide-in-up">
                 <PromptEditor
+                    key={promptForEditor?.id || 'new-editor'}
                     initialPrompt={promptForEditor}
-                    onSave={handleSaveEditedPrompt}
+                    onSavePrompt={addPromptToGallery}
+                    savedPrompts={savedPrompts}
+                    setView={handleSetView}
+                    onNavigateToGallery={() => handleSetView('gallery')}
                 />
             </div>
         )}

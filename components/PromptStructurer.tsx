@@ -19,7 +19,7 @@ interface PromptStructurerProps {
     onClearInitialStyle: () => void;
     initialIdea: string | null;
     onClearInitialIdea: () => void;
-    onSaveEditedPrompt: (prompt: Omit<SavedPrompt, 'id'>) => void;
+    onSaveStructuredPrompt: (prompt: Omit<SavedPrompt, 'id'>) => void;
     onGoToEditor: (prompt: string) => void;
 }
 
@@ -28,7 +28,7 @@ export const PromptStructurer: React.FC<PromptStructurerProps> = ({
     onClearInitialStyle, 
     initialIdea,
     onClearInitialIdea,
-    onSaveEditedPrompt,
+    onSaveStructuredPrompt,
     onGoToEditor
 }) => {
   const [mode, setMode] = useState<Mode>('idea');
@@ -133,7 +133,7 @@ export const PromptStructurer: React.FC<PromptStructurerProps> = ({
       
       const coverImageDataUrl = subjectImages.length > 0 ? `data:${subjectImages[0].mimeType};base64,${subjectImages[0].base64}` : '';
       
-      onSaveEditedPrompt({
+      onSaveStructuredPrompt({
         type: 'structured',
         prompt: structuredPrompt,
         coverImage: coverImageDataUrl,

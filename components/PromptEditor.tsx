@@ -1,502 +1,415 @@
 
-
-import React, { useState, useCallback, useEffect, useRef, useReducer } from 'react';
-import { JsonDisplay } from './JsonDisplay';
-import { JsonFormEditor } from './JsonFormEditor';
-import { generateStructuredPromptMetadata, suggestTextPromptEdits, convertTextPromptToJson, PromptSuggestion, refactorJsonPrompt } from '../services/geminiService';
-import { SavedPrompt } from '../types';
+import React, { useState, useEffect } from 'react';
+import { SavedPrompt, ExtractionMode } from '../types';
+import { AppView } from '../App';
+import { modularizePrompt, assembleMasterPrompt, optimizePromptFragment, mergeModulesIntoJsonTemplate, createJsonTemplate, generateStructuredPromptMetadata } from '../services/geminiService';
+import { EXTRACTION_MODE_MAP } from '../config';
+import { Loader } from './Loader';
+import { ClipboardIcon } from './icons/ClipboardIcon';
+import { CheckIcon } from './icons/CheckIcon';
+import { GalleryIcon } from './icons/GalleryIcon';
+import { FilePlusIcon } from './icons/FilePlusIcon';
+import { ClipboardPasteIcon } from './icons/ClipboardPasteIcon';
+import { PromptModule } from './PromptModule';
 import { UndoIcon } from './icons/UndoIcon';
-import { RedoIcon } from './icons/RedoIcon';
-import { RestoreIcon } from './icons/RestoreIcon';
-import { LightbulbIcon } from './icons/LightbulbIcon';
+import { GalleryModal } from './GalleryModal';
 import { JsonIcon } from './icons/JsonIcon';
-import { SparklesIcon } from './icons/SparklesIcon';
 
 interface PromptEditorProps {
     initialPrompt: SavedPrompt | null;
-    onSave: (prompt: Omit<SavedPrompt, 'id'>) => void;
+    onSavePrompt: (prompt: SavedPrompt) => void;
+    savedPrompts: SavedPrompt[];
+    setView: (view: AppView) => void;
+    onNavigateToGallery: () => void;
 }
 
-interface JsonSuggestion {
-    refactoredPrompt: string;
-    explanation: string;
-}
-
-// --- History State Management with useReducer ---
-type HistoryState = {
-  history: string[];
-  currentIndex: number;
+const initialFragments: Partial<Record<ExtractionMode, string>> = {
+    subject: '', pose: '', expression: '', outfit: '', object: '',
+    scene: '', color: '', composition: '', style: ''
 };
 
-type HistoryAction =
-  | { type: 'SET'; payload: string }
-  | { type: 'UPDATE'; payload: string }
-  | { type: 'UNDO' }
-  | { type: 'REDO' }
-  | { type: 'RESTORE' };
-
-const historyReducer = (state: HistoryState, action: HistoryAction): HistoryState => {
-  switch (action.type) {
-    case 'SET':
-      if (action.payload === state.history[state.currentIndex]) return state;
-      return { history: [action.payload], currentIndex: 0 };
-    case 'UPDATE': {
-      if (action.payload === state.history[state.currentIndex]) return state;
-      const newHistory = state.history.slice(0, state.currentIndex + 1);
-      newHistory.push(action.payload);
-      return { history: newHistory, currentIndex: newHistory.length - 1 };
-    }
-    case 'UNDO':
-      return { ...state, currentIndex: Math.max(0, state.currentIndex - 1) };
-    case 'REDO':
-      return { ...state, currentIndex: Math.min(state.history.length - 1, state.currentIndex + 1) };
-    case 'RESTORE':
-      return state.history.length > 0 ? { ...state, currentIndex: 0 } : state;
-    default:
-      return state;
-  }
-};
-// --- End of History Management ---
-
-
-const ActionButton: React.FC<{ onClick: () => void; disabled?: boolean; children: React.ReactNode; title: string }> = ({ onClick, disabled, children, title }) => (
-    <button
-        onClick={onClick}
-        disabled={disabled}
-        title={title}
-        className="p-2.5 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 disabled:text-gray-600 disabled:bg-white/5 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-teal-500"
-    >
-        {children}
-    </button>
-);
-
-const SmallLoader: React.FC = () => (
-    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-    </svg>
-);
-
-
-export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSave }) => {
-    const [{ history, currentIndex: currentHistoryIndex }, dispatch] = useReducer(historyReducer, { history: [], currentIndex: -1 });
-    const [promptType, setPromptType] = useState<'json' | 'text' | null>(null);
-
-    const [parsedJson, setParsedJson] = useState<any>(null);
-    const [isSaving, setIsSaving] = useState(false);
+export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSavePrompt, savedPrompts, setView, onNavigateToGallery }) => {
+    const [viewMode, setViewMode] = useState<'selection' | 'editor'>('selection');
+    const [fragments, setFragments] = useState<Partial<Record<ExtractionMode, string>>>(initialFragments);
+    const [pastedText, setPastedText] = useState('');
+    const [pastedJson, setPastedJson] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [finalPrompt, setFinalPrompt] = useState('');
+    const [outputType, setOutputType] = useState<'text' | 'json' | null>(null);
+    const [copied, setCopied] = useState(false);
+    const [galleryModalFor, setGalleryModalFor] = useState<ExtractionMode | null>(null);
+    const [optimizingModule, setOptimizingModule] = useState<ExtractionMode | null>(null);
+    const [suggestions, setSuggestions] = useState<Partial<Record<ExtractionMode, string[]>>>({});
+    const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
     
-    const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([]);
-    const [isSuggesting, setIsSuggesting] = useState(false);
-    const [suggestionError, setSuggestionError] = useState<string | null>(null);
-    const [isConverting, setIsConverting] = useState(false);
-
-    const [isRefactoring, setIsRefactoring] = useState(false);
-    const [jsonSuggestion, setJsonSuggestion] = useState<JsonSuggestion | null>(null);
-    const [refactorError, setRefactorError] = useState<string | null>(null);
-
-    const textEditorRef = useRef<HTMLTextAreaElement>(null);
-    const [selection, setSelection] = useState<{ start: number, end: number } | null>(null);
-    const [isFlashing, setIsFlashing] = useState(false);
-    const [editorViewKey, setEditorViewKey] = useState(0);
-
-    const currentPromptString = history[currentHistoryIndex] || '';
-
     useEffect(() => {
         if (initialPrompt) {
-            const isJson = initialPrompt.type === 'structured';
-            setPromptType(isJson ? 'json' : 'text');
-            dispatch({ type: 'SET', payload: initialPrompt.prompt });
-            
-            setSuggestions([]);
-            setSuggestionError(null);
-            setJsonSuggestion(null);
-            setRefactorError(null);
-        } else {
-            dispatch({ type: 'SET', payload: '' });
-            setPromptType(null);
+            handleLoadPrompt(initialPrompt.prompt);
         }
     }, [initialPrompt]);
-
-    useEffect(() => {
-        const promptStr = history[currentHistoryIndex];
-        if (promptStr && promptType === 'json') {
-            try {
-                const newJson = JSON.parse(promptStr);
-                setParsedJson(newJson);
-                setError(null);
-            } catch (e) {
-                console.error("Error parsing JSON from history", e);
-                setError("El estado del historial contiene un JSON inválido.");
-                setParsedJson(null);
-            }
-        }
-    }, [currentHistoryIndex, history, promptType]);
-
-    useEffect(() => {
-        if (selection && textEditorRef.current) {
-            textEditorRef.current.focus();
-            textEditorRef.current.setSelectionRange(selection.start, selection.end);
-            setSelection(null); // Clear selection state after applying
-        }
-    }, [selection, currentPromptString]);
     
-    const handleJsonChange = useCallback((newJsonData: any) => {
-        const newPromptString = JSON.stringify(newJsonData, null, 2);
-        dispatch({ type: 'UPDATE', payload: newPromptString });
-    }, []);
-
-     const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newPromptString = e.target.value;
-        dispatch({ type: 'UPDATE', payload: newPromptString });
-    }, []);
-
-    const handleSuggestEdits = async () => {
-        if (!currentPromptString) return;
-        setIsSuggesting(true);
-        setSuggestionError(null);
-        setSuggestions([]);
-        try {
-            const newSuggestions = await suggestTextPromptEdits(currentPromptString);
-            setSuggestions(newSuggestions);
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-            setSuggestionError(`Error suggesting: ${errorMessage}`);
-        } finally {
-            setIsSuggesting(false);
-        }
-    };
-
-    const handleApplySuggestion = (suggestion: PromptSuggestion) => {
-        let newPrompt = currentPromptString;
-        switch (suggestion.type) {
-            case 'ADDITION':
-                if (suggestion.data.text_to_add) {
-                    const originalTrimmed = newPrompt.trim();
-                    const separator = originalTrimmed.length > 0 ? ', ' : '';
-                    const textToActuallyAdd = suggestion.data.text_to_add;
-
-                    newPrompt = `${originalTrimmed}${separator}${textToActuallyAdd}`;
-                    
-                    const selectionStart = originalTrimmed.length > 0 
-                        ? originalTrimmed.length + separator.length 
-                        : 0;
-                    const selectionEnd = newPrompt.length;
-
-                    setSelection({ start: selectionStart, end: selectionEnd });
-                }
-                break;
-            case 'REPLACEMENT':
-                if (suggestion.data.text_to_remove && suggestion.data.text_to_replace_with) {
-                    const startIndex = newPrompt.indexOf(suggestion.data.text_to_remove);
-                    if (startIndex !== -1) {
-                        newPrompt = newPrompt.replace(suggestion.data.text_to_remove, suggestion.data.text_to_replace_with);
-                        const endIndex = startIndex + suggestion.data.text_to_replace_with.length;
-                        setSelection({ start: startIndex, end: endIndex });
-                    }
-                }
-                break;
-            case 'REMOVAL':
-                 if (suggestion.data.text_to_remove) {
-                    newPrompt = newPrompt.replace(suggestion.data.text_to_remove, '');
-                    // Clean up common artifacts like double commas or leading/trailing commas
-                    newPrompt = newPrompt.replace(/, ,/g, ',').replace(/,,/g, ',').trim().replace(/^,|,$/g, '').trim();
-                }
-                break;
-        }
-        dispatch({ type: 'UPDATE', payload: newPrompt });
-        if (textEditorRef.current) {
-            setIsFlashing(true);
-            setTimeout(() => setIsFlashing(false), 700); // Duration of the animation
-        }
-    };
-
-    const handleConvertToJSON = async () => {
-        if (!currentPromptString) return;
-        setIsConverting(true);
+    const handleLoadPrompt = async (promptText: string) => {
+        setIsLoading(true);
         setError(null);
         try {
-            const jsonString = await convertTextPromptToJson(currentPromptString);
-            dispatch({ type: 'UPDATE', payload: jsonString });
-            setPromptType('json');
+            const modularized = await modularizePrompt(promptText);
+            setFragments(modularized);
+            setViewMode('editor');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-            setError(`Error al convertir: ${errorMessage}`);
+            setError(`Error al modularizar: ${errorMessage}`);
         } finally {
-            setIsConverting(false);
+            setIsLoading(false);
         }
     };
 
-    const handleRefactorJson = async () => {
-        if (!currentPromptString) return;
-        setIsRefactoring(true);
-        setRefactorError(null);
-        setJsonSuggestion(null);
+    const handleImportTemplate = async () => {
+        if (!pastedJson.trim()) return;
 
-        try {
-            const result = await refactorJsonPrompt(currentPromptString);
-            setJsonSuggestion({
-                refactoredPrompt: result.refactored_prompt,
-                explanation: result.explanation
-            });
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-            setRefactorError(`Error al refactorizar: ${errorMessage}`);
-        } finally {
-            setIsRefactoring(false);
-        }
-    };
-
-    const handleApplyRefactor = () => {
-        if (jsonSuggestion) {
-            dispatch({ type: 'UPDATE', payload: jsonSuggestion.refactoredPrompt });
-            setJsonSuggestion(null);
-            setEditorViewKey(prev => prev + 1);
-        }
-    };
-
-
-    const handleSave = async () => {
-        if (!currentPromptString || !initialPrompt) return;
-        setIsSaving(true);
+        setIsLoading(true);
         setError(null);
         try {
-            const finalPromptType = promptType === 'json' ? 'structured' : initialPrompt.type;
-            let metadata: Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
-            
-            const coverImagePayload = initialPrompt.coverImage 
-                ? { 
-                    imageBase64: initialPrompt.coverImage.split(',')[1], 
-                    mimeType: initialPrompt.coverImage.match(/:(.*?);/)?.[1] || 'image/png' 
-                  } 
-                : undefined;
+            const templateJson = await createJsonTemplate(pastedJson);
+            const metadata = await generateStructuredPromptMetadata(templateJson);
 
-            if (finalPromptType === 'structured') {
-                metadata = await generateStructuredPromptMetadata(currentPromptString, coverImagePayload);
-            } else {
-                metadata = {
-                    title: initialPrompt.title,
-                    category: initialPrompt.category,
-                    artType: initialPrompt.artType,
-                    notes: initialPrompt.notes,
-                };
+            const newTemplatePrompt: SavedPrompt = {
+                id: Date.now().toString(),
+                type: 'structured',
+                prompt: templateJson,
+                coverImage: '', 
+                title: metadata.title,
+                category: metadata.category,
+                artType: 'Plantilla JSON',
+                notes: metadata.notes,
+            };
+
+            onSavePrompt(newTemplatePrompt);
+            alert(`Plantilla "${metadata.title}" guardada en la galería!`);
+            setPastedJson('');
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setError(`Error al importar plantilla: ${errorMessage}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const handleStartBlank = () => {
+        setFragments(initialFragments);
+        setFinalPrompt('');
+        setError(null);
+        setViewMode('editor');
+    };
+
+    const handleGoBackToSelection = () => {
+        setFragments(initialFragments);
+        setPastedText('');
+        setError(null);
+        setFinalPrompt('');
+        setOutputType(null);
+        setCopied(false);
+        setIsLoading(false);
+        setViewMode('selection');
+    };
+
+    const handleFragmentChange = (mode: ExtractionMode, value: string) => {
+        setFragments(prev => ({ ...prev, [mode]: value }));
+    };
+    
+    const handleOpenGalleryForModule = (mode: ExtractionMode) => {
+        setGalleryModalFor(mode);
+    };
+
+    const handleSelectFromGalleryForModule = (selectedPrompt: SavedPrompt) => {
+        if (galleryModalFor) {
+            handleFragmentChange(galleryModalFor, selectedPrompt.prompt);
+        }
+        setGalleryModalFor(null);
+    };
+
+    const handleOptimizeModule = async (mode: ExtractionMode) => {
+        const fragmentValue = fragments[mode];
+        if (!fragmentValue || !fragmentValue.trim()) return;
+
+        setOptimizingModule(mode);
+        setSuggestions(prev => ({ ...prev, [mode]: [] }));
+        setError(null);
+        try {
+            const newSuggestions = await optimizePromptFragment(mode, fragments);
+            setSuggestions(prev => ({ ...prev, [mode]: newSuggestions }));
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setError(`Error al optimizar: ${errorMessage}`);
+        } finally {
+            setOptimizingModule(null);
+        }
+    };
+
+    const handleGenerateText = async () => {
+        setIsLoading(true);
+        setOutputType('text');
+        setError(null);
+        setFinalPrompt('');
+        try {
+            const result = await assembleMasterPrompt(fragments);
+            setFinalPrompt(result);
+        } catch (err) {
+            setOutputType(null);
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setError(`Error al ensamblar: ${errorMessage}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleGenerateJson = () => {
+        const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
+            if (value && value.trim() !== '') {
+                acc[key as ExtractionMode] = value;
             }
-            
-            onSave({
-                type: finalPromptType,
-                prompt: currentPromptString,
-                coverImage: initialPrompt.coverImage,
-                ...metadata,
-            });
+            return acc;
+        }, {} as Partial<Record<ExtractionMode, string>>);
 
+        if (Object.keys(activeFragments).length === 0) {
+            setError("No hay contenido en los módulos para generar un JSON.");
+            return;
+        }
+        setError(null);
+
+        const jsonTemplates = savedPrompts.filter(p => p.type === 'structured');
+
+        if (jsonTemplates.length > 0) {
+            setIsTemplateSelectorOpen(true);
+        } else {
+            const jsonString = JSON.stringify(activeFragments, null, 2);
+            setFinalPrompt(jsonString);
+            setOutputType('json');
+        }
+    };
+    
+    const handleSelectJsonTemplate = async (template: SavedPrompt) => {
+        setIsTemplateSelectorOpen(false);
+        setIsLoading(true);
+        setOutputType('json');
+        setError(null);
+        setFinalPrompt('');
+        
+        const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
+            if (value && value.trim() !== '') {
+                acc[key as ExtractionMode] = value;
+            }
+            return acc;
+        }, {} as Partial<Record<ExtractionMode, string>>);
+
+        try {
+            const result = await mergeModulesIntoJsonTemplate(activeFragments, template.prompt);
+            setFinalPrompt(result);
         } catch (err) {
+            setOutputType(null);
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-            setError(`Error al guardar: ${errorMessage}`);
-            console.error(err);
+            setError(`Error al fusionar con plantilla: ${errorMessage}`);
         } finally {
-            setIsSaving(false);
+            setIsLoading(false);
         }
     };
 
-    if (!initialPrompt) {
+    const handleSave = () => {
+        if (!finalPrompt) return;
+        
+        if (outputType === 'text') {
+            const newPrompt: SavedPrompt = {
+                id: Date.now().toString(),
+                type: 'master',
+                prompt: finalPrompt,
+                coverImage: '',
+                title: `Prompt Maestro - ${new Date().toLocaleDateString()}`,
+                category: 'Ensamblado',
+                artType: 'Prompt Compuesto',
+                notes: 'Generado desde el Editor Modular como texto plano.'
+            };
+            onSavePrompt(newPrompt);
+            setView('gallery');
+        } else if (outputType === 'json') {
+            const newPrompt: SavedPrompt = {
+                id: Date.now().toString(),
+                type: 'structured',
+                prompt: finalPrompt,
+                coverImage: '',
+                title: `JSON Modular - ${new Date().toLocaleDateString()}`,
+                category: 'JSON Modular',
+                artType: 'Prompt Estructurado',
+                notes: 'Generado desde el Editor Modular como JSON.'
+            };
+            onSavePrompt(newPrompt);
+            setView('gallery');
+        }
+    };
+
+    const handleCopy = () => {
+        if (finalPrompt) {
+            navigator.clipboard.writeText(finalPrompt);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    if (viewMode === 'selection') {
         return (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center glass-pane p-8 rounded-2xl">
-                <svg className="w-20 h-20 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002 2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                <h2 className="mt-6 text-2xl font-bold text-gray-400">Editor de Prompts</h2>
-                <p className="mt-2 text-gray-500 max-w-md">
-                    Para empezar, genera un prompt en el <span className="font-semibold text-teal-400">Estructurador</span> y haz clic en "Editar", o carga un prompt guardado desde la <span className="font-semibold text-teal-400">Galería</span>.
-                </p>
+            <div className="glass-pane p-8 rounded-2xl max-w-4xl mx-auto">
+                <div className="text-center mb-8">
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
+                        Panel de Control Modular
+                    </h1>
+                    <p className="mt-2 text-gray-400">Elige cómo quieres empezar a construir tu próximo gran prompt.</p>
+                </div>
+
+                {isLoading && <div className="flex justify-center my-4"><Loader /></div>}
+                {error && <div className="my-4 text-center text-red-400 bg-red-500/10 p-3 rounded-lg"><p>{error}</p></div>}
+                
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
+                        <button onClick={onNavigateToGallery} className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
+                            <GalleryIcon className="w-10 h-10 text-teal-400" />
+                            <h2 className="font-semibold text-gray-200">Cargar desde Galería</h2>
+                            <p className="text-xs text-gray-500">Carga un prompt guardado para editarlo o descomponerlo.</p>
+                        </button>
+                        <button onClick={handleStartBlank} className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
+                            <FilePlusIcon className="w-10 h-10 text-teal-400" />
+                            <h2 className="font-semibold text-gray-200">Empezar en Blanco</h2>
+                            <p className="text-xs text-gray-500">Construye un prompt desde cero usando los módulos.</p>
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                            <ClipboardPasteIcon className="w-10 h-10 text-teal-400" />
+                            <h2 className="font-semibold text-gray-200">Analizar Prompt de Texto</h2>
+                            <p className="text-xs text-gray-500 max-w-md text-center">Pega un prompt existente y la IA lo descompondrá en los 9 módulos.</p>
+                            <textarea
+                                value={pastedText}
+                                onChange={(e) => setPastedText(e.target.value)}
+                                placeholder="Pega tu prompt de texto aquí..."
+                                className="w-full mt-4 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
+                            />
+                            <button onClick={() => handleLoadPrompt(pastedText)} disabled={!pastedText.trim() || isLoading} className="w-full mt-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                                Analizar y Modularizar
+                            </button>
+                        </div>
+                         <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                            <JsonIcon className="w-10 h-10 text-purple-400" />
+                            <h2 className="font-semibold text-gray-200">Importar Plantilla JSON</h2>
+                            <p className="text-xs text-gray-500 max-w-md text-center">Pega un prompt JSON para guardarlo como una plantilla reutilizable en tu galería.</p>
+                            <textarea
+                                value={pastedJson}
+                                onChange={(e) => setPastedJson(e.target.value)}
+                                placeholder="Pega tu prompt JSON aquí..."
+                                className="w-full mt-4 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
+                            />
+                            <button onClick={handleImportTemplate} disabled={!pastedJson.trim() || isLoading} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                                {isLoading ? 'Analizando...' : 'Analizar y Guardar Plantilla'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
-    
-    if (error && !parsedJson && promptType === 'json') {
-        return (
-             <div className="flex items-center justify-center h-full text-center text-red-400 bg-red-500/10 p-4 rounded-lg glass-pane">
-                <p>{error}</p>
-            </div>
-        )
-    }
-    
-    const actionButtons = (
-        <div className="mt-4 pt-4 border-t border-white/10 flex-shrink-0 space-y-3">
-             <div className="flex items-center justify-center space-x-3 bg-gray-900/50 p-2 rounded-lg">
-                <ActionButton onClick={() => dispatch({type: 'UNDO'})} disabled={currentHistoryIndex <= 0} title="Undo">
-                    <UndoIcon className="w-5 h-5" />
-                </ActionButton>
-                <ActionButton onClick={() => dispatch({type: 'REDO'})} disabled={currentHistoryIndex >= history.length - 1} title="Redo">
-                    <RedoIcon className="w-5 h-5" />
-                </ActionButton>
-                <ActionButton onClick={() => dispatch({type: 'RESTORE'})} disabled={currentHistoryIndex === 0} title="Restore Original">
-                    <RestoreIcon className="w-5 h-5" />
-                </ActionButton>
-            </div>
-            <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="w-full bg-green-600 hover:bg-green-500 disabled:bg-green-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-4 focus:ring-green-500/50"
-            >
-                {isSaving ? 'Saving...' : 'Save Changes to Gallery'}
-            </button>
-        </div>
-    );
 
-    if (promptType === 'json') {
-        return (
-            <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="glass-pane rounded-2xl p-6 shadow-2xl flex flex-col h-full lg:max-h-[75vh]">
-                        <JsonDisplay jsonString={currentPromptString} />
-                    </div>
-                    <div className="glass-pane rounded-2xl p-6 shadow-2xl flex flex-col h-full lg:max-h-[75vh]">
-                        {parsedJson ? (
-                            <>
-                                <div 
-                                    key={editorViewKey}
-                                    className="flex-grow min-h-0 flex flex-col animate-fade-in-subtle"
-                                >
-                                    <div className="flex-shrink-0">
-                                        <button
-                                            onClick={handleRefactorJson}
-                                            disabled={isRefactoring}
-                                            className="w-full flex items-center justify-center space-x-2 bg-purple-600/80 hover:bg-purple-600 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-purple-500/50 mb-4"
-                                        >
-                                            {isRefactoring ? <SmallLoader /> : <><SparklesIcon className="w-5 h-5" /><span>Suggest JSON Improvements</span></>}
-                                        </button>
-                                        {refactorError && <p className="mb-4 text-sm text-red-400 text-center bg-red-500/10 p-2 rounded-lg">{refactorError}</p>}
-                                    </div>
-                                    <div className="flex-grow min-h-0">
-                                        <JsonFormEditor jsonData={parsedJson} onJsonChange={handleJsonChange} />
-                                    </div>
-                                </div>
-                                {actionButtons}
-                            </>
-                        ) : (
-                            <div className="text-gray-500 flex items-center justify-center h-full">
-                            {error ? error : "Loading editor..."}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                 {jsonSuggestion && (
-                    <div 
-                        className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-                        style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-                        onClick={() => setJsonSuggestion(null)}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="suggestion-title"
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center -mb-2">
+                <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
+                    Editor Modular
+                </h1>
+                <button
+                    onClick={handleGoBackToSelection}
+                    className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-gray-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
+                >
+                    <UndoIcon className="w-5 h-5" />
+                    <span>Volver</span>
+                </button>
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(EXTRACTION_MODE_MAP).map(([key, config]) => (
+                    <PromptModule
+                        key={key}
+                        mode={key as ExtractionMode}
+                        config={config}
+                        value={fragments[key as ExtractionMode] || ''}
+                        onChange={handleFragmentChange}
+                        onSavePrompt={onSavePrompt}
+                        savedPrompts={savedPrompts}
+                        onOpenGallery={handleOpenGalleryForModule}
+                        onOptimize={handleOptimizeModule}
+                        isOptimizing={optimizingModule === (key as ExtractionMode)}
+                        suggestions={suggestions[key as ExtractionMode] || []}
+                    />
+                ))}
+            </div>
+            <div className="glass-pane p-6 rounded-2xl space-y-4">
+                <h2 className="text-xl font-bold text-white">Salida y Ensamblaje</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                     <button
+                        onClick={handleGenerateText}
+                        disabled={isLoading}
+                        className="w-full bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-teal-500/50 text-lg"
                     >
-                        <div 
-                            className="glass-pane rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col p-6 animate-scale-in-center"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <h3 id="suggestion-title" className="text-xl font-bold text-teal-300 mb-4 flex items-center space-x-2">
-                                <SparklesIcon className="w-6 h-6" />
-                                <span>Suggested Improvement</span>
-                            </h3>
-                            <div className="overflow-y-auto custom-scrollbar pr-2 -mr-2 flex-grow">
-                                <p className="text-gray-300 whitespace-pre-wrap">{jsonSuggestion.explanation}</p>
-                            </div>
-                            <div className="mt-auto pt-6 flex items-center space-x-4 border-t border-white/10">
-                                <button 
-                                    onClick={handleApplyRefactor}
-                                    className="flex-grow bg-teal-600 hover:bg-teal-500 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-teal-500/50"
-                                >
-                                    Apply Improvement
-                                </button>
-                                <button 
-                                    onClick={() => setJsonSuggestion(null)}
-                                    className="flex-grow bg-gray-600/50 hover:bg-gray-600/80 text-gray-300 font-semibold py-2.5 px-4 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-gray-500/50"
-                                >
-                                    Discard
-                                </button>
-                            </div>
-                        </div>
+                        {isLoading && outputType === 'text' ? 'Generando...' : 'Generar Prompt de Texto'}
+                    </button>
+                    <button
+                        onClick={handleGenerateJson}
+                        disabled={isLoading}
+                        className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-purple-500/50 text-lg"
+                    >
+                        {isLoading && outputType === 'json' ? 'Generando...' : 'Generar como JSON'}
+                    </button>
+                </div>
+                
+                {error && <div className="text-center text-red-400 bg-red-500/10 p-3 rounded-lg"><p>{error}</p></div>}
+                
+                {isLoading && (outputType === 'text' || outputType === 'json') && (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-4">
+                        <Loader />
+                        <p className="mt-4 text-gray-400">Ensamblando prompt...</p>
                     </div>
                 )}
-            </>
-        );
-    }
 
-    if (promptType === 'text') {
-        const getSuggestionPrefix = (type: PromptSuggestion['type']) => {
-            switch (type) {
-                case 'ADDITION': return { text: 'Add:', color: 'text-green-400' };
-                case 'REPLACEMENT': return { text: 'Replace:', color: 'text-amber-400' };
-                case 'REMOVAL': return { text: 'Remove:', color: 'text-red-400' };
-                default: return { text: 'Suggestion:', color: 'text-teal-400' };
-            }
-        };
-
-        return (
-            <div className="glass-pane rounded-2xl p-6 shadow-2xl flex flex-col h-full max-w-4xl mx-auto lg:max-h-[75vh] w-full">
-                <h2 className="text-2xl font-bold text-gray-200 mb-1 flex-shrink-0">Prompt Editor</h2>
-                <div className="text-sm text-gray-400 mb-4 flex-shrink-0">
-                    <span className="font-semibold text-teal-400">{initialPrompt?.title || 'Prompt'}</span> - <span className="italic">{initialPrompt?.category}</span>
-                </div>
-                <div className="flex-grow min-h-[10rem] flex flex-col">
-                  <textarea
-                      ref={textEditorRef}
-                      value={currentPromptString}
-                      onChange={handleTextChange}
-                      className={`w-full flex-grow bg-gray-900/50 rounded-lg p-4 text-gray-300 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-base custom-scrollbar resize-none font-mono ${isFlashing ? 'animate-suggestion-flash' : ''}`}
-                      aria-label="Editor de prompt de texto"
-                  />
-                </div>
-
-
-                <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                            onClick={handleSuggestEdits}
-                            disabled={isSuggesting || isConverting}
-                            className="flex items-center justify-center space-x-2 w-full bg-teal-600/80 hover:bg-teal-600 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-teal-500/50"
-                        >
-                            {isSuggesting ? <SmallLoader /> : <><LightbulbIcon className="w-5 h-5" /> <span>Suggest Edits</span></>}
-                        </button>
-                        <button
-                            onClick={handleConvertToJSON}
-                            disabled={isSuggesting || isConverting}
-                            className="flex items-center justify-center space-x-2 w-full bg-purple-600/80 hover:bg-purple-600 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-purple-500/50"
-                        >
-                           {isConverting ? <SmallLoader /> : <> <JsonIcon className="w-5 h-5" /> <span>Convert to JSON</span> </>}
+                {finalPrompt && !isLoading && (
+                    <div className="space-y-4 animate-fade-slide-in-up">
+                        <div className="relative">
+                            <textarea
+                                readOnly
+                                value={finalPrompt}
+                                className="w-full h-48 bg-gray-900/70 rounded-lg p-4 pr-12 text-gray-300 whitespace-pre-wrap font-mono text-sm resize-none ring-1 ring-white/10 custom-scrollbar"
+                            />
+                            <button onClick={handleCopy} className="absolute top-2 right-2 p-2 rounded-lg bg-white/10 hover:bg-white/20" aria-label="Copiar prompt">
+                               {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
+                           </button>
+                        </div>
+                        <button onClick={handleSave} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg">
+                            Guardar en Galería
                         </button>
                     </div>
-                    
-                    {suggestionError && <p className="text-sm text-red-400 text-center">{suggestionError}</p>}
-                    
-                    {suggestions.length > 0 && (
-                        <div className="pt-3 border-t border-white/10 animate-fade-slide-in-up">
-                            <h4 className="font-semibold text-gray-300 text-sm mb-2">Suggestions:</h4>
-                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-2 -mr-2">
-                                {suggestions.map((suggestion, i) => {
-                                    const prefix = getSuggestionPrefix(suggestion.type);
-                                    return (
-                                        <button 
-                                            key={i} 
-                                            onClick={() => handleApplySuggestion(suggestion)}
-                                            className="text-left p-3 text-sm font-medium rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors ring-1 ring-white/10 w-full focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                            title="Apply this suggestion"
-                                        >
-                                           <strong className={`font-semibold ${prefix.color} mr-2`}>{prefix.text}</strong> {suggestion.description}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {actionButtons}
+                )}
             </div>
-        );
-    }
-
-    // Estado por defecto mientras se determina el tipo
-    return (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center glass-pane p-8 rounded-2xl">
-            <h2 className="mt-6 text-2xl font-bold text-gray-400">Loading Editor...</h2>
+            {galleryModalFor && (
+                <GalleryModal 
+                    prompts={savedPrompts}
+                    onSelect={handleSelectFromGalleryForModule}
+                    onClose={() => setGalleryModalFor(null)}
+                    filter={[galleryModalFor]}
+                />
+            )}
+            {isTemplateSelectorOpen && (
+                <GalleryModal
+                    title="Seleccionar Plantilla JSON"
+                    prompts={savedPrompts}
+                    onSelect={handleSelectJsonTemplate}
+                    onClose={() => setIsTemplateSelectorOpen(false)}
+                    filter={['structured']}
+                />
+            )}
         </div>
     );
 };

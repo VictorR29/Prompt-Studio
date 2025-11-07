@@ -2,6 +2,7 @@
 import React from 'react';
 import { AppView } from '../App';
 import { PencilIcon } from './icons/PencilIcon';
+import { GalleryIcon } from './icons/GalleryIcon';
 
 export type View = 'generator' | 'gallery' | 'structurer' | 'assembler' | 'editor';
 
@@ -19,9 +20,7 @@ const StructurerIcon: React.FC<{className?: string}> = ({className = "w-5 h-5"})
 const AssemblerIcon: React.FC<{className?: string}> = ({className = "w-5 h-5"}) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 7h.01M15 7h.01M9 12h.01M15 12h.01M9 17h.01M15 17h.01" /></svg>
 );
-const GalleryIcon: React.FC<{className?: string}> = ({className = "w-5 h-5"}) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-);
+
 
 export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
   const navButtonClasses = "flex items-center justify-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500";
@@ -33,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
     { view: 'structurer', label: 'Estructurador', icon: <StructurerIcon /> },
     { view: 'assembler', label: 'Ensamblador', icon: <AssemblerIcon /> },
     { view: 'editor', label: 'Editor', icon: <PencilIcon className="w-5 h-5" /> },
-    { view: 'gallery', label: 'Galería', icon: <GalleryIcon /> },
+    { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" /> },
   ];
   
   const activeIndex = navButtons.findIndex(button => button.view === view);
