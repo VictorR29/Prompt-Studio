@@ -1,16 +1,21 @@
 
 
+
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { SavedPrompt, ExtractionMode } from "../types";
 
-const API_KEY = process.env.API_KEY;
+const getApiKey = (): string | null => {
+    // 1. Prioriza la clave del usuario si está presente en localStorage.
+    if (typeof window !== 'undefined') {
+        const userKey = localStorage.getItem('userGeminiKey');
+        if (userKey) {
+            return userKey;
+        }
+    }
+    // 2. Si no hay clave de usuario, usa la clave segura del entorno.
+    return process.env.API_KEY || null;
+};
 
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-const model = 'gemini-2.5-flash';
 
 // --- Throttling Logic to prevent 429 errors ---
 const requestQueue: Array<{
@@ -43,9 +48,18 @@ async function processApiQueue() {
     setTimeout(processApiQueue, MIN_REQUEST_INTERVAL);
 }
 
-function callApiThrottled<T>(apiCall: () => Promise<T>): Promise<T> {
+function callApiThrottled<T>(apiCall: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
-        requestQueue.push({ apiCall, resolve, reject });
+        const wrappedApiCall = async () => {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                return reject(new Error("No se ha configurado la API Key. Añade tu clave en Configuración o asegúrate de que la clave de la aplicación esté disponible."));
+            }
+            const ai = new GoogleGenAI({ apiKey });
+            return apiCall(ai);
+        };
+
+        requestQueue.push({ apiCall: wrappedApiCall, resolve, reject });
         if (!isProcessingQueue) {
             processApiQueue();
         }
@@ -75,9 +89,8 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
             const imageParts = images.map(image => ({
                 inlineData: { data: image.imageBase64, mimeType: image.mimeType },
             }));
-            // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-            const response = await callApiThrottled(() => ai.models.generateContent({
-                model: model,
+            const response = await callApiThrottled(ai => ai.models.generateContent({
+                model: 'gemini-2.5-flash',
                 config: { systemInstruction },
                 contents: {
                     parts: [
@@ -93,6 +106,9 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
             return text.trim();
         } catch (error) {
             console.error(`Error calling Gemini API for ${errorContext}:`, error);
+            if (error instanceof Error) {
+                throw new Error(error.message || "No se pudo obtener una respuesta del modelo de IA.");
+            }
             throw new Error("No se pudo obtener una respuesta del modelo de IA.");
         }
     };
@@ -115,9 +131,8 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
             inlineData: { data: image.imageBase64, mimeType: image.mimeType },
         }));
         try {
-            // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-            const response = await callApiThrottled(() => ai.models.generateContent({
-                model: model,
+            const response = await callApiThrottled(ai => ai.models.generateContent({
+                model: 'gemini-2.5-flash',
                 config: {
                     systemInstruction,
                     responseMimeType: "application/json",
@@ -132,11 +147,13 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
                 },
             })) as GenerateContentResponse;
             const jsonString = response.text.trim();
-            // FIX: Add type assertion to JSON.parse to ensure type safety.
             const metadata = JSON.parse(jsonString) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
             return metadata;
         } catch (error) {
             console.error(`Error generating metadata with Gemini API for ${errorContext}:`, error);
+            if (error instanceof Error) {
+                throw new Error(error.message || `No se pudo generar la categorización automática para ${errorContext}.`);
+            }
             throw new Error(`No se pudo generar la categorización automática para ${errorContext}.`);
         }
     };
@@ -384,9 +401,8 @@ export const generateStructuredPromptMetadata = async (
   ];
 
   try {
-      // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-      const response = await callApiThrottled(() => ai.models.generateContent({
-          model: model,
+      const response = await callApiThrottled(ai => ai.models.generateContent({
+          model: 'gemini-2.5-flash',
           config: {
               systemInstruction: metadataSystemInstruction,
               responseMimeType: "application/json",
@@ -396,7 +412,6 @@ export const generateStructuredPromptMetadata = async (
       })) as GenerateContentResponse;
 
       const jsonString = response.text.trim();
-      // FIX: Add type assertion to JSON.parse to ensure type safety.
       const metadata = JSON.parse(jsonString) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
       return metadata;
   } catch (error) {
@@ -444,9 +459,8 @@ export const generateStructuredPrompt = async (promptData: { idea: string; style
     }
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: structuredPromptSystemInstruction,
                 responseMimeType: "application/json",
@@ -498,9 +512,8 @@ export const generateReplicationPrompt = async (image: ImagePayload): Promise<st
             },
         };
 
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: replicationPromptSystemInstruction,
                 responseMimeType: "application/json",
@@ -564,9 +577,8 @@ export const generateStructuredPromptFromImage = async (images: ImagePayload[], 
     }
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: structuredPromptFromImageSystemInstruction,
                 responseMimeType: "application/json",
@@ -630,9 +642,8 @@ export const generateFusedImagePrompt = async (subjectImage: ImagePayload, style
             },
         };
 
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: fusionImageSystemInstruction,
                 responseMimeType: "application/json",
@@ -667,8 +678,7 @@ export const editImageWithPrompt = async (
   prompt: string
 ): Promise<string> => {
   try {
-    // FIX: Cast the response to GenerateContentResponse to access the 'candidates' property.
-    const response = await callApiThrottled(() => ai.models.generateContent({
+    const response = await callApiThrottled(ai => ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
@@ -706,8 +716,7 @@ export const generateImageFromImages = async (
   styleImage: ImagePayload
 ): Promise<string> => {
   try {
-    // FIX: Cast the response to GenerateContentResponse to access the 'candidates' property.
-    const response = await callApiThrottled(() => ai.models.generateContent({
+    const response = await callApiThrottled(ai => ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
@@ -760,9 +769,8 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
     };
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: ideasSystemInstruction,
                 responseMimeType: "application/json",
@@ -776,7 +784,6 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
         })) as GenerateContentResponse;
 
         const jsonString = response.text.trim();
-        // FIX: Add type assertion to JSON.parse to ensure type safety.
         const ideas = JSON.parse(jsonString) as string[];
         return ideas;
     } catch (error) {
@@ -865,9 +872,8 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
     const assemblyRequest = `Ensambla los siguientes fragmentos en un prompt maestro coherente, siguiendo las reglas: \n${promptPieces.join('\n')}`;
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: masterAssemblerSystemInstruction,
             },
@@ -904,9 +910,8 @@ export const generateMasterPromptMetadata = async (prompt: string, images: Image
     }));
 
     try {
-      // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-      const response = await callApiThrottled(() => ai.models.generateContent({
-        model: model,
+      const response = await callApiThrottled(ai => ai.models.generateContent({
+        model: 'gemini-2.5-flash',
         config: {
           systemInstruction: metadataSystemInstruction,
           responseMimeType: "application/json",
@@ -922,7 +927,6 @@ export const generateMasterPromptMetadata = async (prompt: string, images: Image
       })) as GenerateContentResponse;
 
       const jsonString = response.text.trim();
-      // FIX: Add type assertion to JSON.parse to ensure type safety.
       const metadata = JSON.parse(jsonString) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
       return metadata;
     } catch (error) {
@@ -972,9 +976,8 @@ IMPORTANT: The value of 'text_to_remove' must be an EXACT substring that exists 
     };
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction,
                 responseMimeType: "application/json",
@@ -983,7 +986,6 @@ IMPORTANT: The value of 'text_to_remove' must be an EXACT substring that exists 
             contents: { parts: [{ text: `Analyze this prompt: "${prompt}"` }] }
         })) as GenerateContentResponse;
         const jsonString = response.text.trim();
-        // FIX: Add type assertion to JSON.parse to ensure type safety.
         return JSON.parse(jsonString) as PromptSuggestion[];
     } catch (error) {
         console.error("Error generating prompt suggestions with Gemini API:", error);
@@ -995,9 +997,8 @@ export const convertTextPromptToJson = async (prompt: string): Promise<string> =
     const systemInstruction = `Eres un experto en la creación de prompts JSON para IA de generación de imágenes. Tu tarea es analizar un prompt de texto detallado y convertirlo a un formato JSON estructurado. El objetivo es una reestructuración fiel sin perder información ni añadir nuevos detalles. Analiza el prompt del usuario, extrae sus componentes (sujeto, estilo, composición, etc.) y mapea cada uno al campo correspondiente en una plantilla JSON adecuada. El JSON final debe ser una representación estructurada y fiel del prompt original. Devuelve únicamente el objeto JSON final, válido y optimizado.`;
     
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction,
                 responseMimeType: "application/json",
@@ -1045,9 +1046,8 @@ Analyze the following JSON prompt and return the result with the specified struc
     };
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction,
                 responseMimeType: "application/json",
@@ -1056,7 +1056,6 @@ Analyze the following JSON prompt and return the result with the specified struc
             contents: { parts: [{ text: `Refactor this JSON prompt: \`\`\`json\n${prompt}\n\`\`\`` }] }
         })) as GenerateContentResponse;
         const jsonString = response.text.trim();
-        // FIX: Add type assertion to JSON.parse to ensure type safety.
         const result = JSON.parse(jsonString) as { refactored_prompt: string; explanation: string; };
         
         try {
@@ -1112,9 +1111,8 @@ const modularizeResponseSchema = {
 
 export const modularizePrompt = async (prompt: string): Promise<Record<ExtractionMode, string>> => {
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: modularizePromptSystemInstruction,
                 responseMimeType: "application/json",
@@ -1123,7 +1121,6 @@ export const modularizePrompt = async (prompt: string): Promise<Record<Extractio
             contents: { parts: [{ text: `Analiza y modulariza el siguiente prompt: "${prompt}"` }] },
         })) as GenerateContentResponse;
         const jsonString = response.text.trim();
-        // FIX: Add type assertion to JSON.parse to ensure type safety. This resolves the downstream errors in PromptEditor.tsx.
         return JSON.parse(jsonString) as Record<ExtractionMode, string>;
     } catch (error) {
         console.error("Error calling Gemini API for prompt modularization:", error);
@@ -1167,9 +1164,8 @@ ${otherFragmentsContext || "No additional context."}
 Generate 3 concise suggestions to enhance and expand the '${targetMode.toUpperCase()}' module based on this global context.`;
     
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: optimizeFragmentSystemInstruction,
                 responseMimeType: "application/json",
@@ -1178,7 +1174,6 @@ Generate 3 concise suggestions to enhance and expand the '${targetMode.toUpperCa
             contents: { parts: [{ text: userPrompt }] }
         })) as GenerateContentResponse;
         const jsonString = response.text.trim();
-        // FIX: Add type assertion to JSON.parse to ensure type safety.
         return JSON.parse(jsonString) as string[];
     } catch (error) {
         console.error("Error optimizing fragment contextually with Gemini API:", error);
@@ -1221,8 +1216,8 @@ ${otherFragmentsContext}
 Please rewrite the fragment to make it perfectly coherent with the provided context.`;
 
     try {
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: adaptFragmentSystemInstruction,
             },
@@ -1285,9 +1280,8 @@ ${activeModules}
 Sigue las reglas para integrar el contenido de los módulos en la plantilla JSON.`;
 
     try {
-        // FIX: Cast the response to GenerateContentResponse to access the 'text' property.
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: mergeModulesIntoJsonTemplateSystemInstruction,
                 responseMimeType: "application/json",
@@ -1329,8 +1323,8 @@ export const createJsonTemplate = async (jsonPrompt: string): Promise<string> =>
         const systemInstruction = `The following text is intended to be a valid JSON string, but it contains syntax errors. Please correct the syntax (e.g., fix quotes, remove trailing commas, etc.) and return ONLY the raw, corrected JSON string. Do not add explanations, markdown, or any other text outside of the JSON object. If it's impossible to fix, return an empty JSON object: {}.`;
         
         try {
-            const response = await callApiThrottled(() => ai.models.generateContent({
-                model: model,
+            const response = await callApiThrottled(ai => ai.models.generateContent({
+                model: 'gemini-2.5-flash',
                 config: { systemInstruction },
                 contents: { parts: [{ text: jsonPrompt }] },
             })) as GenerateContentResponse;
@@ -1348,8 +1342,8 @@ export const createJsonTemplate = async (jsonPrompt: string): Promise<string> =>
 
     // If we have a valid JSON string (either original or corrected), proceed to templatize it.
     try {
-        const response = await callApiThrottled(() => ai.models.generateContent({
-            model: model,
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: createJsonTemplateSystemInstruction,
                 responseMimeType: "application/json",

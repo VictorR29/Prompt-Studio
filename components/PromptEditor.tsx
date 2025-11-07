@@ -1,9 +1,6 @@
 
-
-
-
 // FIX: Import 'useState' and 'useEffect' from React to resolve hook usage and type inference errors.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
 import { modularizePrompt, assembleMasterPrompt, optimizePromptFragment, mergeModulesIntoJsonTemplate, createJsonTemplate, generateStructuredPromptMetadata, adaptFragmentToContext } from '../services/geminiService';
@@ -51,17 +48,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
     const [isJsonChoiceModalOpen, setIsJsonChoiceModalOpen] = useState(false);
     
-    useEffect(() => {
-        if (initialPrompt) {
-            handleLoadPrompt(initialPrompt.prompt);
-        }
-    }, [initialPrompt]);
-    
-    const handleLoadPrompt = async (promptText: string) => {
+    const handleLoadPrompt = useCallback(async (promptText: string) => {
         setLoadingAction('analyze');
         setError(null);
         try {
-            const modularized = await modularizePrompt(promptText);
+            // FIX: Cast the result from `modularizePrompt` to the expected type to prevent type errors down the line.
+            const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
             setFragments(modularized);
             setViewMode('editor');
         } catch (err) {
@@ -70,16 +62,23 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         } finally {
             setLoadingAction(null);
         }
-    };
-
+    }, []);
+    
+    useEffect(() => {
+        if (initialPrompt) {
+            handleLoadPrompt(initialPrompt.prompt);
+        }
+    }, [initialPrompt, handleLoadPrompt]);
+    
     const handleImportTemplate = async () => {
         if (!pastedJson.trim()) return;
 
         setLoadingAction('import');
         setError(null);
         try {
-            const templateJson = await createJsonTemplate(pastedJson);
-            const metadata = await generateStructuredPromptMetadata(templateJson);
+            // FIX: Cast results from service functions to their expected types.
+            const templateJson = await createJsonTemplate(pastedJson) as string;
+            const metadata = await generateStructuredPromptMetadata(templateJson) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
 
             const newTemplatePrompt: SavedPrompt = {
                 id: Date.now().toString(),
@@ -162,7 +161,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
                 setOptimizingModule(targetModule);
                 try {
-                    const adaptedFragment = await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments);
+                    // FIX: Cast the result from `adaptFragmentToContext` to a string.
+                    const adaptedFragment = await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments) as string;
                     handleFragmentChange(targetModule, adaptedFragment);
                     addToast(`Fragmento adaptado e insertado en '${EXTRACTION_MODE_MAP[targetModule].label}'`, 'success');
                 } catch (err) {
@@ -185,7 +185,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setSuggestions(prev => ({ ...prev, [mode]: [] }));
         setError(null);
         try {
-            const newSuggestions = await optimizePromptFragment(mode, fragments);
+            // FIX: Cast the result from `optimizePromptFragment` to an array of strings.
+            const newSuggestions = await optimizePromptFragment(mode, fragments) as string[];
             setSuggestions(prev => ({ ...prev, [mode]: newSuggestions }));
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -201,7 +202,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setError(null);
         setFinalPrompt('');
         try {
-            const result = await assembleMasterPrompt(fragments);
+            // FIX: Cast the result from `assembleMasterPrompt` to a string.
+            const result = await assembleMasterPrompt(fragments) as string;
             setFinalPrompt(result);
         } catch (err) {
             setOutputType(null);
@@ -256,7 +258,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         }, {} as Partial<Record<ExtractionMode, string>>);
 
         try {
-            const result = await mergeModulesIntoJsonTemplate(activeFragments, template.prompt);
+            // FIX: Cast the result from `mergeModulesIntoJsonTemplate` to a string.
+            const result = await mergeModulesIntoJsonTemplate(activeFragments, template.prompt) as string;
             setFinalPrompt(result);
         } catch (err) {
             setOutputType(null);

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -15,6 +16,7 @@ import { ExtractorModeSelector } from './components/ExtractorModeSelector';
 import { PromptModal } from './components/PromptModal';
 import { EXTRACTION_MODE_MAP } from './config';
 import { Toast } from './components/Toast';
+import { SettingsModal } from './components/SettingsModal';
 
 export type AppView = 'generator' | 'gallery' | 'structurer' | 'assembler' | 'editor';
 
@@ -38,6 +40,7 @@ const App: React.FC = () => {
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>('style');
   const [selectedPromptForModal, setSelectedPromptForModal] = useState<SavedPrompt | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -142,11 +145,12 @@ const App: React.FC = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
       setError(`Error en el análisis: ${errorMessage}`);
+      addToast(`Error en el análisis: ${errorMessage}`, 'error');
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, [images, extractionMode]);
+  }, [images, extractionMode, addToast]);
 
   const handleSaveExtractorPrompt = async () => {
     if (!prompt || images.length === 0) return;
@@ -177,6 +181,7 @@ const App: React.FC = () => {
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
         setError(`Error al guardar: ${errorMessage}`);
+        addToast(`Error al guardar: ${errorMessage}`, 'error');
         console.error(err);
     } finally {
         setIsSaving(false);
@@ -260,7 +265,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent text-gray-200 font-sans flex flex-col">
-      <Header view={view} setView={handleSetView} />
+      <Header view={view} setView={handleSetView} onOpenSettings={() => setIsSettingsModalOpen(true)} />
       <main className="flex-grow container mx-auto p-4 md:p-8 w-full pb-24 md:pb-8">
         {view === 'generator' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-slide-in-up">
@@ -347,6 +352,12 @@ const App: React.FC = () => {
           onClose={handleClosePromptModal}
           onDelete={handleDeletePrompt}
           onEdit={handleEditPrompt}
+        />
+      )}
+      {isSettingsModalOpen && (
+        <SettingsModal
+            onClose={() => setIsSettingsModalOpen(false)}
+            addToast={addToast}
         />
       )}
       <div aria-live="assertive" className="fixed inset-0 pointer-events-none p-4 flex flex-col items-end justify-end space-y-2 z-[100]">

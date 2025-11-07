@@ -1,14 +1,17 @@
 
+
 import React from 'react';
 import { AppView } from '../App';
 import { PencilIcon } from './icons/PencilIcon';
 import { GalleryIcon } from './icons/GalleryIcon';
+import { SettingsIcon } from './icons/SettingsIcon';
 
 export type View = 'generator' | 'gallery' | 'structurer' | 'assembler' | 'editor';
 
 interface HeaderProps {
     view: View;
     setView: (view: View) => void;
+    onOpenSettings: () => void;
 }
 
 const ExtractorIcon: React.FC<{className?: string}> = ({className = "w-5 h-5"}) => (
@@ -22,7 +25,7 @@ const AssemblerIcon: React.FC<{className?: string}> = ({className = "w-5 h-5"}) 
 );
 
 
-export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
+export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings }) => {
   const navButtonClasses = "flex items-center justify-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500";
   const activeClasses = "bg-teal-600 text-white shadow-lg";
   const inactiveClasses = "text-gray-300 hover:bg-white/10";
@@ -44,18 +47,27 @@ export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
             Prompt Studio
           </h1>
-          <nav className="hidden md:flex items-center space-x-1 bg-gray-900/50 p-1 rounded-full">
-            {navButtons.map(button => (
-              <button
-                  key={button.view}
-                  onClick={() => setView(button.view as View)}
-                  className={`${navButtonClasses} ${view === button.view ? activeClasses : inactiveClasses}`}
+          <div className="flex items-center space-x-2">
+            <nav className="hidden md:flex items-center space-x-1 bg-gray-900/50 p-1 rounded-full">
+              {navButtons.map(button => (
+                <button
+                    key={button.view}
+                    onClick={() => setView(button.view as View)}
+                    className={`${navButtonClasses} ${view === button.view ? activeClasses : inactiveClasses}`}
+                >
+                    {button.icon}
+                    <span>{button.label}</span>
+                </button>
+                ))}
+            </nav>
+            <button
+                onClick={onOpenSettings}
+                className="p-2.5 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
+                aria-label="Configuración"
               >
-                  {button.icon}
-                  <span>{button.label}</span>
-              </button>
-              ))}
-          </nav>
+              <SettingsIcon className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       </header>
 
