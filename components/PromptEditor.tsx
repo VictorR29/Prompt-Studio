@@ -1,4 +1,3 @@
-
 // FIX: Import 'useState' and 'useEffect' from React to resolve hook usage and type inference errors.
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
@@ -76,8 +75,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setLoadingAction('import');
         setError(null);
         try {
-            // FIX: Cast results from service functions to their expected types.
-            const templateJson = await createJsonTemplate(pastedJson) as string;
+            // FIX: Safely convert service call result to a string to avoid type errors.
+            const templateJson = String(await createJsonTemplate(pastedJson));
             const metadata = await generateStructuredPromptMetadata(templateJson) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
 
             const newTemplatePrompt: SavedPrompt = {
@@ -161,8 +160,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
                 setOptimizingModule(targetModule);
                 try {
-                    // FIX: Cast the result from `adaptFragmentToContext` to a string.
-                    const adaptedFragment = await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments) as string;
+                    // FIX: Safely convert service call result to a string to avoid type errors.
+                    const adaptedFragment = String(await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments));
                     handleFragmentChange(targetModule, adaptedFragment);
                     addToast(`Fragmento adaptado e insertado en '${EXTRACTION_MODE_MAP[targetModule].label}'`, 'success');
                 } catch (err) {
@@ -202,8 +201,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setError(null);
         setFinalPrompt('');
         try {
-            // FIX: Cast the result from `assembleMasterPrompt` to a string.
-            const result = await assembleMasterPrompt(fragments) as string;
+            // FIX: Safely convert service call result to a string to avoid type errors.
+            const result = String(await assembleMasterPrompt(fragments));
             setFinalPrompt(result);
         } catch (err) {
             setOutputType(null);
@@ -258,8 +257,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         }, {} as Partial<Record<ExtractionMode, string>>);
 
         try {
-            // FIX: Cast the result from `mergeModulesIntoJsonTemplate` to a string.
-            const result = await mergeModulesIntoJsonTemplate(activeFragments, template.prompt) as string;
+            // FIX: Safely convert service call result to a string to avoid type errors.
+            const result = String(await mergeModulesIntoJsonTemplate(activeFragments, template.prompt));
             setFinalPrompt(result);
         } catch (err) {
             setOutputType(null);
