@@ -214,7 +214,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     };
     
     const handleGenerateJson = () => {
-        const activeFragments = Object.values(fragments).some(v => v && v.trim() !== '');
+        // FIX: Use a type guard to ensure 'v' is a string before calling '.trim()'.
+        const activeFragments = Object.values(fragments).some(v => typeof v === 'string' && v.trim() !== '');
         if (!activeFragments) {
             setError("No hay contenido en los módulos para generar un JSON.");
             return;
@@ -226,7 +227,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleDirectJsonGeneration = () => {
         setIsJsonChoiceModalOpen(false);
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
-            if (value && value.trim() !== '') {
+            // FIX: Use a type guard to ensure 'value' is a string before calling '.trim()'.
+            if (typeof value === 'string' && value.trim() !== '') {
                 acc[key as ExtractionMode] = value;
             }
             return acc;
@@ -250,7 +252,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setFinalPrompt('');
         
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
-            if (value && value.trim() !== '') {
+            // FIX: Use a type guard to ensure 'value' is a string before calling '.trim()'.
+            if (typeof value === 'string' && value.trim() !== '') {
                 acc[key as ExtractionMode] = value;
             }
             return acc;
