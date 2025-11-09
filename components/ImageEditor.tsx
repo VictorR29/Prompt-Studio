@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback } from 'react';
 import { ImageUploader } from './ImageUploader';
 import { Loader } from './Loader';
@@ -237,8 +238,7 @@ export const MasterAssembler: React.FC<MasterAssemblerProps> = ({ onSaveMasterPr
                     </div>
                 ) : (
                      <div className="flex flex-col items-center justify-center h-full text-center">
-{/* Fix: Corrected the SVG syntax by moving the 'd' attribute to the 'path' element, fixing the 'viewBox', and removing a duplicate 'stroke' attribute. */}
-                        <svg className="w-16 h-16 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 16v-2m0-8v-2m0 4h.01M6 12H4m16 0h-2m-8 0h.01M12 18h.01M18 12h.01M6 6.01h.01M18 18.01h.01M6 18.01h.01M18 6.01h.01" /></svg>
+                        <svg className="w-16 h-16 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 16v-2m0-8v-2m0 4h.01M6 12H4m16 0h-2m-8 0h.01M12 18h.01M18 12h.01M6 6.01h.01M18 18.01h.01M6 18.01h.01M18 6.01h.01" /></svg>
                         <h2 className="mt-4 text-xl font-semibold text-gray-500">Esperando fragmentos</h2>
                         <p className="mt-1 text-gray-600">El prompt maestro aparecerá aquí.</p>
                     </div>

@@ -1,4 +1,4 @@
-// FIX: Import 'useState' and 'useEffect' from React to resolve hook usage and type inference errors.
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
@@ -51,7 +51,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setLoadingAction('analyze');
         setError(null);
         try {
-            // FIX: Cast the result from `modularizePrompt` to the expected type to prevent type errors down the line.
             const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
             setFragments(modularized);
             setViewMode('editor');
@@ -75,7 +74,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setLoadingAction('import');
         setError(null);
         try {
-            // FIX: Safely convert service call result to a string to avoid type errors.
             const templateJson = String(await createJsonTemplate(pastedJson));
             const metadata = await generateStructuredPromptMetadata(templateJson) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
 
@@ -160,7 +158,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
                 setOptimizingModule(targetModule);
                 try {
-                    // FIX: Safely convert service call result to a string to avoid type errors.
                     const adaptedFragment = String(await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments));
                     handleFragmentChange(targetModule, adaptedFragment);
                     addToast(`Fragmento adaptado e insertado en '${EXTRACTION_MODE_MAP[targetModule].label}'`, 'success');
@@ -184,7 +181,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setSuggestions(prev => ({ ...prev, [mode]: [] }));
         setError(null);
         try {
-            // FIX: Cast the result from `optimizePromptFragment` to an array of strings.
             const newSuggestions = await optimizePromptFragment(mode, fragments) as string[];
             setSuggestions(prev => ({ ...prev, [mode]: newSuggestions }));
         } catch (err) {
@@ -201,7 +197,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setError(null);
         setFinalPrompt('');
         try {
-            // FIX: Safely convert service call result to a string to avoid type errors.
             const result = String(await assembleMasterPrompt(fragments));
             setFinalPrompt(result);
         } catch (err) {
@@ -214,7 +209,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     };
     
     const handleGenerateJson = () => {
-        // FIX: Use a type guard to ensure 'v' is a string before calling '.trim()'.
         const activeFragments = Object.values(fragments).some(v => typeof v === 'string' && v.trim() !== '');
         if (!activeFragments) {
             setError("No hay contenido en los módulos para generar un JSON.");
@@ -227,7 +221,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleDirectJsonGeneration = () => {
         setIsJsonChoiceModalOpen(false);
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
-            // FIX: Use a type guard to ensure 'value' is a string before calling '.trim()'.
             if (typeof value === 'string' && value.trim() !== '') {
                 acc[key as ExtractionMode] = value;
             }
@@ -252,7 +245,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setFinalPrompt('');
         
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
-            // FIX: Use a type guard to ensure 'value' is a string before calling '.trim()'.
             if (typeof value === 'string' && value.trim() !== '') {
                 acc[key as ExtractionMode] = value;
             }
@@ -260,7 +252,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         }, {} as Partial<Record<ExtractionMode, string>>);
 
         try {
-            // FIX: Safely convert service call result to a string to avoid type errors.
             const result = String(await mergeModulesIntoJsonTemplate(activeFragments, template.prompt));
             setFinalPrompt(result);
         } catch (err) {
