@@ -111,7 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, addToast 
             onClick={handleClear}
             className="flex-grow text-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2.5 px-4 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-gray-500/50"
           >
-            Limpiar y Usar Clave por Defecto
+            Limpiar clave
           </button>
           <button
             onClick={handleSave}
