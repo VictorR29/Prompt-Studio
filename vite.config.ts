@@ -8,9 +8,6 @@ export default defineConfig(({ mode }) => {
     // FIX: Pass empty string to loadEnv to use default process.cwd() and avoid TypeScript type error for 'cwd'.
     const env = loadEnv(mode, '', '');
     return {
-      // Set base path for GitHub Pages
-      base: '/Prompt-Studio/', 
-      
       server: {
         port: 3000,
         host: '0.0.0.0',
