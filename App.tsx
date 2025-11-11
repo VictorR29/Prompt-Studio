@@ -3,8 +3,6 @@ import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { PromptDisplay } from './components/PromptDisplay';
 import { Gallery } from './components/Gallery';
-import { PromptStructurer } from './components/PromptStructurer';
-import { MasterAssembler } from './components/ImageEditor';
 import { PromptEditor } from './components/PromptEditor';
 import { generateFeatureMetadata, analyzeImageFeature } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
@@ -52,8 +50,6 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>('editor');
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
-  const [styleToStructure, setStyleToStructure] = useState<string | null>(null);
-  const [ideaToStructure, setIdeaToStructure] = useState<string | null>(null);
   const [promptForEditor, setPromptForEditor] = useState<SavedPrompt | null>(null);
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>('style');
   const [selectedPromptForModal, setSelectedPromptForModal] = useState<SavedPrompt | null>(null);
@@ -234,25 +230,6 @@ const App: React.FC = () => {
     } finally {
         setIsSaving(false);
     }
-  };
-  
-  // These functions are now conceptually part of the editor, but we keep the logic for now
-  const handleSaveStructuredPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
-    const newPrompt: SavedPrompt = {
-        id: Date.now().toString(),
-        ...promptToSave,
-    };
-    addPromptToGallery(newPrompt);
-    addToast('Prompt guardado en la galería', 'success');
-  };
-  
-  const handleSaveMasterPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
-    const newPrompt: SavedPrompt = {
-      id: Date.now().toString(),
-      ...promptToSave,
-    };
-    addPromptToGallery(newPrompt);
-    addToast('Prompt guardado en la galería', 'success');
   };
 
   const handleDeletePrompt = (id: string) => {

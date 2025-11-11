@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
-import { modularizePrompt, assembleMasterPrompt, optimizePromptFragment, mergeModulesIntoJsonTemplate, createJsonTemplate, generateStructuredPromptMetadata, adaptFragmentToContext } from '../services/geminiService';
+import { 
+    modularizePrompt, 
+    assembleMasterPrompt, 
+    optimizePromptFragment, 
+    mergeModulesIntoJsonTemplate, 
+    createJsonTemplate, 
+    generateStructuredPromptMetadata, 
+    adaptFragmentToContext, 
+    analyzeImageFeature,
+    generateStructuredPrompt,
+    generateStructuredPromptFromImage
+} from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -14,6 +25,12 @@ import { UndoIcon } from './icons/UndoIcon';
 import { GalleryModal } from './GalleryModal';
 import { JsonIcon } from './icons/JsonIcon';
 import { CloseIcon } from './icons/CloseIcon';
+import { fileToBase64 } from '../utils/fileUtils';
+import { ImageUploader } from './ImageUploader';
+import { SparklesIcon } from './icons/SparklesIcon';
+
+
+type ImageState = { url: string; base64: string; mimeType: string; };
 
 interface PromptEditorProps {
     initialPrompt: SavedPrompt | null;
@@ -33,10 +50,12 @@ const initialFragments: Partial<Record<ExtractionMode, string>> = {
 export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSavePrompt, savedPrompts, setView, onNavigateToGallery, addToast, setGlobalLoader }) => {
     const [viewMode, setViewMode] = useState<'selection' | 'editor'>('selection');
     const [fragments, setFragments] = useState<Partial<Record<ExtractionMode, string>>>(initialFragments);
+    const [imagesByModule, setImagesByModule] = useState<Partial<Record<ExtractionMode, ImageState[]>>>({});
     const [pastedText, setPastedText] = useState('');
     const [pastedJson, setPastedJson] = useState('');
-    const [loadingAction, setLoadingAction] = useState<'analyze' | 'import' | null>(null);
+    const [loadingAction, setLoadingAction] = useState<'analyze' | 'import' | 'structure' | null>(null);
     const [isLoading, setIsLoading] = useState(false); // For editor-mode actions
+    const [loadingModules, setLoadingModules] = useState<Partial<Record<ExtractionMode, boolean>>>({});
     const [error, setError] = useState<string | null>(null);
     const [finalPrompt, setFinalPrompt] = useState('');
     const [outputType, setOutputType] = useState<'text' | 'json' | null>(null);
@@ -46,6 +65,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const [suggestions, setSuggestions] = useState<Partial<Record<ExtractionMode, string[]>>>({});
     const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
     const [isJsonChoiceModalOpen, setIsJsonChoiceModalOpen] = useState(false);
+
+    // State for the new "Generate Structure" section
+    const [structurerIdea, setStructurerIdea] = useState('');
+    const [structurerStyle, setStructurerStyle] = useState('');
+    const [structurerImages, setStructurerImages] = useState<ImageState[]>([]);
     
     const handleLoadPrompt = useCallback(async (promptText: string) => {
         setLoadingAction('analyze');
@@ -58,11 +82,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al modularizar: ${errorMessage}`);
+            addToast(`Error al modularizar: ${errorMessage}`, 'error');
         } finally {
             setLoadingAction(null);
             setGlobalLoader({ active: false, message: '' });
         }
-    }, [setGlobalLoader]);
+    }, [setGlobalLoader, addToast]);
     
     useEffect(() => {
         if (initialPrompt) {
@@ -98,14 +123,47 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al importar plantilla: ${errorMessage}`);
+            addToast(`Error al importar plantilla: ${errorMessage}`, 'error');
         } finally {
             setLoadingAction(null);
             setGlobalLoader({ active: false, message: '' });
         }
     };
     
+    const handleGenerateStructure = async () => {
+        setLoadingAction('structure');
+        setError(null);
+        setGlobalLoader({ active: true, message: 'Generando prompt estructurado...' });
+
+        try {
+            let resultJson: string;
+            if (structurerImages.length > 0) {
+                 const imagePayloads = structurerImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
+                 resultJson = await generateStructuredPromptFromImage(imagePayloads, structurerStyle || structurerIdea);
+            } else {
+                if (!structurerIdea.trim()) {
+                    throw new Error('La idea principal es necesaria.');
+                }
+                resultJson = await generateStructuredPrompt({ idea: structurerIdea, style: structurerStyle });
+            }
+            
+            setGlobalLoader({ active: true, message: 'Estructura creada. Modularizando...' });
+            await handleLoadPrompt(resultJson);
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setError(`Error al generar estructura: ${errorMessage}`);
+            addToast(`Error al generar estructura: ${errorMessage}`, 'error');
+            setGlobalLoader({ active: false, message: '' });
+        } finally {
+            setLoadingAction(null);
+            // setGlobalLoader is handled by handleLoadPrompt on success
+        }
+    };
+
     const handleStartBlank = () => {
         setFragments(initialFragments);
+        setImagesByModule({});
         setFinalPrompt('');
         setError(null);
         setViewMode('editor');
@@ -113,6 +171,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
     const handleGoBackToSelection = () => {
         setFragments(initialFragments);
+        setImagesByModule({});
         setPastedText('');
         setError(null);
         setFinalPrompt('');
@@ -126,6 +185,56 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleFragmentChange = (mode: ExtractionMode, value: string) => {
         setFragments(prev => ({ ...prev, [mode]: value }));
     };
+
+    const analyzeImagesForModule = useCallback(async (mode: ExtractionMode, images: ImageState[]) => {
+        setLoadingModules(prev => ({ ...prev, [mode]: true }));
+        try {
+            const imagePayload = images.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
+            const result = await analyzeImageFeature(mode, imagePayload);
+            handleFragmentChange(mode, result);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            addToast(`Error al analizar imagen para '${EXTRACTION_MODE_MAP[mode].label}': ${errorMessage}`, 'error');
+        } finally {
+            setLoadingModules(prev => ({ ...prev, [mode]: false }));
+        }
+    }, [addToast]);
+
+    const handleImageUploadForModule = useCallback(async (mode: ExtractionMode, files: File[]) => {
+        const config = EXTRACTION_MODE_MAP[mode];
+        const maxImages = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
+        const currentImages = imagesByModule[mode] || [];
+        
+        if (currentImages.length + files.length > maxImages) {
+            addToast(`Máximo ${maxImages} imágenes para ${config.label}.`, 'error');
+            return;
+        }
+
+        try {
+            const newImagesData = await Promise.all(
+                Array.from(files).map(file => fileToBase64(file).then(data => ({ ...data, url: URL.createObjectURL(file) })))
+            );
+            
+            const allImages = [...currentImages, ...newImagesData];
+            setImagesByModule(prev => ({ ...prev, [mode]: allImages }));
+            await analyzeImagesForModule(mode, allImages);
+
+        } catch (err) {
+            addToast('Error al procesar imágenes.', 'error');
+        }
+    }, [imagesByModule, analyzeImagesForModule, addToast]);
+    
+    const handleImageRemoveForModule = useCallback(async (mode: ExtractionMode, indexToRemove: number) => {
+        const currentImages = imagesByModule[mode] || [];
+        const updatedImages = currentImages.filter((_, index) => index !== indexToRemove);
+        setImagesByModule(prev => ({ ...prev, [mode]: updatedImages }));
+
+        if (updatedImages.length > 0) {
+            await analyzeImagesForModule(mode, updatedImages);
+        } else {
+            handleFragmentChange(mode, '');
+        }
+    }, [imagesByModule, analyzeImagesForModule]);
     
     const handleOpenGalleryForModule = (mode: ExtractionMode) => {
         setGalleryModalFor(mode);
@@ -317,57 +426,93 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
     if (viewMode === 'selection') {
         return (
-            <div className="glass-pane p-8 rounded-2xl max-w-4xl mx-auto">
+            <div className="glass-pane p-6 md:p-8 rounded-2xl max-w-5xl mx-auto animate-fade-slide-in-up">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
-                        Panel de Control Modular
+                        Editor Hub
                     </h1>
                     <p className="mt-2 text-gray-400">Elige cómo quieres empezar a construir tu próximo gran prompt.</p>
                 </div>
 
-                {loadingAction && <div className="flex justify-center my-4"><Loader /></div>}
                 {error && <div className="my-4 text-center text-red-400 bg-red-500/10 p-3 rounded-lg"><p>{error}</p></div>}
                 
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
-                        <button onClick={onNavigateToGallery} data-tour-id="editor-load-gallery" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
-                            <GalleryIcon className="w-10 h-10 text-teal-400" />
-                            <h2 className="font-semibold text-gray-200">Cargar desde Galería</h2>
-                            <p className="text-xs text-gray-500">Carga un prompt guardado para editarlo o descomponerlo.</p>
-                        </button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                         <button onClick={handleStartBlank} data-tour-id="editor-start-blank" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
                             <FilePlusIcon className="w-10 h-10 text-teal-400" />
                             <h2 className="font-semibold text-gray-200">Empezar en Blanco</h2>
                             <p className="text-xs text-gray-500">Construye un prompt desde cero usando los módulos.</p>
                         </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div data-tour-id="editor-paste-text" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                        <button onClick={onNavigateToGallery} data-tour-id="editor-load-gallery" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
+                            <GalleryIcon className="w-10 h-10 text-teal-400" />
+                            <h2 className="font-semibold text-gray-200">Cargar desde Galería</h2>
+                            <p className="text-xs text-gray-500">Carga un prompt guardado para editarlo o descomponerlo.</p>
+                        </button>
+                         <button onClick={() => {
+                            const element = document.getElementById('paste-text-section');
+                            element?.scrollIntoView({ behavior: 'smooth' });
+                         }} className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
                             <ClipboardPasteIcon className="w-10 h-10 text-teal-400" />
+                            <h2 className="font-semibold text-gray-200">Analizar Texto</h2>
+                            <p className="text-xs text-gray-500">Pega un prompt y la IA lo descompondrá en módulos.</p>
+                        </button>
+                    </div>
+
+                    <div id="structure-section" data-tour-id="editor-generate-ai" className="flex flex-col items-center justify-center p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                        <SparklesIcon className="w-10 h-10 text-purple-400 mb-3" />
+                        <h2 className="font-semibold text-gray-200 text-lg">Generar Estructura con IA</h2>
+                        <p className="text-xs text-gray-500 max-w-2xl text-center mb-6">Describe una idea, añade un estilo y/o una imagen de referencia, y la IA generará una base modular completa para que la edites.</p>
+                        
+                        <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div className="flex flex-col space-y-4">
+                                <textarea
+                                    value={structurerIdea}
+                                    onChange={(e) => setStructurerIdea(e.target.value)}
+                                    placeholder="Idea Principal (ej: un astronauta explorando un planeta alienígena)..."
+                                    className="w-full flex-grow bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px] resize-none"
+                                />
+                                 <textarea
+                                    value={structurerStyle}
+                                    onChange={(e) => setStructurerStyle(e.target.value)}
+                                    placeholder="Estilo (Opcional, ej: cinematic, oil painting)..."
+                                    className="w-full flex-grow bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px] resize-none"
+                                />
+                           </div>
+                           <div className="h-full">
+                             <ImageUploader onImagesUpload={(files) => {
+                                fileToBase64(files[0]).then(imgData => setStructurerImages([{...imgData, url: URL.createObjectURL(files[0])}]));
+                             }} onImageRemove={() => setStructurerImages([])} images={structurerImages} maxImages={1} />
+                           </div>
+                        </div>
+
+                        <button onClick={handleGenerateStructure} disabled={(!structurerIdea.trim() && structurerImages.length === 0) || loadingAction !== null} className="w-full max-w-xs mt-4 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                            {loadingAction === 'structure' ? 'Generando...' : 'Generar y Modularizar'}
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div id="paste-text-section" data-tour-id="editor-paste-text" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
                             <h2 className="font-semibold text-gray-200">Analizar Prompt de Texto</h2>
-                            <p className="text-xs text-gray-500 max-w-md text-center">Pega un prompt existente y la IA lo descompondrá en los 9 módulos.</p>
                             <textarea
                                 value={pastedText}
                                 onChange={(e) => setPastedText(e.target.value)}
                                 placeholder="Pega tu prompt de texto aquí..."
-                                className="w-full mt-4 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
+                                className="w-full mt-2 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
                             />
                             <button onClick={() => handleLoadPrompt(pastedText)} disabled={!pastedText.trim() || loadingAction !== null} className="w-full mt-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
                                 {loadingAction === 'analyze' ? 'Analizando...' : 'Analizar y Modularizar'}
                             </button>
                         </div>
                          <div data-tour-id="editor-import-json" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
-                            <JsonIcon className="w-10 h-10 text-purple-400" />
                             <h2 className="font-semibold text-gray-200">Importar Plantilla JSON</h2>
-                            <p className="text-xs text-gray-500 max-w-md text-center">Pega un prompt JSON para guardarlo como una plantilla reutilizable en tu galería.</p>
                             <textarea
                                 value={pastedJson}
                                 onChange={(e) => setPastedJson(e.target.value)}
                                 placeholder="Pega tu prompt JSON aquí..."
-                                className="w-full mt-4 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
+                                className="w-full mt-2 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
                             />
                             <button onClick={handleImportTemplate} disabled={!pastedJson.trim() || loadingAction !== null} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
-                                {loadingAction === 'import' ? 'Analizando...' : 'Analizar y Guardar Plantilla'}
+                                {loadingAction === 'import' ? 'Analizando...' : 'Guardar como Plantilla'}
                             </button>
                         </div>
                     </div>
@@ -397,11 +542,15 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                         mode={key as ExtractionMode}
                         config={config}
                         value={fragments[key as ExtractionMode] || ''}
+                        images={imagesByModule[key as ExtractionMode] || []}
                         onChange={handleFragmentChange}
+                        onImageUpload={handleImageUploadForModule}
+                        onImageRemove={handleImageRemoveForModule}
                         onSavePrompt={onSavePrompt}
                         savedPrompts={savedPrompts}
                         onOpenGallery={handleOpenGalleryForModule}
                         onOptimize={handleOptimizeModule}
+                        isAnalyzingImages={loadingModules[key as ExtractionMode] || false}
                         isOptimizing={optimizingModule === (key as ExtractionMode)}
                         suggestions={suggestions[key as ExtractionMode] || []}
                         addToast={addToast}

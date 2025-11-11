@@ -4,16 +4,24 @@ import { EXTRACTION_MODE_MAP } from '../config';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { GalleryIcon } from './icons/GalleryIcon';
 import { SaveIcon } from './icons/SaveIcon';
+import { ImageIcon } from './icons/ImageIcon';
+import { CloseIcon } from './icons/CloseIcon';
+
+type ImageState = { url: string; base64: string; mimeType: string; };
 
 interface PromptModuleProps {
     mode: ExtractionMode;
     config: typeof EXTRACTION_MODE_MAP[ExtractionMode];
     value: string;
+    images: ImageState[];
     onChange: (mode: ExtractionMode, value: string) => void;
+    onImageUpload: (mode: ExtractionMode, files: File[]) => void;
+    onImageRemove: (mode: ExtractionMode, index: number) => void;
     onSavePrompt: (prompt: SavedPrompt) => void;
     savedPrompts: SavedPrompt[];
     onOpenGallery: (mode: ExtractionMode) => void;
     onOptimize: (mode: ExtractionMode) => void;
+    isAnalyzingImages: boolean;
     isOptimizing: boolean;
     suggestions: string[];
     addToast: (message: string, type?: 'success' | 'error') => void;
@@ -29,15 +37,36 @@ const SmallLoader: React.FC = () => (
 export const PromptModule: React.FC<PromptModuleProps> = ({ 
     mode, 
     config, 
-    value, 
-    onChange, 
+    value,
+    images,
+    onChange,
+    onImageUpload,
+    onImageRemove,
     onSavePrompt, 
     onOpenGallery,
     onOptimize,
+    isAnalyzingImages,
     isOptimizing,
     suggestions,
     addToast
 }) => {
+    const inputId = React.useRef(`file-upload-${mode}-${Math.random().toString(36).substring(7)}`);
+    const maxImages = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
+    const canUploadMore = images.length < maxImages;
+
+    const handleImageUploadClick = () => {
+        const inputElement = document.getElementById(inputId.current);
+        if (inputElement) {
+            inputElement.click();
+        }
+    };
+    
+    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) {
+            onImageUpload(mode, Array.from(event.target.files));
+        }
+        event.target.value = ''; // Reset input to allow re-uploading the same file
+    };
 
     const handleSaveFragment = () => {
         if (!value) return;
@@ -45,7 +74,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             id: Date.now().toString(),
             type: mode,
             prompt: value,
-            coverImage: '',
+            coverImage: images.length > 0 ? images[0].url : '',
             title: `${config.label} - ${value.substring(0, 20)}...`,
             category: config.label,
             artType: 'Fragmento de Prompt',
@@ -58,6 +87,25 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     return (
         <div className="glass-pane p-4 rounded-xl flex flex-col space-y-3" data-tour-id={`editor-module-${mode}`}>
             <h3 className={`font-semibold text-lg ${config.badgeClassName.replace('bg-', 'text-').replace('/20', '')}`}>{config.label}</h3>
+            
+            {images.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {images.map((image, index) => (
+                        <div key={index} className="relative w-12 h-12 group flex-shrink-0">
+                            <img src={image.url} alt={`Preview ${index}`} className="w-full h-full object-cover rounded-md" />
+                            <button 
+                                onClick={() => onImageRemove(mode, index)}
+                                disabled={isAnalyzingImages}
+                                className="absolute -top-1 -right-1 bg-red-600 hover:bg-red-500 text-white rounded-full p-0.5 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                                aria-label="Eliminar imagen"
+                            >
+                                <CloseIcon className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="relative flex-grow">
                 <textarea
                     value={value}
@@ -66,7 +114,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                     className="w-full h-full min-h-[100px] bg-gray-900/70 rounded-lg p-3 text-gray-300 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner resize-none custom-scrollbar"
                 />
             </div>
-            {suggestions.length > 0 && (
+            {suggestions.length > 0 && !isAnalyzingImages && (
                 <div className="space-y-2 animate-fade-slide-in-up">
                     {suggestions.map((s, i) => (
                         <button key={i} onClick={() => onChange(mode, s)} className="w-full text-left p-2 text-xs rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-colors">
@@ -76,13 +124,24 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 </div>
             )}
             <div className="flex items-center justify-end space-x-2 pt-2 border-t border-white/10" data-tour-id="module-actions-footer">
-                <button onClick={() => onOptimize(mode)} disabled={!value || isOptimizing} title="Optimizar con IA" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-optimize-button">
+                <input
+                    id={inputId.current}
+                    type="file"
+                    className="hidden"
+                    multiple={maxImages > 1}
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={handleFileSelected}
+                />
+                <button onClick={handleImageUploadClick} disabled={!canUploadMore || isAnalyzingImages} title="Analizar desde Imagen" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-image-upload">
+                    {isAnalyzingImages ? <SmallLoader /> : <ImageIcon className="w-4 h-4 text-amber-400" />}
+                </button>
+                <button onClick={() => onOptimize(mode)} disabled={!value || isOptimizing || isAnalyzingImages} title="Optimizar con IA" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-optimize-button">
                     {isOptimizing ? <SmallLoader /> : <SparklesIcon className="w-4 h-4 text-purple-400" />}
                 </button>
-                <button onClick={() => onOpenGallery(mode)} title="Reemplazar desde Galería" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors">
+                <button onClick={() => onOpenGallery(mode)} disabled={isAnalyzingImages} title="Reemplazar desde Galería" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors">
                     <GalleryIcon className="w-4 h-4 text-cyan-400" />
                 </button>
-                 <button onClick={handleSaveFragment} disabled={!value} title="Guardar fragmento en Galería" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors">
+                 <button onClick={handleSaveFragment} disabled={!value || isAnalyzingImages} title="Guardar fragmento en Galería" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors">
                     <SaveIcon className="w-4 h-4 text-green-400" />
                 </button>
             </div>
