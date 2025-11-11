@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -28,6 +29,25 @@ interface ToastMessage {
   type: 'success' | 'error';
 }
 
+const GlobalLoader: React.FC<{ message: string }> = ({ message }) => {
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-[101] flex flex-col items-center justify-center p-4 animate-fade-in-subtle"
+      style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      role="alert"
+      aria-live="assertive"
+    >
+      <Loader />
+      <p className="mt-4 text-lg font-semibold text-gray-200 text-center">
+        {message || 'Procesando con IA...'}
+      </p>
+       <p className="mt-1 text-sm text-gray-400 text-center">
+        La IA está trabajando. Esto puede tardar unos segundos...
+      </p>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [images, setImages] = useState<{ url: string; base64: string; mimeType: string; }[]>([]);
   const [prompt, setPrompt] = useState<string>('');
@@ -45,6 +65,7 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
+  const [globalLoaderState, setGlobalLoaderState] = useState<{ active: boolean; message: string }>({ active: false, message: '' });
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -390,6 +411,7 @@ const App: React.FC = () => {
                       setView={handleSetView}
                       onNavigateToGallery={() => handleSetView('gallery')}
                       addToast={addToast}
+                      setGlobalLoader={setGlobalLoaderState}
                   />
               </div>
           )}
@@ -413,6 +435,7 @@ const App: React.FC = () => {
             addToast={addToast}
         />
       )}
+      {globalLoaderState.active && <GlobalLoader message={globalLoaderState.message} />}
       <div aria-live="assertive" className="fixed inset-0 pointer-events-none p-4 flex flex-col items-end justify-end space-y-2 z-[100]">
         {toasts.map(toast => (
             <Toast

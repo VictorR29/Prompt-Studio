@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
@@ -23,6 +24,7 @@ interface PromptEditorProps {
     setView: (view: AppView) => void;
     onNavigateToGallery: () => void;
     addToast: (message: string, type?: 'success' | 'error') => void;
+    setGlobalLoader: (state: { active: boolean; message: string }) => void;
 }
 
 const initialFragments: Partial<Record<ExtractionMode, string>> = {
@@ -30,7 +32,7 @@ const initialFragments: Partial<Record<ExtractionMode, string>> = {
     scene: '', color: '', composition: '', style: ''
 };
 
-export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSavePrompt, savedPrompts, setView, onNavigateToGallery, addToast }) => {
+export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSavePrompt, savedPrompts, setView, onNavigateToGallery, addToast, setGlobalLoader }) => {
     const [viewMode, setViewMode] = useState<'selection' | 'editor'>('selection');
     const [fragments, setFragments] = useState<Partial<Record<ExtractionMode, string>>>(initialFragments);
     const [pastedText, setPastedText] = useState('');
@@ -50,6 +52,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleLoadPrompt = useCallback(async (promptText: string) => {
         setLoadingAction('analyze');
         setError(null);
+        setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
         try {
             const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
             setFragments(modularized);
@@ -59,8 +62,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setError(`Error al modularizar: ${errorMessage}`);
         } finally {
             setLoadingAction(null);
+            setGlobalLoader({ active: false, message: '' });
         }
-    }, []);
+    }, [setGlobalLoader]);
     
     useEffect(() => {
         if (initialPrompt) {
@@ -73,6 +77,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
         setLoadingAction('import');
         setError(null);
+        setGlobalLoader({ active: true, message: 'Creando plantilla desde JSON...' });
         try {
             const templateJson = String(await createJsonTemplate(pastedJson));
             const metadata = await generateStructuredPromptMetadata(templateJson) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
@@ -97,6 +102,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setError(`Error al importar plantilla: ${errorMessage}`);
         } finally {
             setLoadingAction(null);
+            setGlobalLoader({ active: false, message: '' });
         }
     };
     
@@ -157,6 +163,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                  if (!selectedPrompt) return;
 
                 setOptimizingModule(targetModule);
+                setGlobalLoader({ active: true, message: 'Adaptando fragmento al contexto...' });
                 try {
                     const adaptedFragment = String(await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments));
                     handleFragmentChange(targetModule, adaptedFragment);
@@ -168,6 +175,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     handleFragmentChange(targetModule, selectedPrompt.prompt);
                 } finally {
                     setOptimizingModule(null);
+                    setGlobalLoader({ active: false, message: '' });
                 }
             }
         }
@@ -180,6 +188,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setOptimizingModule(mode);
         setSuggestions(prev => ({ ...prev, [mode]: [] }));
         setError(null);
+        setGlobalLoader({ active: true, message: `Optimizando '${EXTRACTION_MODE_MAP[mode].label}' con IA...` });
         try {
             const newSuggestions = await optimizePromptFragment(mode, fragments) as string[];
             setSuggestions(prev => ({ ...prev, [mode]: newSuggestions }));
@@ -188,6 +197,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setError(`Error al optimizar: ${errorMessage}`);
         } finally {
             setOptimizingModule(null);
+            setGlobalLoader({ active: false, message: '' });
         }
     };
 
@@ -196,6 +206,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setOutputType('text');
         setError(null);
         setFinalPrompt('');
+        setGlobalLoader({ active: true, message: 'Ensamblando prompt de texto...' });
         try {
             const result = String(await assembleMasterPrompt(fragments));
             setFinalPrompt(result);
@@ -205,6 +216,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setError(`Error al ensamblar: ${errorMessage}`);
         } finally {
             setIsLoading(false);
+            setGlobalLoader({ active: false, message: '' });
         }
     };
     
@@ -243,6 +255,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setOutputType('json');
         setError(null);
         setFinalPrompt('');
+        setGlobalLoader({ active: true, message: 'Fusionando módulos con plantilla JSON...' });
         
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
             if (typeof value === 'string' && value.trim() !== '') {
@@ -260,6 +273,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setError(`Error al fusionar con plantilla: ${errorMessage}`);
         } finally {
             setIsLoading(false);
+            setGlobalLoader({ active: false, message: '' });
         }
     };
 
