@@ -522,87 +522,98 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center -mb-2">
-                <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
-                    Editor Modular
-                </h1>
-                <button
-                    onClick={handleGoBackToSelection}
-                    className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-gray-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
-                >
-                    <UndoIcon className="w-5 h-5" />
-                    <span>Volver</span>
-                </button>
-            </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour-id="editor-modules-grid">
-                {Object.entries(EXTRACTION_MODE_MAP).map(([key, config]) => (
-                    <PromptModule
-                        key={key}
-                        mode={key as ExtractionMode}
-                        config={config}
-                        value={fragments[key as ExtractionMode] || ''}
-                        images={imagesByModule[key as ExtractionMode] || []}
-                        onChange={handleFragmentChange}
-                        onImageUpload={handleImageUploadForModule}
-                        onImageRemove={handleImageRemoveForModule}
-                        onSavePrompt={onSavePrompt}
-                        savedPrompts={savedPrompts}
-                        onOpenGallery={handleOpenGalleryForModule}
-                        onOptimize={handleOptimizeModule}
-                        isAnalyzingImages={loadingModules[key as ExtractionMode] || false}
-                        isOptimizing={optimizingModule === (key as ExtractionMode)}
-                        suggestions={suggestions[key as ExtractionMode] || []}
-                        addToast={addToast}
-                    />
-                ))}
-            </div>
-            <div className="glass-pane p-6 rounded-2xl space-y-4" data-tour-id="editor-output-section">
-                <h2 className="text-xl font-bold text-white">Salida y Ensamblaje</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                     <button
-                        onClick={handleGenerateText}
-                        disabled={isLoading}
-                        className="w-full bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-teal-500/50 text-lg"
-                    >
-                        {isLoading && outputType === 'text' ? 'Generando...' : 'Generar Prompt de Texto'}
-                    </button>
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+            {/* Left Panel (Modules) */}
+            <div className="lg:col-span-7 space-y-6">
+                <div className="flex justify-between items-center -mb-2">
+                    <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
+                        Editor Modular
+                    </h1>
                     <button
-                        onClick={handleGenerateJson}
-                        disabled={isLoading}
-                        className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-purple-500/50 text-lg"
+                        onClick={handleGoBackToSelection}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-gray-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
                     >
-                        {isLoading && outputType === 'json' ? 'Generando...' : 'Generar como JSON'}
+                        <UndoIcon className="w-5 h-5" />
+                        <span>Volver</span>
                     </button>
                 </div>
-                
-                {error && <div className="text-center text-red-400 bg-red-500/10 p-3 rounded-lg"><p>{error}</p></div>}
-                
-                {isLoading && (outputType === 'text' || outputType === 'json') && (
-                    <div className="flex flex-col items-center justify-center h-full text-center py-4">
-                        <Loader />
-                        <p className="mt-4 text-gray-400">Ensamblando prompt...</p>
-                    </div>
-                )}
-
-                {finalPrompt && !isLoading && (
-                    <div className="space-y-4 animate-fade-slide-in-up">
-                        <div className="relative">
-                            <textarea
-                                readOnly
-                                value={finalPrompt}
-                                className="w-full h-48 bg-gray-900/70 rounded-lg p-4 pr-12 text-gray-300 whitespace-pre-wrap font-mono text-sm resize-none ring-1 ring-white/10 custom-scrollbar"
-                            />
-                            <button onClick={handleCopy} className="absolute top-2 right-2 p-2 rounded-lg bg-white/10 hover:bg-white/20" aria-label="Copiar prompt">
-                               {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
-                           </button>
-                        </div>
-                        <button onClick={handleSave} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg">
-                            Guardar en Galería
-                        </button>
-                    </div>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-tour-id="editor-modules-grid">
+                    {Object.entries(EXTRACTION_MODE_MAP).map(([key, config]) => (
+                        <PromptModule
+                            key={key}
+                            mode={key as ExtractionMode}
+                            config={config}
+                            value={fragments[key as ExtractionMode] || ''}
+                            images={imagesByModule[key as ExtractionMode] || []}
+                            onChange={handleFragmentChange}
+                            onImageUpload={handleImageUploadForModule}
+                            onImageRemove={handleImageRemoveForModule}
+                            onSavePrompt={onSavePrompt}
+                            savedPrompts={savedPrompts}
+                            onOpenGallery={handleOpenGalleryForModule}
+                            onOptimize={handleOptimizeModule}
+                            isAnalyzingImages={loadingModules[key as ExtractionMode] || false}
+                            isOptimizing={optimizingModule === (key as ExtractionMode)}
+                            suggestions={suggestions[key as ExtractionMode] || []}
+                            addToast={addToast}
+                        />
+                    ))}
+                </div>
             </div>
+
+            {/* Right Panel (Output) */}
+            <div className="mt-6 lg:mt-0 lg:col-span-5">
+                <div className="lg:sticky lg:top-[90px]">
+                    <div className="glass-pane p-6 rounded-2xl space-y-4" data-tour-id="editor-output-section">
+                        <h2 className="text-xl font-bold text-white">Salida y Ensamblaje</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                                onClick={handleGenerateText}
+                                disabled={isLoading}
+                                className="w-full bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-teal-500/50 text-lg"
+                            >
+                                {isLoading && outputType === 'text' ? 'Generando...' : 'Generar Prompt de Texto'}
+                            </button>
+                            <button
+                                onClick={handleGenerateJson}
+                                disabled={isLoading}
+                                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-purple-500/50 text-lg"
+                            >
+                                {isLoading && outputType === 'json' ? 'Generando...' : 'Generar como JSON'}
+                            </button>
+                        </div>
+                        
+                        {error && <div className="text-center text-red-400 bg-red-500/10 p-3 rounded-lg"><p>{error}</p></div>}
+                        
+                        {isLoading && (outputType === 'text' || outputType === 'json') && (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-4">
+                                <Loader />
+                                <p className="mt-4 text-gray-400">Ensamblando prompt...</p>
+                            </div>
+                        )}
+
+                        {finalPrompt && !isLoading && (
+                            <div className="space-y-4 animate-fade-slide-in-up">
+                                <div className="relative">
+                                    <textarea
+                                        readOnly
+                                        value={finalPrompt}
+                                        className="w-full h-48 bg-gray-900/70 rounded-lg p-4 pr-12 text-gray-300 whitespace-pre-wrap font-mono text-sm resize-none ring-1 ring-white/10 custom-scrollbar"
+                                    />
+                                    <button onClick={handleCopy} className="absolute top-2 right-2 p-2 rounded-lg bg-white/10 hover:bg-white/20" aria-label="Copiar prompt">
+                                    {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
+                                </button>
+                                </div>
+                                <button onClick={handleSave} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg">
+                                    Guardar en Galería
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Modals are kept at the end to ensure they are on top of the layout */}
             {galleryModalFor && (
                 <GalleryModal 
                     prompts={savedPrompts}
@@ -622,7 +633,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     filter={['structured']}
                 />
             )}
-             {isJsonChoiceModalOpen && (
+            {isJsonChoiceModalOpen && (
                 <div
                 className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-subtle"
                 style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
