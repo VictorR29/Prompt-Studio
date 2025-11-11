@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { SparklesIcon } from './icons/SparklesIcon';
@@ -50,6 +50,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     suggestions,
     addToast
 }) => {
+    const [isDragging, setIsDragging] = useState(false);
     const inputId = React.useRef(`file-upload-${mode}-${Math.random().toString(36).substring(7)}`);
     const maxImages = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
     const canUploadMore = images.length < maxImages;
@@ -83,6 +84,34 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
         onSavePrompt(newPrompt);
         addToast(`'${config.label}' guardado en la galería!`, 'success');
     };
+    
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && canUploadMore) {
+            onImageUpload(mode, Array.from(e.dataTransfer.files));
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (canUploadMore) {
+            setIsDragging(true);
+        }
+    };
+    
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
 
     return (
         <div className="glass-pane p-4 rounded-xl flex flex-col space-y-3" data-tour-id={`editor-module-${mode}`}>
@@ -106,13 +135,25 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 </div>
             )}
 
-            <div className="relative flex-grow">
+            <div 
+                className="relative flex-grow"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+            >
                 <textarea
                     value={value}
                     onChange={(e) => onChange(mode, e.target.value)}
                     placeholder={config.description}
                     className="w-full h-full min-h-[100px] bg-gray-900/70 rounded-lg p-3 text-gray-300 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner resize-none custom-scrollbar"
                 />
+                 {isDragging && (
+                    <div className="absolute inset-0 bg-teal-500/20 border-2 border-dashed border-teal-400 rounded-lg flex flex-col items-center justify-center pointer-events-none transition-opacity">
+                        <ImageIcon className="w-8 h-8 text-teal-300 mb-2" />
+                        <p className="text-sm font-semibold text-teal-300">Suelta para analizar</p>
+                    </div>
+                )}
             </div>
             {suggestions.length > 0 && !isAnalyzingImages && (
                 <div className="space-y-2 animate-fade-slide-in-up">
