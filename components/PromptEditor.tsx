@@ -28,6 +28,7 @@ import { CloseIcon } from './icons/CloseIcon';
 import { fileToBase64 } from '../utils/fileUtils';
 import { ImageUploader } from './ImageUploader';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { CollapsibleSection } from './CollapsibleSection';
 
 
 type ImageState = { url: string; base64: string; mimeType: string; };
@@ -65,11 +66,30 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const [suggestions, setSuggestions] = useState<Partial<Record<ExtractionMode, string[]>>>({});
     const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
     const [isJsonChoiceModalOpen, setIsJsonChoiceModalOpen] = useState(false);
+    const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
+        character: true,
+        aesthetic: true,
+    });
 
     // State for the new "Generate Structure" section
     const [structurerIdea, setStructurerIdea] = useState('');
     const [structurerStyle, setStructurerStyle] = useState('');
     const [structurerImages, setStructurerImages] = useState<ImageState[]>([]);
+
+    useEffect(() => {
+        try {
+            const savedState = localStorage.getItem('promptEditorSections');
+            if (savedState) {
+                setOpenSections(JSON.parse(savedState));
+            }
+        } catch (error) {
+            console.error("Failed to load section state from localStorage", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('promptEditorSections', JSON.stringify(openSections));
+    }, [openSections]);
     
     const handleLoadPrompt = useCallback(async (promptText: string) => {
         setLoadingAction('analyze');
@@ -520,6 +540,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             </div>
         );
     }
+    
+    const characterModules: ExtractionMode[] = ['subject', 'pose', 'expression', 'outfit', 'object'];
+    const aestheticModules: ExtractionMode[] = ['style', 'scene', 'color', 'composition'];
 
     return (
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
@@ -537,28 +560,70 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                         <span>Volver</span>
                     </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-tour-id="editor-modules-grid">
-                    {Object.entries(EXTRACTION_MODE_MAP).map(([key, config]) => (
-                        <PromptModule
-                            key={key}
-                            mode={key as ExtractionMode}
-                            config={config}
-                            value={fragments[key as ExtractionMode] || ''}
-                            images={imagesByModule[key as ExtractionMode] || []}
-                            onChange={handleFragmentChange}
-                            onImageUpload={handleImageUploadForModule}
-                            onImageRemove={handleImageRemoveForModule}
-                            onSavePrompt={onSavePrompt}
-                            savedPrompts={savedPrompts}
-                            onOpenGallery={handleOpenGalleryForModule}
-                            onOptimize={handleOptimizeModule}
-                            isAnalyzingImages={loadingModules[key as ExtractionMode] || false}
-                            isOptimizing={optimizingModule === (key as ExtractionMode)}
-                            suggestions={suggestions[key as ExtractionMode] || []}
-                            addToast={addToast}
-                        />
-                    ))}
-                </div>
+                
+                <CollapsibleSection
+                    title="Personaje / Sujeto"
+                    isOpen={!!openSections.character}
+                    onToggle={() => setOpenSections(prev => ({ ...prev, character: !prev.character }))}
+                >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-tour-id="editor-modules-grid">
+                        {characterModules.map((key) => {
+                            const config = EXTRACTION_MODE_MAP[key];
+                            return (
+                                <PromptModule
+                                    key={key}
+                                    mode={key}
+                                    config={config}
+                                    value={fragments[key] || ''}
+                                    images={imagesByModule[key] || []}
+                                    onChange={handleFragmentChange}
+                                    onImageUpload={handleImageUploadForModule}
+                                    onImageRemove={handleImageRemoveForModule}
+                                    onSavePrompt={onSavePrompt}
+                                    savedPrompts={savedPrompts}
+                                    onOpenGallery={handleOpenGalleryForModule}
+                                    onOptimize={handleOptimizeModule}
+                                    isAnalyzingImages={loadingModules[key] || false}
+                                    isOptimizing={optimizingModule === key}
+                                    suggestions={suggestions[key] || []}
+                                    addToast={addToast}
+                                />
+                            );
+                        })}
+                    </div>
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                    title="Estética / Composición"
+                    isOpen={!!openSections.aesthetic}
+                    onToggle={() => setOpenSections(prev => ({ ...prev, aesthetic: !prev.aesthetic }))}
+                >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {aestheticModules.map((key) => {
+                            const config = EXTRACTION_MODE_MAP[key];
+                            return (
+                                <PromptModule
+                                    key={key}
+                                    mode={key}
+                                    config={config}
+                                    value={fragments[key] || ''}
+                                    images={imagesByModule[key] || []}
+                                    onChange={handleFragmentChange}
+                                    onImageUpload={handleImageUploadForModule}
+                                    onImageRemove={handleImageRemoveForModule}
+                                    onSavePrompt={onSavePrompt}
+                                    savedPrompts={savedPrompts}
+                                    onOpenGallery={handleOpenGalleryForModule}
+                                    onOptimize={handleOptimizeModule}
+                                    isAnalyzingImages={loadingModules[key] || false}
+                                    isOptimizing={optimizingModule === key}
+                                    suggestions={suggestions[key] || []}
+                                    addToast={addToast}
+                                />
+                            );
+                        })}
+                    </div>
+                </CollapsibleSection>
             </div>
 
             {/* Right Panel (Output) */}
