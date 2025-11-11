@@ -38,7 +38,6 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
     { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" /> },
   ];
   
-  const activeIndex = navButtons.findIndex(button => button.view === view);
 
   return (
     <>
@@ -73,26 +72,24 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
 
       {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-pane border-t border-[var(--glass-border)] z-30">
-        <div className="grid grid-cols-5 items-center h-16 relative">
-           <div
-            className="absolute top-0 h-0.5 bg-teal-400 rounded-b-full transition-transform duration-300 ease-in-out"
-            style={{
-              width: '20%', // 100% / 5 buttons
-              transform: `translateX(${activeIndex * 100}%)`,
-            }}
-            aria-hidden="true"
-          />
+        <div className="flex justify-around items-center h-16 px-2">
           {navButtons.map(button => {
             const isActive = view === button.view;
             return (
               <button
                 key={`mobile-${button.view}`}
                 onClick={() => setView(button.view as View)}
-                className={`flex flex-col items-center justify-center space-y-1 w-full h-full transition-colors duration-200 focus:outline-none ${isActive ? 'text-teal-400' : 'text-gray-400 hover:text-teal-300'}`}
+                className={`flex items-center justify-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 ${
+                  isActive 
+                  ? 'bg-teal-600 text-white shadow-lg px-4 py-2 space-x-2' 
+                  : 'text-gray-400 hover:text-teal-300 w-12 h-12'
+                }`}
                 aria-current={isActive}
               >
-                {React.cloneElement(button.icon, { className: `w-6 h-6 transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}` })}
-                <span className="text-xs font-medium">{button.label}</span>
+                {React.cloneElement(button.icon, { className: `w-6 h-6 flex-shrink-0` })}
+                {isActive && (
+                  <span className="text-sm font-semibold whitespace-nowrap animate-fade-in-subtle">{button.label}</span>
+                )}
               </button>
             )
           })}

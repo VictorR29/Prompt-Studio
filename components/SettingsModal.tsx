@@ -73,7 +73,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, addToast 
         </div>
         <div className="space-y-4">
             <p className="text-gray-400 text-sm">
-                Puedes usar tu propia API Key de Google AI Studio. El uso se facturará a tu cuenta de Google Cloud. Si dejas este campo vacío, usarás la clave por defecto de la aplicación (sujeta a límites de uso).
+                Puedes usar tu propia API Key de Google AI Studio. El uso se facturará a tu cuenta de Google Cloud.
             </p>
             <div>
                 <label htmlFor="api-key-input" className="block text-sm font-medium text-gray-300 mb-2">
