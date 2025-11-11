@@ -17,7 +17,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { Loader } from './components/Loader';
 import { WalkthroughGuide } from './components/WalkthroughGuide';
 
-export type AppView = 'generator' | 'gallery' | 'structurer' | 'assembler' | 'editor';
+export type AppView = 'editor' | 'extractor' | 'gallery';
 
 interface ToastMessage {
   id: number;
@@ -235,7 +235,8 @@ const App: React.FC = () => {
         setIsSaving(false);
     }
   };
-
+  
+  // These functions are now conceptually part of the editor, but we keep the logic for now
   const handleSaveStructuredPrompt = (promptToSave: Omit<SavedPrompt, 'id'>) => {
     const newPrompt: SavedPrompt = {
         id: Date.now().toString(),
@@ -258,29 +259,21 @@ const App: React.FC = () => {
       setSavedPrompts(prev => prev.filter(p => p.id !== id));
   };
 
-  const handleUseStyleInStructurer = useCallback((style: string) => {
-    setStyleToStructure(style);
-    handleSetView('structurer');
-  }, []);
-  
-  const handleUseIdeaAndStyleInStructurer = useCallback((idea: string, style: string) => {
-    setIdeaToStructure(idea);
-    setStyleToStructure(style);
-    handleSetView('structurer');
-  }, []);
-  
-  const handleUseFeatureInStructurer = useCallback((featurePrompt: string) => {
-    setIdeaToStructure(featurePrompt);
-    setStyleToStructure(null);
-    handleSetView('structurer');
-  }, []);
-
-  const clearStyleToStructure = useCallback(() => {
-    setStyleToStructure(null);
-  }, []);
-  
-  const clearIdeaToStructure = useCallback(() => {
-    setIdeaToStructure(null);
+  const handleUseFeatureInEditor = useCallback((featurePrompt: string) => {
+    // This logic will be handled inside the new Editor Hub
+    // For now, it can load a temporary prompt into the editor
+     const tempPrompt: SavedPrompt = {
+      id: `temp-${Date.now()}`,
+      type: 'style', // Generic type
+      prompt: featurePrompt,
+      coverImage: '',
+      title: 'Nuevo Fragmento desde Extractor',
+      category: 'Fragmento',
+      artType: 'Prompt',
+      notes: 'Editando un nuevo fragmento desde el extractor.'
+    };
+    setPromptForEditor(tempPrompt);
+    handleSetView('editor');
   }, []);
 
   const handleEditPrompt = useCallback((promptToLoad: SavedPrompt) => {
@@ -288,21 +281,6 @@ const App: React.FC = () => {
     handleSetView('editor');
   }, []);
   
-  const handleGoToEditorFromStructurer = useCallback((promptString: string) => {
-    const tempPrompt: SavedPrompt = {
-      id: `temp-${Date.now()}`,
-      type: 'structured',
-      prompt: promptString,
-      coverImage: '',
-      title: 'Nuevo Prompt Estructurado',
-      category: 'JSON',
-      artType: 'Prompt',
-      notes: 'Editando un nuevo prompt desde el estructurador.'
-    };
-    setPromptForEditor(tempPrompt);
-    handleSetView('editor');
-  }, []);
-
   const handleSelectPromptForModal = useCallback((prompt: SavedPrompt) => {
     setSelectedPromptForModal(prompt);
   }, []);
@@ -352,7 +330,7 @@ const App: React.FC = () => {
         </main>
       ) : (
         <main className="flex-grow container mx-auto p-4 md:p-8 w-full pb-24 md:pb-8">
-          {view === 'generator' && (
+          {view === 'extractor' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-slide-in-up">
               <div className="flex flex-col space-y-6 glass-pane p-6 rounded-2xl">
                 <ExtractorModeSelector mode={extractionMode} setMode={setExtractionMode} />
@@ -380,9 +358,9 @@ const App: React.FC = () => {
                   error={error}
                   onSave={handleSaveExtractorPrompt}
                   extractionMode={extractionMode}
-                  onUseStyle={handleUseStyleInStructurer}
-                  onUseIdeaAndStyle={handleUseIdeaAndStyleInStructurer}
-                  onUseFeature={handleUseFeatureInStructurer}
+                  onUseStyle={(p) => handleUseFeatureInEditor(p)}
+                  onUseIdeaAndStyle={(idea, style) => handleUseFeatureInEditor(`${idea}, ${style}`)}
+                  onUseFeature={(p) => handleUseFeatureInEditor(p)}
                 />
               </div>
             </div>
@@ -392,25 +370,6 @@ const App: React.FC = () => {
               <Gallery 
                 prompts={savedPrompts} 
                 onSelect={handleSelectPromptForModal}
-              />
-            </div>
-          )}
-          {view === 'structurer' && (
-            <div className="animate-fade-slide-in-up">
-              <PromptStructurer 
-                initialStyle={styleToStructure}
-                onClearInitialStyle={clearStyleToStructure}
-                initialIdea={ideaToStructure}
-                onClearInitialIdea={clearIdeaToStructure}
-                onSaveStructuredPrompt={handleSaveStructuredPrompt}
-                onGoToEditor={handleGoToEditorFromStructurer}
-              />
-            </div>
-          )}
-          {view === 'assembler' && (
-            <div className="animate-fade-slide-in-up">
-              <MasterAssembler 
-                onSaveMasterPrompt={handleSaveMasterPrompt}
               />
             </div>
           )}

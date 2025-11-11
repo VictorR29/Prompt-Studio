@@ -91,7 +91,7 @@ export const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, isLoading,
     if (prompt) {
       const isStyleMode = extractionMode === 'style';
       const useAction = isStyleMode ? onUseStyle : onUseFeature;
-      const useActionLabel = `Usar ${EXTRACTION_MODE_MAP[extractionMode].label} en Estructurador`;
+      const useActionLabel = `Usar ${EXTRACTION_MODE_MAP[extractionMode].label} en Editor`;
 
       return (
         <div className="relative h-full flex flex-col space-y-4 animate-fade-slide-in-up">
