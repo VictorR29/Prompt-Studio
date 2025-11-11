@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { AppView } from '../App';
 import { PencilIcon } from './icons/PencilIcon';
@@ -31,11 +29,11 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
   const inactiveClasses = "text-gray-300 hover:bg-white/10";
 
   const navButtons = [
-    { view: 'generator', label: 'Extractor', icon: <ExtractorIcon /> },
-    { view: 'structurer', label: 'Estructurador', icon: <StructurerIcon /> },
-    { view: 'assembler', label: 'Ensamblador', icon: <AssemblerIcon /> },
-    { view: 'editor', label: 'Editor', icon: <PencilIcon className="w-5 h-5" /> },
-    { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" /> },
+    { view: 'generator', label: 'Extractor', icon: <ExtractorIcon />, tourId: 'nav-extractor' },
+    { view: 'structurer', label: 'Estructurador', icon: <StructurerIcon />, tourId: 'nav-structurer' },
+    { view: 'assembler', label: 'Ensamblador', icon: <AssemblerIcon />, tourId: 'nav-assembler' },
+    { view: 'editor', label: 'Editor', icon: <PencilIcon className="w-5 h-5" />, tourId: 'nav-editor' },
+    { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" />, tourId: 'nav-gallery' },
   ];
   
 
@@ -43,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
     <>
       <header className="sticky top-0 z-20 glass-pane border-b-0">
         <div className="container mx-auto flex items-center justify-between p-3">
-          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
+          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500" data-tour-id="main-title">
             Prompt Studio
           </h1>
           <div className="flex items-center space-x-2">
@@ -53,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
                     key={button.view}
                     onClick={() => setView(button.view as View)}
                     className={`${navButtonClasses} ${view === button.view ? activeClasses : inactiveClasses}`}
+                    data-tour-id={button.tourId}
                 >
                     {button.icon}
                     <span>{button.label}</span>
@@ -85,6 +84,7 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
                   : 'text-gray-400 hover:text-teal-300 w-12 h-12'
                 }`}
                 aria-current={isActive}
+                data-tour-id={`${button.tourId}-mobile`}
               >
                 {React.cloneElement(button.icon, { className: `w-6 h-6 flex-shrink-0` })}
                 {isActive && (

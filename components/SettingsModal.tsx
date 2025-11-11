@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { CloseIcon } from './icons/CloseIcon';
 
 interface SettingsModalProps {
   onClose: () => void;
+  onKeySaved: () => void;
   addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, addToast }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySaved, addToast }) => {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
@@ -26,6 +26,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, addToast 
       localStorage.removeItem('userGeminiKey');
       addToast('Usando la clave de la aplicación por defecto.', 'success');
     }
+    onKeySaved();
     onClose();
   };
   
@@ -33,6 +34,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, addToast 
     localStorage.removeItem('userGeminiKey');
     setApiKey('');
     addToast('Se ha limpiado tu API Key. Usando la clave por defecto.', 'success');
+    onKeySaved();
   };
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {

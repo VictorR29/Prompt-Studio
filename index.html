@@ -89,6 +89,26 @@
       .animate-fade-in-subtle {
         animation: fade-in-subtle 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
       }
+
+      /* Walkthrough styles */
+      .walkthrough-highlight {
+        position: absolute;
+        border-radius: 9999px; /* Pill shape for nav buttons */
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+      }
+      .walkthrough-highlight.rect {
+        border-radius: 0.75rem; /* Rect shape for other elements */
+      }
+      .walkthrough-tooltip {
+        position: absolute;
+        z-index: 10000;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        width: 320px;
+        max-width: 90vw;
+      }
     </style>
   <script type="importmap">
 {

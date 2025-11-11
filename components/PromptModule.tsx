@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
 import { EXTRACTION_MODE_MAP } from '../config';
@@ -58,7 +56,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     };
 
     return (
-        <div className="glass-pane p-4 rounded-xl flex flex-col space-y-3">
+        <div className="glass-pane p-4 rounded-xl flex flex-col space-y-3" data-tour-id={`editor-module-${mode}`}>
             <h3 className={`font-semibold text-lg ${config.badgeClassName.replace('bg-', 'text-').replace('/20', '')}`}>{config.label}</h3>
             <div className="relative flex-grow">
                 <textarea
@@ -77,8 +75,8 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                     ))}
                 </div>
             )}
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-white/10">
-                <button onClick={() => onOptimize(mode)} disabled={!value || isOptimizing} title="Optimizar con IA" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors">
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-white/10" data-tour-id="module-actions-footer">
+                <button onClick={() => onOptimize(mode)} disabled={!value || isOptimizing} title="Optimizar con IA" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-optimize-button">
                     {isOptimizing ? <SmallLoader /> : <SparklesIcon className="w-4 h-4 text-purple-400" />}
                 </button>
                 <button onClick={() => onOpenGallery(mode)} title="Reemplazar desde Galería" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors">

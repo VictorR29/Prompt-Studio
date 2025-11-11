@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode } from '../types';
 import { AppView } from '../App';
@@ -332,19 +330,19 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
-                        <button onClick={onNavigateToGallery} className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
+                        <button onClick={onNavigateToGallery} data-tour-id="editor-load-gallery" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
                             <GalleryIcon className="w-10 h-10 text-teal-400" />
                             <h2 className="font-semibold text-gray-200">Cargar desde Galería</h2>
                             <p className="text-xs text-gray-500">Carga un prompt guardado para editarlo o descomponerlo.</p>
                         </button>
-                        <button onClick={handleStartBlank} className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
+                        <button onClick={handleStartBlank} data-tour-id="editor-start-blank" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 hover:bg-white/10 rounded-lg transition-all ring-1 ring-white/10 hover:ring-teal-400">
                             <FilePlusIcon className="w-10 h-10 text-teal-400" />
                             <h2 className="font-semibold text-gray-200">Empezar en Blanco</h2>
                             <p className="text-xs text-gray-500">Construye un prompt desde cero usando los módulos.</p>
                         </button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                        <div data-tour-id="editor-paste-text" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
                             <ClipboardPasteIcon className="w-10 h-10 text-teal-400" />
                             <h2 className="font-semibold text-gray-200">Analizar Prompt de Texto</h2>
                             <p className="text-xs text-gray-500 max-w-md text-center">Pega un prompt existente y la IA lo descompondrá en los 9 módulos.</p>
@@ -358,7 +356,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 {loadingAction === 'analyze' ? 'Analizando...' : 'Analizar y Modularizar'}
                             </button>
                         </div>
-                         <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                         <div data-tour-id="editor-import-json" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
                             <JsonIcon className="w-10 h-10 text-purple-400" />
                             <h2 className="font-semibold text-gray-200">Importar Plantilla JSON</h2>
                             <p className="text-xs text-gray-500 max-w-md text-center">Pega un prompt JSON para guardarlo como una plantilla reutilizable en tu galería.</p>
@@ -392,7 +390,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     <span>Volver</span>
                 </button>
             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-tour-id="editor-modules-grid">
                 {Object.entries(EXTRACTION_MODE_MAP).map(([key, config]) => (
                     <PromptModule
                         key={key}
@@ -410,7 +408,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     />
                 ))}
             </div>
-            <div className="glass-pane p-6 rounded-2xl space-y-4">
+            <div className="glass-pane p-6 rounded-2xl space-y-4" data-tour-id="editor-output-section">
                 <h2 className="text-xl font-bold text-white">Salida y Ensamblaje</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                      <button

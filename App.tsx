@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -20,6 +15,7 @@ import { EXTRACTION_MODE_MAP } from './config';
 import { Toast } from './components/Toast';
 import { SettingsModal } from './components/SettingsModal';
 import { Loader } from './components/Loader';
+import { WalkthroughGuide } from './components/WalkthroughGuide';
 
 export type AppView = 'generator' | 'gallery' | 'structurer' | 'assembler' | 'editor';
 
@@ -66,6 +62,8 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
   const [globalLoaderState, setGlobalLoaderState] = useState<{ active: boolean; message: string }>({ active: false, message: '' });
+  const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
+  const [hasCheckedForWalkthrough, setHasCheckedForWalkthrough] = useState(false);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -75,13 +73,23 @@ const App: React.FC = () => {
   const checkApiKey = useCallback(() => {
     const userKey = localStorage.getItem('userGeminiKey');
     const envKey = process.env.API_KEY;
-    if ((userKey && userKey.trim() !== '') || (envKey && envKey.trim() !== '')) {
-      setHasApiKey(true);
+    const keyExists = (userKey && userKey.trim() !== '') || (envKey && envKey.trim() !== '');
+    if (keyExists) {
+        setHasApiKey(true);
+        if (!hasCheckedForWalkthrough) {
+            const hasCompleted = localStorage.getItem('hasCompletedWalkthrough');
+            if (!hasCompleted) {
+                // Delay to allow UI to settle before starting the tour
+                setTimeout(() => setIsWalkthroughActive(true), 500);
+            }
+            setHasCheckedForWalkthrough(true);
+        }
     } else {
-      setHasApiKey(false);
+        setHasApiKey(false);
     }
     setIsCheckingApiKey(false);
-  }, []);
+  }, [hasCheckedForWalkthrough]);
+
 
   useEffect(() => {
     checkApiKey();
@@ -303,9 +311,14 @@ const App: React.FC = () => {
       setSelectedPromptForModal(null);
   }, []);
 
-  const handleCloseSettings = () => {
-    setIsSettingsModalOpen(false);
-    checkApiKey(); // Re-check for the key when the modal is closed
+  const handleKeySaved = () => {
+    checkApiKey(); // Re-check for the key, which will trigger walkthrough if needed
+  };
+
+  const finishWalkthrough = () => {
+    localStorage.setItem('hasCompletedWalkthrough', 'true');
+    setIsWalkthroughActive(false);
+    addToast('¡Tutorial completado! Ya estás listo para crear.', 'success');
   };
 
   if (isCheckingApiKey) {
@@ -431,11 +444,19 @@ const App: React.FC = () => {
       )}
       {isSettingsModalOpen && (
         <SettingsModal
-            onClose={handleCloseSettings}
+            onClose={() => setIsSettingsModalOpen(false)}
+            onKeySaved={handleKeySaved}
             addToast={addToast}
         />
       )}
       {globalLoaderState.active && <GlobalLoader message={globalLoaderState.message} />}
+      {isWalkthroughActive && (
+        <WalkthroughGuide 
+          onFinish={finishWalkthrough}
+          setView={setView}
+          currentView={view}
+        />
+      )}
       <div aria-live="assertive" className="fixed inset-0 pointer-events-none p-4 flex flex-col items-end justify-end space-y-2 z-[100]">
         {toasts.map(toast => (
             <Toast
