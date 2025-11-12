@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { ExtractionMode } from '../types';
 import { EXTRACTION_MODES } from '../config';
 
@@ -11,18 +11,39 @@ export const ExtractorModeSelector: React.FC<ExtractorModeSelectorProps> = ({ mo
   const containerRef = useRef<HTMLDivElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({});
 
-  useEffect(() => {
+  const updateIndicator = useCallback(() => {
     if (containerRef.current) {
       const activeButton = containerRef.current.querySelector(`[role="radio"][aria-checked="true"]`) as HTMLButtonElement;
       if (activeButton) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const buttonRect = activeButton.getBoundingClientRect();
+        
         setIndicatorStyle({
-          width: `${activeButton.offsetWidth}px`,
-          height: `${activeButton.offsetHeight}px`,
-          transform: `translate(${activeButton.offsetLeft}px, ${activeButton.offsetTop}px)`,
+          width: `${buttonRect.width}px`,
+          height: `${buttonRect.height}px`,
+          transform: `translate(${buttonRect.left - containerRect.left}px, ${buttonRect.top - containerRect.top}px)`,
         });
       }
     }
-  }, [mode]);
+  }, []);
+
+  useLayoutEffect(() => {
+    // Initial calculation
+    updateIndicator();
+
+    // Recalculate after fonts are loaded, which can change button sizes
+    document.fonts.ready.then(() => {
+        updateIndicator();
+    });
+
+    // Recalculate on window resize
+    window.addEventListener('resize', updateIndicator);
+
+    return () => {
+      window.removeEventListener('resize', updateIndicator);
+    };
+  }, [mode, updateIndicator]);
+
 
   return (
     <div className="w-full">
@@ -40,7 +61,7 @@ export const ExtractorModeSelector: React.FC<ExtractorModeSelectorProps> = ({ mo
                         onClick={() => setMode(item.id)}
                         role="radio"
                         aria-checked={mode === item.id}
-                        className={`relative z-10 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 ${mode === item.id ? 'text-white' : 'text-gray-300 hover:text-white'}`}
+                        className={`relative z-10 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 text-center ${mode === item.id ? 'text-white' : 'text-gray-300 hover:text-white'}`}
                     >
                         {item.label}
                     </button>
