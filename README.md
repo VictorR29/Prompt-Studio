@@ -64,9 +64,3 @@ Si eres un apasionado del arte con IA y quieres mejorar Prompt Studio, ¡tu ayud
 * Haz tus Cambios y haz commit (`git commit -m 'Add some AmazingArtFeature'`).
 * Haz Push a tu rama (`git push origin feature/AmazingArtFeature`).
 * Abre un Pull Request.
-
----
-
-### 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Consulta el archivo `LICENSE` para más detalles.
