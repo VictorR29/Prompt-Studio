@@ -10,8 +10,6 @@ Esta aplicación web fue programada usando **Vibe Coding** asistido por **Google
 
 Hemos consolidado el flujo de trabajo en torno al **Editor Modular**, el corazón de la aplicación, ahora enriquecido con las funciones del **Ensamblador** y **Estructurador**.
 
-![Captura del Editor Hub de Prompt Studio](assets/Editor Hub.png)
-
 ### ✨ Características Clave y Flujos de Entrada
 
 * **Análisis Inverso y Modularización (9 Fragmentos):** Descompón cualquier *prompt* de texto o JSON en **9 módulos editables** (Sujeto, Pose, Estilo, Composición, etc.) listos para ser modificados.
@@ -22,8 +20,6 @@ Hemos consolidado el flujo de trabajo en torno al **Editor Modular**, el corazó
 
 El sistema aplica **Lógica de Prioridad y Filtrado** (Reglas Maestras) para eliminar redundancias y conflictos entre los fragmentos (ej., el color del Outfit vs. la Paleta de Colores) justo antes de generar el *prompt* final.
 
-![Captura del Prompt Final Ensamblado](assets/resultado-del-edit.png)
-
 ---
 
 ### 🖼️ Edición Granular y Optimización
@@ -31,8 +27,6 @@ El sistema aplica **Lógica de Prioridad y Filtrado** (Reglas Maestras) para eli
 Cada uno de los 9 fragmentos tiene su propia herramienta de refinamiento.
 
 * **Optimización Contextual:** Recibe **sugerencias inteligentes** en tiempo real para cada módulo, basadas en el contexto del *prompt* completo que estás construyendo.
-
-![Captura del Módulo en Edición con Opciones de Optimización](assets/editando.png)
 
 ---
 
