@@ -10,7 +10,7 @@ Esta aplicación web fue programada usando **Vibe Coding** asistido por **Google
 
 Hemos consolidado el flujo de trabajo en torno al **Editor Modular**, el corazón de la aplicación, ahora enriquecido con las funciones del **Ensamblador** y **Estructurador**.
 
-![Captura del Editor Hub de Prompt Studio](assets/editor-nuevo.png)
+![Captura del Editor Hub de Prompt Studio](assets/Editor Hub.png)
 
 ### ✨ Características Clave y Flujos de Entrada
 
