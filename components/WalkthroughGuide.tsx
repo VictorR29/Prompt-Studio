@@ -41,6 +41,10 @@ const getTooltipPosition = (rect: DOMRect, placement = 'bottom') => {
         if (placement === 'left' && (rect.left - gap - tooltipWidth < viewportMargin)) {
             effectivePlacement = 'right';
         }
+        // For top placement on an element that is far right, 'left' might be better.
+        if (placement === 'top' && (rect.left + rect.width / 2 > window.innerWidth / 2) && (rect.left - gap - tooltipWidth > viewportMargin)) {
+            effectivePlacement = 'left';
+        }
     }
 
     // Apply styling based on the final determined placement.
