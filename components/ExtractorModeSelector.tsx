@@ -61,7 +61,7 @@ export const ExtractorModeSelector: React.FC<ExtractorModeSelectorProps> = ({ mo
                         onClick={() => setMode(item.id)}
                         role="radio"
                         aria-checked={mode === item.id}
-                        className={`relative z-10 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 text-center ${mode === item.id ? 'text-white' : 'text-gray-300 hover:text-white'}`}
+                        className={`relative z-10 w-full px-3 py-2 text-sm font-semibold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 flex items-center justify-center ${mode === item.id ? 'text-white' : 'text-gray-300 hover:text-white'}`}
                     >
                         {item.label}
                     </button>
