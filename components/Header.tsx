@@ -2,21 +2,19 @@ import React from 'react';
 import { AppView } from '../App';
 import { PencilIcon } from './icons/PencilIcon';
 import { GalleryIcon } from './icons/GalleryIcon';
-import { SettingsIcon } from './icons/SettingsIcon';
 
 export type View = 'editor' | 'extractor' | 'gallery';
 
 interface HeaderProps {
     view: View;
     setView: (view: View) => void;
-    onOpenSettings: () => void;
 }
 
 const ExtractorIcon: React.FC<{className?: string}> = ({className = "w-5 h-5"}) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.95-4.243-1.591 1.591M5.25 12H3m4.243-4.95L6 6m11.25 6.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
 );
 
-export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings }) => {
+export const Header: React.FC<HeaderProps> = ({ view, setView }) => {
   const navButtonClasses = "flex items-center justify-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500";
   const activeClasses = "bg-teal-600 text-white shadow-lg";
   const inactiveClasses = "text-gray-300 hover:bg-white/10";
@@ -49,13 +47,6 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
                 </button>
                 ))}
             </nav>
-            <button
-                onClick={onOpenSettings}
-                className="p-2.5 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
-                aria-label="Configuración"
-              >
-              <SettingsIcon className="w-6 h-6" />
-            </button>
           </div>
         </div>
       </header>

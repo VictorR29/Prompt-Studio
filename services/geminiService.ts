@@ -1,21 +1,5 @@
-
-
-
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { SavedPrompt, ExtractionMode } from "../types";
-
-const getApiKey = (): string | null => {
-    // 1. Prioriza la clave del usuario si está presente en localStorage.
-    if (typeof window !== 'undefined') {
-        const userKey = localStorage.getItem('userGeminiKey');
-        if (userKey) {
-            return userKey;
-        }
-    }
-    // 2. Si no hay clave de usuario, usa la clave segura del entorno.
-    return process.env.API_KEY || null;
-};
-
 
 // --- Throttling Logic to prevent 429 errors ---
 const requestQueue: Array<{
@@ -51,11 +35,10 @@ async function processApiQueue() {
 function callApiThrottled<T>(apiCall: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
         const wrappedApiCall = async () => {
-            const apiKey = getApiKey();
-            if (!apiKey) {
-                return reject(new Error("No se ha configurado la API Key. Añade tu clave en Configuración o asegúrate de que la clave de la aplicación esté disponible."));
+            if (!process.env.API_KEY) {
+                return reject(new Error("API Key no encontrada. Asegúrate de que está configurada en las variables de entorno."));
             }
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             return apiCall(ai);
         };
 
@@ -273,23 +256,33 @@ Foco y Profundidad: Control de nitidez y el desenfoque (ej. shallow depth of fie
 Ubicación del Sujeto: Posición clave dentro del encuadre (ej. subject framed by a doorway, centered subject, leading lines composition).
 
 Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
-    color: `Analiza el uso del color en la imagen. Tu tarea es generar una descripción única, concisa y optimizada, siempre en inglés, que especifique la paleta, su distribución y el impacto tonal de forma matizada. Omite códigos HEX y utiliza nombres de colores descriptivos (ej. 'deep cobalt blue', 'fiery crimson', 'muted beige').
+    color: `Tu tarea es analizar el uso del color en la imagen y generar una descripción optimizada en inglés.
 
-La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+**Paso 1: Análisis de la Imagen**
+Primero, determina si la imagen es:
+A) Una escena con contenido (personajes, paisajes, objetos definidos).
+B) Principalmente una paleta de colores abstracta (muestras de color, gradientes, sin un sujeto claro).
 
-1.  **Esquema de Color, Tono y Saturación:** El tipo de paleta, la temperatura dominante y el nivel de saturación general (ej. 'vibrant complementary palette', 'desaturated and muted analogous color scheme').
+**Paso 2: Generación del Prompt según el tipo de imagen**
 
-2.  **Colores Dominantes y Variaciones Tonales:** Los tonos principales y sus matices o variaciones (ej. 'dominated by earthy tones, ranging from deep umber to light beige').
+**SI ES UNA ESCENA CON CONTENIDO (A), sigue estas reglas:**
+Genera una descripción que especifique la paleta y su distribución por zonas. Omite códigos HEX y usa nombres de colores descriptivos.
+1.  **Esquema General:** Describe el esquema de color, tono y saturación (ej. 'vibrant complementary palette', 'desaturated analogous color scheme').
+2.  **Colores Dominantes:** Menciona los tonos principales.
+3.  **Aplicación por Zonas (REGLA CRÍTICA):** Describe dónde se localizan los colores clave usando áreas funcionales y genéricas. NO uses nombres de prendas específicas.
+    *   **Usa:** 'hair area', 'skin tone', 'primary garment area', 'secondary garment area', 'background', 'foreground elements', 'main light source color'.
+    *   **EVITA:** 'dress', 'hat', 'boots', 'sword'.
+    *   **Ejemplo:** '...fiery red on the main garment area, deep cobalt blue in the background.'
+4.  **Contraste y Calidad:** Describe el contraste y la calidad general de la luz.
 
-3.  **Aplicación Contextual por Zonas (REGLA CRÍTICA):** Describe dónde se localizan los colores clave. Para evitar conflictos de forma, DEBES usar áreas genéricas y funcionales. NO uses nombres de prendas o accesorios específicos.
-    *   **Usa términos como:** 'hair area', 'skin tone', 'primary garment area', 'secondary garment area', 'background', 'foreground elements', 'main light source color'.
-    *   **EVITA términos como:** 'dress', 'hat', 'boots', 'sword'.
-    *   **Ejemplo Correcto:** '...with fiery red on the main garment area, and deep cobalt blue in the background.'
-    *   **Ejemplo Incorrecto:** '...with a red dress and a blue sky.'
+**SI ES UNA PALETA DE COLORES ABSTRACTA (B), sigue estas reglas:**
+Genera una descripción global de la paleta, sin asignarla a zonas específicas.
+1.  **Atmósfera y Tono:** Describe la sensación general de la paleta (ej. 'a warm and autumnal color palette', 'a cold, futuristic neon color scheme').
+2.  **Esquema y Colores Clave:** Describe el tipo de paleta y los colores más importantes que la componen, usando nombres descriptivos (ej. 'an analogous scheme dominated by deep forest greens and earthy browns, with a single fiery orange accent color').
+3.  **Calidad de la Luz Implícita:** Sugiere cómo interactúan los colores (ej. 'creating a sense of soft, diffused light' o 'high-contrast and dramatic').
+4.  **NO menciones áreas** como 'hair area' o 'background'. El prompt debe ser una descripción general del estilo de color.
 
-4.  **Contraste y Calidad General:** El nivel de contraste y cómo interactúa con la saturación y las luces (ej. 'high contrast in highlights against muted midtones', 'low contrast with soft, desaturated matte colors').
-
-Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+**Salida Final:** Tu salida debe ser un único bloque de texto en inglés, sin etiquetas ni explicaciones adicionales.`,
     object: `Tu única tarea es analizar la imagen para identificar el objeto más prominente y describirlo. El objeto suele ser un ítem que se puede sostener o que destaca visualmente del personaje o el fondo.
 
 Reglas Estrictas:
