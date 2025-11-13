@@ -276,10 +276,13 @@ Genera una descripción que especifique la paleta y su distribución por zonas. 
 4.  **Contraste y Calidad:** Describe el contraste y la calidad general de la luz.
 
 **SI ES UNA PALETA DE COLORES ABSTRACTA (B), sigue estas reglas:**
-Genera una descripción global de la paleta, sin asignarla a zonas específicas.
-1.  **Atmósfera y Tono:** Describe la sensación general de la paleta (ej. 'a warm and autumnal color palette', 'a cold, futuristic neon color scheme').
-2.  **Esquema y Colores Clave:** Describe el tipo de paleta y los colores más importantes que la componen, usando nombres descriptivos (ej. 'an analogous scheme dominated by deep forest greens and earthy browns, with a single fiery orange accent color').
-3.  **Calidad de la Luz Implícita:** Sugiere cómo interactúan los colores (ej. 'creating a sense of soft, diffused light' o 'high-contrast and dramatic').
+Genera una descripción de la paleta lo suficientemente detallada para que un artista la use.
+1.  **Análisis Jerárquico:** Identifica y lista los colores clave en una jerarquía clara:
+    *   **Color(es) Dominante(s):** El color que ocupa la mayor parte del área o define el tono principal.
+    *   **Color(es) Secundario(s):** Colores importantes que complementan al dominante.
+    *   **Color(es) de Acento:** Colores que aparecen en pequeñas cantidades pero que son visualmente impactantes.
+2.  **Descripción Rica:** Usa nombres de colores descriptivos y evocadores (ej. 'burnt sienna', 'midnight blue', 'electric magenta', 'mint green').
+3.  **Relación y Atmósfera:** Describe cómo se relacionan los colores entre sí y la atmósfera que crean (ej. 'A harmonious analogous palette featuring a dominant deep forest green, a secondary earthy brown, and vibrant fiery orange and soft cream accent colors, creating a warm and rustic mood').
 4.  **NO menciones áreas** como 'hair area' o 'background'. El prompt debe ser una descripción general del estilo de color.
 
 **Salida Final:** Tu salida debe ser un único bloque de texto en inglés, sin etiquetas ni explicaciones adicionales.`,
@@ -319,7 +322,7 @@ const metadataInstructionConfig = {
     outfit: { expert: 'catalogador experto en diseño de vestuario para artistas digitales', feature: 'outfit', rules: { title: 'Crea un título corto y descriptivo para el outfit (ej. "Vestimenta Táctica Militar", "Vestido de Gala Barroco").', category: "Identifica la categoría del vestuario (ej. 'Moda Cyberpunk', 'Fantasía Medieval', 'Alta Costura Vintage').", artType: "Clasifica el uso principal (ej. 'Diseño de Personaje', 'Concept Art de Vestuario').", notes: 'Escribe una breve nota (1-2 frases) sobre el estilo del outfit.'}},
     composition: { expert: 'catalogador experto en composición fotográfica para artistas', feature: 'composición visual', rules: { title: 'Crea un título corto y descriptivo para la composición (ej. "Retrato con Regla de Tercios", "Plano General Simétrico").', category: "Identifica la categoría de la composición (ej. 'Composición Dinámica', 'Encuadre Simétrico', 'Retrato Íntimo').", artType: "Clasifica el uso principal (ej. 'Referencia de Composición', 'Estudio de Encuadre', 'Boceto Narrativo').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la composición.'}},
     color: { expert: 'catalogador experto en paletas de color para artistas', feature: 'paleta de color', rules: { title: 'Crea un título corto y descriptivo para la paleta (ej. "Paleta Neón Urbana", "Tonos Pastel Suaves").', category: "Identifica la categoría de la paleta (ej. 'Paleta Complementaria', 'Esquema Monocromático', 'Tonos Análogos').", artType: "Clasifica el uso principal (ej. 'Referencia de Color', 'Estudio de Tono', 'Moodboard Visual').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la paleta.'}},
-    object: { expert: 'catalogador de assets para artistas digitales', feature: 'objeto', rules: { title: 'Crea un título corto y descriptivo para el objeto (ej. "Espada Rúnica", "Cámara Antigua").', category: "Identifica la categoría del objeto (ej. 'Arma de Fantasía', 'Objeto Cotidiano', 'Dispositivo Tecnológico').", artType: "Clasifica el uso principal (ej. 'Asset para Escena', 'Concepto de Objeto', 'Prop').", notes: 'Escribe una breve nota (1-2 frases) sobre las características del objeto.'}},
+    object: { expert: 'catalogador de assets para artistas digitales', feature: 'objeto', rules: { title: 'Crea un título corto y descriptivo para el objeto (ej. "Espada Rúnica", "Cámara Antigua").', category: "Identifica la categoría del objeto (ej. 'Arma de Fantasía', 'Objeto Cotidiano', 'Dispositivo Tecnológico').", artType: "Clasifica el uso principal (ej. 'Asset para Escena', 'Concepto de Objeto', 'Prop').", notes: 'Escribe una breve nota (1--2 frases) sobre las características del objeto.'}},
 };
 
 const metadataSystemInstructions = Object.fromEntries(
@@ -826,10 +829,20 @@ Aplica estas reglas de forma estricta para eliminar redundancias y crear un prom
     *   **Acción:** El fragmento COMPOSICION elimina la descripción de perspectiva, ángulo y tipo de plano (ej. 'low angle shot', 'wide shot') del fragmento ESCENA.
     *   **Si Ausente:** Si COMPOSICION está ausente, ESCENA debe incluir los términos de perspectiva y encuadre que detecte.
 
-6.  **Paleta de Colores vs. Otros (Outfit, Escena, Estilo):**
-    *   **Prioridad:** PALETA DE COLORES (Prioridad Absoluta sobre color).
-    *   **Acción:** El fragmento PALETA DE COLORES elimina TODA descripción de color, esquema cromático, tono y contraste de los fragmentos OUTFIT, ESCENA y ESTILO. Los colores de la paleta deben aplicarse de forma coherente a toda la escena.
-    *   **Si Ausente:** Si PALETA DE COLORES está ausente, el color se infiere de los otros fragmentos.
+6.  **Paleta de Colores (Regla del Artista Experto):**
+    *   **Prioridad:** PALETA DE COLORES tiene prioridad absoluta sobre cualquier otro color mencionado.
+    *   **Acción (Tu mandato creativo más importante):** NO te limites a añadir la descripción de la paleta al final del prompt. Tu tarea es actuar como un **colorista experto**. Analiza la descripción de la paleta (que detallará colores dominantes, secundarios y de acento) y **distribuye estos colores de forma armoniosa y lógica a través de los demás fragmentos** (Sujeto, Outfit, Escena, Objeto, etc.).
+    *   **Reglas de Distribución:**
+        *   Usa los **colores dominantes** para las áreas más grandes (ej. el fondo, la prenda principal del outfit).
+        *   Usa los **colores secundarios** para otros elementos significativos (ej. una prenda secundaria, un objeto grande).
+        *   Usa los **colores de acento** para detalles pequeños y de alto impacto (ej. el color de los ojos, joyas, efectos de luz, bordados, adornos).
+        *   Asegúrate de que la aplicación sea **coherente**. No apliques colores extraños a la piel, a menos que la descripción del sujeto lo justifique (ej. "un alienígena de piel verde").
+    *   **Ejemplo de Fusión:**
+        *   OUTFIT: "a suit of armor"
+        *   ESCENA: "in a throne room"
+        *   COLOR: "A regal palette with dominant deep purple, secondary gold, and silver accent colors."
+        *   **Resultado Ensamblado (parcial):** "...wearing a suit of deep purple armor with gold filigree and silver trim, in a throne room adorned with gold details..."
+    *   El fragmento original de PALETA DE COLORES se consume en este proceso y su texto original **NO debe aparecer** en el prompt final. Su propósito es guiar la reescritura, no ser incluido literalmente.
 
 7.  **Regla de Estilo Global vs. Estilos Individuales:**
     *   **Contexto:** Esta es la regla principal para determinar la estética final de la imagen.
