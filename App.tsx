@@ -13,6 +13,8 @@ import { EXTRACTION_MODE_MAP } from './config';
 import { Toast } from './components/Toast';
 import { Loader } from './components/Loader';
 import { WalkthroughGuide } from './components/WalkthroughGuide';
+import { ApiKeySetup } from './components/ApiKeySetup';
+import { SettingsModal } from './components/SettingsModal';
 
 export type AppView = 'editor' | 'extractor' | 'gallery';
 
@@ -55,6 +57,8 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [globalLoaderState, setGlobalLoaderState] = useState<{ active: boolean; message: string }>({ active: false, message: '' });
   const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
+  const [isApiKeySet, setIsApiKeySet] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -68,6 +72,29 @@ const App: React.FC = () => {
         setTimeout(() => setIsWalkthroughActive(true), 500);
     }
   }, []);
+
+  useEffect(() => {
+    const checkApiKey = () => {
+        const userKey = localStorage.getItem('userGeminiKey');
+        // The app is considered configured if a user key is set.
+        // The fallback to process.env.API_KEY will be handled in the service.
+        if (userKey) {
+            setIsApiKeySet(true);
+        } else {
+             // Check for the fallback key to avoid showing the setup screen if not needed.
+            if(process.env.API_KEY) {
+                setIsApiKeySet(true);
+            } else {
+                setIsApiKeySet(false);
+            }
+        }
+    };
+    checkApiKey();
+  }, []);
+
+  const handleKeySaved = () => {
+    setIsApiKeySet(true);
+  };
 
 
   const handleSetView = (newView: AppView) => {
@@ -250,10 +277,14 @@ const App: React.FC = () => {
     setIsWalkthroughActive(false);
     addToast('¡Tutorial completado! Ya estás listo para crear.', 'success');
   };
+  
+  if (!isApiKeySet) {
+    return <ApiKeySetup onKeySaved={handleKeySaved} addToast={addToast} />;
+  }
 
   return (
     <div className="min-h-screen bg-transparent text-gray-200 font-sans flex flex-col">
-      <Header view={view} setView={handleSetView} />
+      <Header view={view} setView={handleSetView} onOpenSettings={() => setIsSettingsModalOpen(true)} />
       
       <main className="flex-grow container mx-auto p-4 md:p-8 w-full pb-24 md:pb-8">
         {view === 'extractor' && (
@@ -324,6 +355,13 @@ const App: React.FC = () => {
           onClose={handleClosePromptModal}
           onDelete={handleDeletePrompt}
           onEdit={handleEditPrompt}
+        />
+      )}
+       {isSettingsModalOpen && (
+        <SettingsModal
+          onClose={() => setIsSettingsModalOpen(false)}
+          onKeySaved={handleKeySaved}
+          addToast={addToast}
         />
       )}
       {globalLoaderState.active && <GlobalLoader message={globalLoaderState.message} />}

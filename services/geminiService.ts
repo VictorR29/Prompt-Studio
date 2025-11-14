@@ -35,10 +35,13 @@ async function processApiQueue() {
 function callApiThrottled<T>(apiCall: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
         const wrappedApiCall = async () => {
-            if (!process.env.API_KEY) {
-                return reject(new Error("API Key no encontrada. Asegúrate de que está configurada en las variables de entorno."));
+            const userApiKey = localStorage.getItem('userGeminiKey');
+            const apiKey = userApiKey || process.env.API_KEY;
+
+            if (!apiKey) {
+                return reject(new Error("API Key no configurada. Por favor, ingrésala en la configuración para continuar."));
             }
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey });
             return apiCall(ai);
         };
 
