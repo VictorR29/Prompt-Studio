@@ -758,6 +758,38 @@ export const generateImageFromImages = async (
   }
 };
 
+export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+  try {
+    // A more descriptive prompt for better covers
+    const generationPrompt = `Create a visually stunning, high-quality, cinematic image that artistically represents the following concept: ${prompt}`;
+    // FIX: Cast the response from callApiThrottled to a specific type to resolve TypeScript errors.
+    // The type is based on the Gemini API documentation for the generateImages method.
+    const response = await callApiThrottled(ai => ai.models.generateImages({
+      model: 'imagen-4.0-generate-001',
+      prompt: generationPrompt,
+      config: {
+        numberOfImages: 1,
+        outputMimeType: 'image/jpeg',
+        aspectRatio: '1:1',
+      },
+    })) as { generatedImages: { image: { imageBytes: string } }[] };
+
+    if (response.generatedImages && response.generatedImages.length > 0) {
+      const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+      return `data:image/jpeg;base64,${base64ImageBytes}`;
+    }
+    
+    throw new Error("La API no devolvió ninguna imagen.");
+
+  } catch (error) {
+    console.error("Error generating image from prompt with Gemini API:", error);
+    if (error instanceof Error) {
+        throw new Error(error.message || "No se pudo generar la imagen de portada.");
+    }
+    throw new Error("No se pudo generar la imagen de portada.");
+  }
+};
+
 export const generateIdeasForStyle = async (stylePrompt: string): Promise<string[]> => {
     const ideasSystemInstruction = `Eres un director creativo y conceptual. Tu tarea es analizar un prompt de estilo visual y, basándote en él, generar entre 3 y 5 ideas de escenas cortas, evocadoras y únicas. Las ideas deben ser concisas (máximo 10-15 palabras cada una).
 
@@ -1342,7 +1374,15 @@ export const createJsonTemplate = async (jsonPrompt: string): Promise<string> =>
                 config: { systemInstruction },
                 contents: { parts: [{ text: jsonPrompt }] },
             })) as GenerateContentResponse;
-            const cleanedJsonText = response.text.trim();
+            const rawResponseText = response.text.trim();
+            let cleanedJsonText = rawResponseText;
+
+            // FIX: The AI might wrap the JSON in markdown or add extra text.
+            // This regex extracts the first JSON object or array from the response string.
+            const jsonMatch = rawResponseText.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+            if (jsonMatch && jsonMatch[0]) {
+                cleanedJsonText = jsonMatch[0];
+            }
             
             // Validate the AI's output before proceeding.
             JSON.parse(cleanedJsonText);

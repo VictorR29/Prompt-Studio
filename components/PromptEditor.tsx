@@ -12,7 +12,8 @@ import {
     analyzeImageFeature,
     generateStructuredPrompt,
     generateStructuredPromptFromImage,
-    generateMasterPromptMetadata
+    generateMasterPromptMetadata,
+    generateImageFromPrompt
 } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
@@ -158,13 +159,21 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setGlobalLoader({ active: true, message: 'Creando plantilla desde JSON...' });
         try {
             const templateJson = String(await createJsonTemplate(pastedJson));
-            const metadata = await generateStructuredPromptMetadata(templateJson) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
+
+            setGlobalLoader({ active: true, message: 'Generando portada para la plantilla...' });
+            const coverImageDataUrl = await generateImageFromPrompt(templateJson);
+            
+            setGlobalLoader({ active: true, message: 'Generando metadatos para la plantilla...' });
+            const metadata = await generateStructuredPromptMetadata(templateJson, {
+                imageBase64: coverImageDataUrl.split(',')[1],
+                mimeType: 'image/jpeg'
+            }) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
 
             const newTemplatePrompt: SavedPrompt = {
                 id: Date.now().toString(),
                 type: 'structured',
                 prompt: templateJson,
-                coverImage: '', 
+                coverImage: coverImageDataUrl,
                 title: metadata.title,
                 category: metadata.category,
                 artType: 'Plantilla JSON',
@@ -447,15 +456,15 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     
         try {
             if (outputType === 'text') {
-                // FIX: The original flatMap implementation had type inference issues.
-                // Using reduce is a more robust way to flatten the array of image arrays.
-                // FIX: Use Array.isArray to ensure the value is an array before concatenating, fixing a TypeScript type error.
                 const allImages: ImageState[] = Object.values(imagesByModule).reduce<ImageState[]>((acc, val) => (Array.isArray(val) ? acc.concat(val) : acc), []);
                 let coverImageDataUrl = '';
                 
                 if (allImages.length > 0) {
                     setGlobalLoader({ active: true, message: 'Creando collage para la portada...' });
                     coverImageDataUrl = await createImageCollage(allImages.map(img => ({ base64: img.base64, mimeType: img.mimeType })));
+                } else {
+                    setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
+                    coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
                 }
     
                 setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
@@ -472,13 +481,19 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 onSavePrompt(newPrompt);
                 addToast('Prompt maestro guardado en la galería', 'success');
             } else if (outputType === 'json') {
+                setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
+                const coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
+                
                 setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
-                const metadata = await generateStructuredPromptMetadata(finalPrompt);
+                const metadata = await generateStructuredPromptMetadata(finalPrompt, {
+                    imageBase64: coverImageDataUrl.split(',')[1],
+                    mimeType: 'image/jpeg'
+                });
                 const newPrompt: SavedPrompt = {
                     id: Date.now().toString(),
                     type: 'structured',
                     prompt: finalPrompt,
-                    coverImage: '',
+                    coverImage: coverImageDataUrl,
                     ...metadata
                 };
                 onSavePrompt(newPrompt);
@@ -645,6 +660,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                     isOptimizing={optimizingModule === key}
                                     suggestions={suggestions[key] || []}
                                     addToast={addToast}
+                                    setGlobalLoader={setGlobalLoader}
                                 />
                             );
                         })}
@@ -677,6 +693,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                     isOptimizing={optimizingModule === key}
                                     suggestions={suggestions[key] || []}
                                     addToast={addToast}
+                                    setGlobalLoader={setGlobalLoader}
                                 />
                             );
                         })}

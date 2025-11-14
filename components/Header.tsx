@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
             </nav>
             <button
               onClick={onOpenSettings}
-              className="hidden md:inline-flex p-2 rounded-full text-gray-300 hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
+              className="inline-flex p-2 rounded-full text-gray-300 hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
               aria-label="Configuración"
               title="Configuración"
             >
@@ -85,13 +85,6 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
               </button>
             )
           })}
-           <button
-              onClick={onOpenSettings}
-              className="flex items-center justify-center rounded-full transition-all duration-300 ease-in-out text-gray-400 hover:text-teal-300 w-12 h-12 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500"
-              aria-label="Configuración"
-            >
-              <SettingsIcon className="w-6 h-6 flex-shrink-0" />
-            </button>
         </div>
       </nav>
     </>

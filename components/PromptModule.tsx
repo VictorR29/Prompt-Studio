@@ -6,6 +6,7 @@ import { GalleryIcon } from './icons/GalleryIcon';
 import { SaveIcon } from './icons/SaveIcon';
 import { ImageIcon } from './icons/ImageIcon';
 import { CloseIcon } from './icons/CloseIcon';
+import { generateImageFromPrompt } from '../services/geminiService';
 
 type ImageState = { url: string; base64: string; mimeType: string; };
 
@@ -25,6 +26,7 @@ interface PromptModuleProps {
     isOptimizing: boolean;
     suggestions: string[];
     addToast: (message: string, type?: 'success' | 'error') => void;
+    setGlobalLoader: (state: { active: boolean; message: string }) => void;
 }
 
 const SmallLoader: React.FC = () => (
@@ -48,7 +50,8 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     isAnalyzingImages,
     isOptimizing,
     suggestions,
-    addToast
+    addToast,
+    setGlobalLoader
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const inputId = React.useRef(`file-upload-${mode}-${Math.random().toString(36).substring(7)}`);
@@ -69,20 +72,49 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
         event.target.value = ''; // Reset input to allow re-uploading the same file
     };
 
-    const handleSaveFragment = () => {
+    const handleSaveFragment = async () => {
         if (!value) return;
-        const newPrompt: SavedPrompt = {
-            id: Date.now().toString(),
-            type: mode,
-            prompt: value,
-            coverImage: images.length > 0 ? images[0].url : '',
-            title: `${config.label} - ${value.substring(0, 20)}...`,
-            category: config.label,
-            artType: 'Fragmento de Prompt',
-            notes: `Fragmento de tipo '${config.label}' guardado desde el Editor Modular.`
-        };
-        onSavePrompt(newPrompt);
-        addToast(`'${config.label}' guardado en la galería!`, 'success');
+        setGlobalLoader({ active: true, message: 'Guardando fragmento...' });
+    
+        try {
+            let coverImageUrl = images.length > 0 ? `data:${images[0].mimeType};base64,${images[0].base64}` : '';
+            
+            if (!coverImageUrl) {
+                setGlobalLoader({ active: true, message: 'Generando portada para el fragmento...' });
+                coverImageUrl = await generateImageFromPrompt(value);
+            }
+            
+            const newPrompt: SavedPrompt = {
+                id: Date.now().toString(),
+                type: mode,
+                prompt: value,
+                coverImage: coverImageUrl,
+                title: `${config.label} - ${value.substring(0, 20)}...`,
+                category: config.label,
+                artType: 'Fragmento de Prompt',
+                notes: `Fragmento de tipo '${config.label}' guardado desde el Editor Modular.`
+            };
+            onSavePrompt(newPrompt);
+            addToast(`'${config.label}' guardado en la galería!`, 'success');
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+            addToast(`Error al guardar: ${errorMessage}`, 'error');
+            // Save without cover on error as a fallback
+            const newPrompt: SavedPrompt = {
+                id: Date.now().toString(),
+                type: mode,
+                prompt: value,
+                coverImage: '',
+                title: `${config.label} - ${value.substring(0, 20)}...`,
+                category: config.label,
+                artType: 'Fragmento de Prompt',
+                notes: `Fragmento de tipo '${config.label}' guardado desde el Editor Modular.`
+            };
+            onSavePrompt(newPrompt);
+            addToast(`'${config.label}' guardado sin portada.`, 'success');
+        } finally {
+            setGlobalLoader({ active: false, message: '' });
+        }
     };
     
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
