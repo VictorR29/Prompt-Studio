@@ -189,8 +189,11 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
             return; // Wait for the correct view
         }
 
+        // If we're in the middle of a transition (view change or click),
+        // acknowledge it and wait for the next render cycle for the DOM to be stable.
         if (isTransitioning) {
             setIsTransitioning(false);
+            return;
         }
         
         updateTargetRect();

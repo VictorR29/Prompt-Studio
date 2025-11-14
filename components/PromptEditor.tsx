@@ -94,7 +94,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         localStorage.setItem('promptEditorSections', JSON.stringify(openSections));
     }, [openSections]);
     
-    const handleLoadPrompt = useCallback(async (promptText: string) => {
+    const handleLoadPromptFromUI = useCallback(async (promptText: string) => {
         setLoadingAction('analyze');
         setError(null);
         setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
@@ -113,10 +113,42 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     }, [setGlobalLoader, addToast]);
     
     useEffect(() => {
+        // This effect specifically handles loading an `initialPrompt` prop,
+        // including cleanup for when the component unmounts mid-load.
+        let isMounted = true;
+
+        const loadInitialPrompt = async (promptText: string) => {
+            setLoadingAction('analyze');
+            setError(null);
+            setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
+            try {
+                const modularized = await modularizePrompt(promptText);
+                if (isMounted) {
+                    setFragments(modularized as Record<ExtractionMode, string>);
+                    setViewMode('editor');
+                }
+            } catch (err) {
+                if (isMounted) {
+                    const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+                    setError(`Error al modularizar: ${errorMessage}`);
+                    addToast(`Error al modularizar: ${errorMessage}`, 'error');
+                }
+            } finally {
+                if (isMounted) {
+                    setLoadingAction(null);
+                    setGlobalLoader({ active: false, message: '' });
+                }
+            }
+        };
+
         if (initialPrompt) {
-            handleLoadPrompt(initialPrompt.prompt);
+            loadInitialPrompt(initialPrompt.prompt);
         }
-    }, [initialPrompt, handleLoadPrompt]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [initialPrompt, addToast, setGlobalLoader]);
     
     const handleImportTemplate = async () => {
         if (!pastedJson.trim()) return;
@@ -171,7 +203,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             }
             
             setGlobalLoader({ active: true, message: 'Estructura creada. Modularizando...' });
-            await handleLoadPrompt(resultJson);
+            await handleLoadPromptFromUI(resultJson);
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -415,8 +447,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     
         try {
             if (outputType === 'text') {
-                // FIX: Use flatMap to correctly flatten and type the array of images, resolving downstream type errors.
-                const allImages: ImageState[] = Object.values(imagesByModule).flatMap(val => val || []);
+                // FIX: The original flatMap implementation had type inference issues.
+                // Using reduce is a more robust way to flatten the array of image arrays.
+                // FIX: Use Array.isArray to ensure the value is an array before concatenating, fixing a TypeScript type error.
+                const allImages: ImageState[] = Object.values(imagesByModule).reduce<ImageState[]>((acc, val) => (Array.isArray(val) ? acc.concat(val) : acc), []);
                 let coverImageDataUrl = '';
                 
                 if (allImages.length > 0) {
@@ -543,7 +577,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 placeholder="Pega tu prompt de texto aquí..."
                                 className="w-full mt-2 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
                             />
-                            <button onClick={() => handleLoadPrompt(pastedText)} disabled={!pastedText.trim() || loadingAction !== null} className="w-full mt-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                            <button onClick={() => handleLoadPromptFromUI(pastedText)} disabled={!pastedText.trim() || loadingAction !== null} className="w-full mt-2 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
                                 {loadingAction === 'analyze' ? 'Analizando...' : 'Analizar y Modularizar'}
                             </button>
                         </div>
