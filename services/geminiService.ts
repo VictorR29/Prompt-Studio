@@ -19,18 +19,23 @@ async function processApiQueue() {
 
     isProcessingQueue = true;
     const request = requestQueue.shift();
-    if (!request) return; // Should not happen, but for type safety
+    if (!request) { // Should not happen, but robustly handle to prevent hangs
+        isProcessingQueue = false;
+        setTimeout(processApiQueue, MIN_REQUEST_INTERVAL); // Retry processing
+        return;
+    }
 
     try {
         const result = await request.apiCall();
         request.resolve(result);
     } catch (error) {
         request.reject(error);
+    } finally {
+        // Ensure the queue continues processing even if a promise resolver has an issue (highly unlikely but robust)
+        setTimeout(processApiQueue, MIN_REQUEST_INTERVAL);
     }
-
-    // Wait for the interval before processing the next request.
-    setTimeout(processApiQueue, MIN_REQUEST_INTERVAL);
 }
+
 
 function callApiThrottled<T>(apiCall: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -321,11 +326,11 @@ const metadataInstructionConfig = {
     subject: { expert: 'director de casting y catalogador experto en personajes', feature: 'sujeto', rules: { title: 'Crea un título corto y descriptivo para el sujeto (ej. "Guerrera Cibernética", "Explorador de Mundos", "Maga del Bosque").', category: "Identifica la categoría del arquetipo del personaje (ej. 'Personaje de Ciencia Ficción', 'Héroe de Fantasía', 'Retrato Realista').", artType: "Clasifica el uso principal (ej. 'Concepto de Personaje', 'Referencia para Retrato', 'Diseño de Protagonista').", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia del personaje o para qué tipo de historias sería adecuado.'}},
     pose: { expert: 'catalogador experto en poses para artistas digitales', feature: 'pose', rules: { title: 'Crea un título corto y descriptivo para la pose. Ejemplos: "Pose de Acción Saltando", "Postura Relajada de Pie", "Mirada Confiada".', category: "Identifica la categoría de la pose. Ejemplos: 'Pose Dinámica', 'Pose Estática', 'Pose Contemplativa', 'Pose de Combate'.", artType: "Clasifica el uso principal. Ejemplos: 'Referencia de Personaje', 'Estudio de Anatomía', 'Boceto de Acción'.", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia de la pose o para qué tipo de personajes o escenas sería más adecuada.'}},
     expression: { expert: 'catalogador experto en expresiones faciales para artistas digitales', feature: 'expresión', rules: { title: 'Crea un título corto y descriptivo para la expresión. Ejemplos: "Sonrisa Desafiante", "Mirada Melancólica", "Grito de Furia".', category: "Identifica la categoría de la emoción. Ejemplos: 'Expresión de Alegría', 'Expresión de Tristeza', 'Expresión de Ira', 'Expresión Sutil'.", artType: "Clasifica el uso principal. Ejemplos: 'Estudio de Personaje', 'Referencia Emocional', 'Retrato Expresivo'.", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia de la expresión o para qué tipo de personajes o escenas sería más adecuada.'}},
-    scene: { expert: 'catalogador experto en escenarios para artistas digitales', feature: 'escena', rules: { title: 'Crea un título corto y descriptivo para la escena (ej. "Fábrica Abandonada", "Lago al Atardecer").', category: "Identifica la categoría del escenario (ej. 'Paisaje Urbano', 'Entorno Natural', 'Interior Cinemático').", artType: "Clasifica el uso principal (ej. 'Arte Conceptual de Entorno', 'Fondo para Ilustración').", notes: 'Escribe una breve nota (1-2 frases) sobre la atmósfera de la escena.'}},
-    outfit: { expert: 'catalogador experto en diseño de vestuario para artistas digitales', feature: 'outfit', rules: { title: 'Crea un título corto y descriptivo para el outfit (ej. "Vestimenta Táctica Militar", "Vestido de Gala Barroco").', category: "Identifica la categoría del vestuario (ej. 'Moda Cyberpunk', 'Fantasía Medieval', 'Alta Costura Vintage').", artType: "Clasifica el uso principal (ej. 'Diseño de Personaje', 'Concept Art de Vestuario').", notes: 'Escribe una breve nota (1-2 frases) sobre el estilo del outfit.'}},
-    composition: { expert: 'catalogador experto en composición fotográfica para artistas', feature: 'composición visual', rules: { title: 'Crea un título corto y descriptivo para la composición (ej. "Retrato con Regla de Tercios", "Plano General Simétrico").', category: "Identifica la categoría de la composición (ej. 'Composición Dinámica', 'Encuadre Simétrico', 'Retrato Íntimo').", artType: "Clasifica el uso principal (ej. 'Referencia de Composición', 'Estudio de Encuadre', 'Boceto Narrativo').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la composición.'}},
-    color: { expert: 'catalogador experto en paletas de color para artistas', feature: 'paleta de color', rules: { title: 'Crea un título corto y descriptivo para la paleta (ej. "Paleta Neón Urbana", "Tonos Pastel Suaves").', category: "Identifica la categoría de la paleta (ej. 'Paleta Complementaria', 'Esquema Monocromático', 'Tonos Análogos').", artType: "Clasifica el uso principal (ej. 'Referencia de Color', 'Estudio de Tono', 'Moodboard Visual').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la paleta.'}},
-    object: { expert: 'catalogador de assets para artistas digitales', feature: 'objeto', rules: { title: 'Crea un título corto y descriptivo para el objeto (ej. "Espada Rúnica", "Cámara Antigua").', category: "Identifica la categoría del objeto (ej. 'Arma de Fantasía', 'Objeto Cotidiano', 'Dispositivo Tecnológico').", artType: "Clasifica el uso principal (ej. 'Asset para Escena', 'Concepto de Objeto', 'Prop').", notes: 'Escribe una breve nota (1--2 frases) sobre las características del objeto.'}},
+    scene: { expert: 'catalogador experto en escenarios para artistas digitales', feature: 'escena', rules: { title: 'Crea un título corto y descriptivo para la escena (ej. "Fábrica Abandonada", "Lago al Atardecer").', category: "Identifica la categoría del escenario (ej. 'Paisaje Urbano', 'Entorno Natural', 'Interior Cinemático').", artType: "Clasifica el uso principal. Ejemplos: 'Arte Conceptual de Entorno', 'Fondo para Ilustración').", notes: 'Escribe una breve nota (1-2 frases) sobre la atmósfera de la escena.'}},
+    outfit: { expert: 'catalogador experto en diseño de vestuario para artistas digitales', feature: 'outfit', rules: { title: 'Crea un título corto y descriptivo para el outfit (ej. "Vestimenta Táctica Militar", "Vestido de Gala Barroco").', category: "Identifica la categoría del vestuario (ej. 'Moda Cyberpunk', 'Fantasía Medieval', 'Alta Costura Vintage').", artType: "Clasifica el uso principal. Ejemplos: 'Diseño de Personaje', 'Concept Art de Vestuario').", notes: 'Escribe una breve nota (1-2 frases) sobre el estilo del outfit.'}},
+    composition: { expert: 'catalogador experto en composición fotográfica para artistas', feature: 'composición visual', rules: { title: 'Crea un título corto y descriptivo para la composición (ej. "Retrato con Regla de Tercios", "Plano General Simétrico").', category: "Identifica la categoría de la composición (ej. 'Composición Dinámica', 'Encuadre Simétrico', 'Retrato Íntimo').", artType: "Clasifica el uso principal. Ejemplos: 'Referencia de Composición', 'Estudio de Encuadre', 'Boceto Narrativo').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la composición.'}},
+    color: { expert: 'catalogador experto en paletas de color para artistas', feature: 'paleta de color', rules: { title: 'Crea un título corto y descriptivo para la paleta (ej. "Paleta Neón Urbana", "Tonos Pastel Suaves").', category: "Identifica la categoría de la paleta (ej. 'Paleta Complementaria', 'Esquema Monocromático', 'Tonos Análogos').", artType: "Clasifica el uso principal. Ejemplos: 'Referencia de Color', 'Estudio de Tono', 'Moodboard Visual').", notes: 'Escribe una breve nota (1-2 frases) sobre el efecto o la sensación que crea la paleta.'}},
+    object: { expert: 'catalogador de assets para artistas digitales', feature: 'objeto', rules: { title: 'Crea un título corto y descriptivo para el objeto (ej. "Espada Rúnica", "Cámara Antigua").', category: "Identifica la categoría del objeto (ej. 'Arma de Fantasía', 'Objeto Cotidiano', 'Dispositivo Tecnológico').", artType: "Clasifica el uso principal. Ejemplos: 'Asset para Escena', 'Concepto de Objeto', 'Prop').", notes: 'Escribe una breve nota (1--2 frases) sobre las características del objeto.'}},
 };
 
 const metadataSystemInstructions = Object.fromEntries(

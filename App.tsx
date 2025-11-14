@@ -108,10 +108,10 @@ const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
 
-  const addToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();
     setToasts(prevToasts => [...prevToasts, { id, message, type }]);
-  };
+  }, []);
 
   useEffect(() => {
     try {
