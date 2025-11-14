@@ -1282,27 +1282,36 @@ Please rewrite the fragment to make it perfectly coherent with the provided cont
     }
 };
 
-const mergeModulesIntoJsonTemplateSystemInstruction = `Eres un experto en ingeniería de prompts que fusiona contenido modular en una plantilla JSON existente. Tu tarea es integrar de manera inteligente el contenido de los 9 módulos de usuario en la plantilla JSON proporcionada.
+const mergeModulesIntoJsonTemplateSystemInstruction = `Eres un experto en ingeniería de prompts que fusiona contenido modular en una plantilla JSON existente. Tu tarea es integrar de manera inteligente el contenido de los 9 módulos de usuario en la plantilla JSON proporcionada, y rellenar creativamente cualquier campo faltante para crear un prompt completo, coherente y sin redundancias.
 
-**Objetivo Principal:** Utilizar la plantilla JSON como una **estructura base**, reemplazando su contenido temático con el contenido de los módulos del usuario. Los elementos estructurales, sintaxis especial y campos extra de la plantilla deben ser preservados.
+**Objetivo Principal:** Utilizar la plantilla JSON como una **estructura base**, reemplazando y completando su contenido temático con la información de los módulos del usuario para producir un JSON final rico en detalles y optimizado.
 
 **Reglas Estrictas:**
 
-1.  **La Plantilla dicta la Estructura:** La estructura de claves, el anidamiento, la sintaxis (como pesos \`::1.5\`) y cualquier campo que no se corresponda directamente con un módulo (ej. \`"seed": 12345\`) DEBEN ser preservados fielmente. Esta es la máxima prioridad.
+1.  **La Plantilla dicta la Estructura:** La estructura de claves, el anidamiento, la sintaxis (como pesos \`::1.5\`) y cualquier campo técnico que no se corresponda con un módulo (ej. \`"seed": 12345\`) DEBEN ser preservados fielmente.
 
-2.  **Los Módulos dictan el Contenido:** El contenido de los 9 módulos de usuario (\`subject\`, \`pose\`, \`style\`, etc.) es la fuente de verdad para el contenido temático.
+2.  **Los Módulos dictan el Contenido Principal:** El contenido de los 9 módulos de usuario (\`subject\`, \`pose\`, \`style\`, etc.) es la fuente de verdad para el contenido temático principal.
 
 3.  **Mapeo y REEMPLAZO Inteligente:**
     *   Analiza el contenido de cada módulo de usuario.
-    *   Encuentra la clave más apropiada dentro de la plantilla JSON para insertar esa información (ej. el módulo 'subject' podría ir en una clave llamada 'character_description').
-    *   **REEMPLAZA COMPLETAMENTE** el valor existente en esa clave de la plantilla con el contenido del módulo correspondiente. **NO combines ni fusiones** el contenido antiguo con el nuevo. El contenido del módulo de usuario siempre tiene la prioridad.
-    *   Si una clave de la plantilla parece contener información de múltiples módulos (ej. \`"description": "a knight in shining armor, photorealistic"\`), reemplázala con una combinación coherente de los módulos de usuario relevantes (ej. \`"description": "{{subject}} in {{outfit}}, {{style}}"\`).
+    *   Encuentra la clave más apropiada dentro de la plantilla JSON para insertar esa información (ej. el módulo 'subject' podría ir en 'character_description').
+    *   **REEMPLAZA COMPLETAMENTE** el valor existente en esa clave de la plantilla con el contenido del módulo correspondiente. El contenido del módulo de usuario siempre tiene la prioridad.
+    *   Una vez que el contenido de un módulo se ha utilizado para rellenar un campo, considéralo "consumido". Evita volver a utilizar el mismo texto del módulo en otros campos a menos que sea absolutamente esencial para la coherencia.
 
-4.  **Manejo de Placeholders:** Si la plantilla ya contiene placeholders como \`{{module_name}}\`, reemplázalos directamente con el contenido del módulo correspondiente.
+4.  **Manejo de Placeholders:** Si la plantilla contiene placeholders como \`{{module_name}}\`, reemplázalos directamente con el contenido del módulo correspondiente.
 
-5.  **Omisión de Módulos Vacíos:** Si un módulo de usuario está vacío, y encuentras un placeholder para él en la plantilla, reemplázalo con un string vacío (\`""\`) o elimina la clave si es más apropiado para la estructura. Si no hay placeholder, simplemente ignora el módulo vacío.
+5.  **Relleno Creativo y Coherente (REGLA CRÍTICA):**
+    *   Después de mapear todos los módulos de usuario, analiza el JSON resultante.
+    *   Si alguna clave de la plantilla ha quedado vacía, sin contenido, o contiene un placeholder para un módulo que el usuario no proporcionó (ej. \`{{scene}}\` pero el módulo 'scene' está vacío), **tu tarea es rellenar ese campo de forma creativa**.
+    *   **REGLA DE NO REPETICIÓN:** Al rellenar estos campos, **NO COPIES Y PEGUES** texto de los módulos ya utilizados. En su lugar, genera **NUEVOS detalles que complementen y expandan** el contexto global. El contenido debe ser **sinérgico**, no una simple repetición.
+    *   **Ejemplo:** Si el módulo 'outfit' es "a grey hoodie under a black coat", no pongas "a grey hoodie under a black coat" en un campo llamado "accessory". En su lugar, podrías poner algo como "a simple silver chain" o "black leather gloves" si se ajusta al contexto.
+    *   El contenido que generes DEBE ser **coherente** con el contexto global. Si el 'subject' es "un guerrero de fantasía", un campo 'scene' vacío podría ser rellenado con "en un castillo en ruinas", no con "un guerrero de fantasía".
 
-6.  **Output Final:** Devuelve únicamente el objeto JSON final, válido, que refleje la estructura de la plantilla pero con el contenido de los módulos del usuario. No incluyas texto adicional.`;
+6.  **Optimización y Concisión:**
+    *   Revisa el JSON final para eliminar cualquier redundancia obvia entre campos. Si dos campos diferentes terminan describiendo lo mismo, consolida la información en el campo más apropiado y simplifica el otro.
+    *   El objetivo es un prompt donde cada clave aporta información única y valiosa.
+
+7.  **Output Final:** Devuelve únicamente el objeto JSON final, válido, que refleje la estructura de la plantilla pero con el contenido de los módulos del usuario y los campos vacíos rellenados de forma inteligente. No incluyas texto adicional.`;
 
 export const mergeModulesIntoJsonTemplate = async (modules: Partial<Record<ExtractionMode, string>>, jsonTemplate: string): Promise<string> => {
     
