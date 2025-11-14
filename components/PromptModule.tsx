@@ -80,8 +80,14 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             let coverImageUrl = images.length > 0 ? `data:${images[0].mimeType};base64,${images[0].base64}` : '';
             
             if (!coverImageUrl) {
-                setGlobalLoader({ active: true, message: 'Generando portada para el fragmento...' });
-                coverImageUrl = await generateImageFromPrompt(value);
+                try {
+                    setGlobalLoader({ active: true, message: 'Generando portada para el fragmento...' });
+                    coverImageUrl = await generateImageFromPrompt(value);
+                } catch (imgErr) {
+                    console.error("Error generating cover image for fragment:", imgErr);
+                    addToast('No se pudo generar la portada. Guardando sin ella.', 'error');
+                    coverImageUrl = ''; // Fallback to no cover
+                }
             }
             
             const newPrompt: SavedPrompt = {
@@ -98,20 +104,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             addToast(`'${config.label}' guardado en la galería!`, 'success');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-            addToast(`Error al guardar: ${errorMessage}`, 'error');
-            // Save without cover on error as a fallback
-            const newPrompt: SavedPrompt = {
-                id: Date.now().toString(),
-                type: mode,
-                prompt: value,
-                coverImage: '',
-                title: `${config.label} - ${value.substring(0, 20)}...`,
-                category: config.label,
-                artType: 'Fragmento de Prompt',
-                notes: `Fragmento de tipo '${config.label}' guardado desde el Editor Modular.`
-            };
-            onSavePrompt(newPrompt);
-            addToast(`'${config.label}' guardado sin portada.`, 'success');
+            addToast(`Error al guardar fragmento: ${errorMessage}`, 'error');
         } finally {
             setGlobalLoader({ active: false, message: '' });
         }

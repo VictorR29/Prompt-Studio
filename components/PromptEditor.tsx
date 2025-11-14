@@ -160,14 +160,23 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const templateJson = String(await createJsonTemplate(pastedJson));
 
-            setGlobalLoader({ active: true, message: 'Generando portada para la plantilla...' });
-            const coverImageDataUrl = await generateImageFromPrompt(templateJson);
+            let coverImageDataUrl = '';
+            try {
+                setGlobalLoader({ active: true, message: 'Generando portada para la plantilla...' });
+                coverImageDataUrl = await generateImageFromPrompt(templateJson);
+            } catch (imgErr) {
+                console.error("Error generating cover image for template:", imgErr);
+                addToast('No se pudo generar la portada para la plantilla. Guardando sin ella.', 'error');
+                coverImageDataUrl = ''; // Fallback to no cover
+            }
             
             setGlobalLoader({ active: true, message: 'Generando metadatos para la plantilla...' });
-            const metadata = await generateStructuredPromptMetadata(templateJson, {
+            const imagePayload = coverImageDataUrl ? {
                 imageBase64: coverImageDataUrl.split(',')[1],
                 mimeType: 'image/jpeg'
-            }) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
+            } : undefined;
+
+            const metadata = await generateStructuredPromptMetadata(templateJson, imagePayload) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
 
             const newTemplatePrompt: SavedPrompt = {
                 id: Date.now().toString(),
@@ -455,19 +464,40 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setGlobalLoader({ active: true, message: 'Guardando en galería...' });
     
         try {
+            let coverImageDataUrl = '';
+    
+            // --- Cover Image Generation Logic ---
             if (outputType === 'text') {
                 const allImages: ImageState[] = Object.values(imagesByModule).reduce<ImageState[]>((acc, val) => (Array.isArray(val) ? acc.concat(val) : acc), []);
-                let coverImageDataUrl = '';
-                
                 if (allImages.length > 0) {
                     setGlobalLoader({ active: true, message: 'Creando collage para la portada...' });
                     coverImageDataUrl = await createImageCollage(allImages.map(img => ({ base64: img.base64, mimeType: img.mimeType })));
                 } else {
+                    try {
+                        setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
+                        coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
+                    } catch (imgErr) {
+                        console.error("Error generating cover image:", imgErr);
+                        addToast('No se pudo generar la portada. Guardando sin ella.', 'error');
+                        coverImageDataUrl = ''; // Fallback to no cover
+                    }
+                }
+            } else if (outputType === 'json') {
+                try {
                     setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
                     coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
+                } catch (imgErr) {
+                    console.error("Error generating cover image:", imgErr);
+                    addToast('No se pudo generar la portada. Guardando sin ella.', 'error');
+                    coverImageDataUrl = ''; // Fallback to no cover
                 }
+            }
     
-                setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
+            // --- Metadata and Saving Logic ---
+            setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
+    
+            if (outputType === 'text') {
+                const allImages: ImageState[] = Object.values(imagesByModule).reduce<ImageState[]>((acc, val) => (Array.isArray(val) ? acc.concat(val) : acc), []);
                 const imagePayload = allImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
                 const metadata = await generateMasterPromptMetadata(finalPrompt, imagePayload);
     
@@ -481,14 +511,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 onSavePrompt(newPrompt);
                 addToast('Prompt maestro guardado en la galería', 'success');
             } else if (outputType === 'json') {
-                setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
-                const coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
-                
-                setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
-                const metadata = await generateStructuredPromptMetadata(finalPrompt, {
+                const imagePayload = coverImageDataUrl ? {
                     imageBase64: coverImageDataUrl.split(',')[1],
                     mimeType: 'image/jpeg'
-                });
+                } : undefined;
+
+                const metadata = await generateStructuredPromptMetadata(finalPrompt, imagePayload);
                 const newPrompt: SavedPrompt = {
                     id: Date.now().toString(),
                     type: 'structured',
