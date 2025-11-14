@@ -11,7 +11,8 @@ import {
     adaptFragmentToContext, 
     analyzeImageFeature,
     generateStructuredPrompt,
-    generateStructuredPromptFromImage
+    generateStructuredPromptFromImage,
+    generateMasterPromptMetadata
 } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
@@ -26,6 +27,7 @@ import { GalleryModal } from './GalleryModal';
 import { JsonIcon } from './icons/JsonIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { fileToBase64 } from '../utils/fileUtils';
+import { createImageCollage } from '../utils/imageUtils';
 import { ImageUploader } from './ImageUploader';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -56,6 +58,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const [pastedJson, setPastedJson] = useState('');
     const [loadingAction, setLoadingAction] = useState<'analyze' | 'import' | 'structure' | null>(null);
     const [isLoading, setIsLoading] = useState(false); // For editor-mode actions
+    const [isSaving, setIsSaving] = useState(false);
     const [loadingModules, setLoadingModules] = useState<Partial<Record<ExtractionMode, boolean>>>({});
     const [error, setError] = useState<string | null>(null);
     const [finalPrompt, setFinalPrompt] = useState('');
@@ -404,35 +407,56 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!finalPrompt) return;
-        
-        if (outputType === 'text') {
-            const newPrompt: SavedPrompt = {
-                id: Date.now().toString(),
-                type: 'master',
-                prompt: finalPrompt,
-                coverImage: '',
-                title: `Prompt Maestro - ${new Date().toLocaleDateString()}`,
-                category: 'Ensamblado',
-                artType: 'Prompt Compuesto',
-                notes: 'Generado desde el Editor Modular como texto plano.'
-            };
-            onSavePrompt(newPrompt);
-            addToast('Prompt guardado en la galería', 'success');
-        } else if (outputType === 'json') {
-            const newPrompt: SavedPrompt = {
-                id: Date.now().toString(),
-                type: 'structured',
-                prompt: finalPrompt,
-                coverImage: '',
-                title: `JSON Modular - ${new Date().toLocaleDateString()}`,
-                category: 'JSON Modular',
-                artType: 'Prompt Estructurado',
-                notes: 'Generado desde el Editor Modular como JSON.'
-            };
-            onSavePrompt(newPrompt);
-            addToast('Prompt guardado en la galería', 'success');
+    
+        setIsSaving(true);
+        setGlobalLoader({ active: true, message: 'Guardando en galería...' });
+    
+        try {
+            if (outputType === 'text') {
+                // FIX: Use flatMap to correctly flatten and type the array of images, resolving downstream type errors.
+                const allImages: ImageState[] = Object.values(imagesByModule).flatMap(val => val || []);
+                let coverImageDataUrl = '';
+                
+                if (allImages.length > 0) {
+                    setGlobalLoader({ active: true, message: 'Creando collage para la portada...' });
+                    coverImageDataUrl = await createImageCollage(allImages.map(img => ({ base64: img.base64, mimeType: img.mimeType })));
+                }
+    
+                setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
+                const imagePayload = allImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
+                const metadata = await generateMasterPromptMetadata(finalPrompt, imagePayload);
+    
+                const newPrompt: SavedPrompt = {
+                    id: Date.now().toString(),
+                    type: 'master',
+                    prompt: finalPrompt,
+                    coverImage: coverImageDataUrl,
+                    ...metadata,
+                };
+                onSavePrompt(newPrompt);
+                addToast('Prompt maestro guardado en la galería', 'success');
+            } else if (outputType === 'json') {
+                setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
+                const metadata = await generateStructuredPromptMetadata(finalPrompt);
+                const newPrompt: SavedPrompt = {
+                    id: Date.now().toString(),
+                    type: 'structured',
+                    prompt: finalPrompt,
+                    coverImage: '',
+                    ...metadata
+                };
+                onSavePrompt(newPrompt);
+                addToast('Prompt JSON guardado en la galería', 'success');
+            }
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            addToast(`Error al guardar: ${errorMessage}`, 'error');
+            console.error("Error saving prompt:", err);
+        } finally {
+            setIsSaving(false);
+            setGlobalLoader({ active: false, message: '' });
         }
     };
 
@@ -669,8 +693,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                     {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
                                 </button>
                                 </div>
-                                <button onClick={handleSave} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg">
-                                    Guardar en Galería
+                                <button onClick={handleSave} disabled={isSaving} className="w-full bg-green-600 hover:bg-green-500 disabled:bg-green-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg">
+                                    {isSaving ? 'Guardando...' : 'Guardar en Galería'}
                                 </button>
                             </div>
                         )}
