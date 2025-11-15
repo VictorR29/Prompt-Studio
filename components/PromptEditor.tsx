@@ -465,6 +465,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     
         try {
             let coverImageDataUrl = '';
+            let coverGenerationFailed = false;
     
             // --- Cover Image Generation Logic ---
             if (outputType === 'text') {
@@ -477,9 +478,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                         setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
                         coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
                     } catch (imgErr) {
+                        coverGenerationFailed = true;
                         console.error("Error generating cover image:", imgErr);
-                        addToast('No se pudo generar la portada. Guardando sin ella.', 'error');
-                        coverImageDataUrl = ''; // Fallback to no cover
                     }
                 }
             } else if (outputType === 'json') {
@@ -487,9 +487,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
                     coverImageDataUrl = await generateImageFromPrompt(finalPrompt);
                 } catch (imgErr) {
+                    coverGenerationFailed = true;
                     console.error("Error generating cover image:", imgErr);
-                    addToast('No se pudo generar la portada. Guardando sin ella.', 'error');
-                    coverImageDataUrl = ''; // Fallback to no cover
                 }
             }
     
@@ -509,7 +508,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     ...metadata,
                 };
                 onSavePrompt(newPrompt);
-                addToast('Prompt maestro guardado en la galería', 'success');
             } else if (outputType === 'json') {
                 const imagePayload = coverImageDataUrl ? {
                     imageBase64: coverImageDataUrl.split(',')[1],
@@ -525,8 +523,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     ...metadata
                 };
                 onSavePrompt(newPrompt);
-                addToast('Prompt JSON guardado en la galería', 'success');
             }
+            
+            if (coverGenerationFailed) {
+                 addToast('Prompt guardado sin portada. La generación de portadas con IA podría requerir una API Key con facturación activada.', 'success');
+            } else {
+                 addToast('Prompt guardado en la galería con su portada.', 'success');
+            }
+
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             addToast(`Error al guardar: ${errorMessage}`, 'error');
