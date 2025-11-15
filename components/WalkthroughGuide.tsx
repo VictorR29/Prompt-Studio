@@ -90,18 +90,32 @@ const getTooltipPosition = (rect: DOMRect, placement = 'bottom') => {
 export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, setView, currentView }) => {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-    const [isTransitioning, setIsTransitioning] = useState(false);
 
     const currentStep = walkthroughSteps[currentStepIndex];
+
+    const getSelectorForCurrentStep = useCallback(() => {
+        if (!currentStep) return null;
+        const isMobile = window.innerWidth < 768;
+        let selector = currentStep.targetSelector;
+        if (isMobile) {
+            const mobileSelector = currentStep.targetSelector.replace('"]', '-mobile"]');
+            if (document.querySelector(mobileSelector)) {
+                selector = mobileSelector;
+            }
+        }
+        return selector;
+    }, [currentStep]);
     
     const advanceStep = () => {
         const isClickStep = currentStep?.clickOnNext;
 
         if (isClickStep) {
-            setIsTransitioning(true);
-            const element = document.querySelector(currentStep.targetSelector) as HTMLElement;
-            if (element) {
-                element.click();
+            const selector = getSelectorForCurrentStep();
+            if (selector) {
+                const element = document.querySelector(selector) as HTMLElement;
+                if (element) {
+                    element.click();
+                }
             }
             setTimeout(() => {
                 if (currentStepIndex < walkthroughSteps.length - 1) {
@@ -109,8 +123,7 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
                 } else {
                     onFinish();
                 }
-                setIsTransitioning(false);
-            }, 300); 
+            }, 300);
         } else {
             if (currentStepIndex < walkthroughSteps.length - 1) {
                 setCurrentStepIndex(prev => prev + 1);
@@ -127,15 +140,10 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
     };
     
      const updateTargetRect = useCallback(() => {
-        if (!currentStep) return;
-        
-        const isMobile = window.innerWidth < 768;
-        let selector = currentStep.targetSelector;
-        if (isMobile) {
-            const mobileSelector = currentStep.targetSelector.replace('"]', '-mobile"]');
-            if (document.querySelector(mobileSelector)) {
-                selector = mobileSelector;
-            }
+        const selector = getSelectorForCurrentStep();
+        if (!selector) {
+            setTargetRect(null);
+            return;
         }
 
         let attempts = 0;
@@ -155,7 +163,13 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
                             block: 'center',
                             inline: 'nearest',
                         });
-                        setTimeout(() => setTargetRect(element.getBoundingClientRect()), 400); 
+                        setTimeout(() => {
+                           const newRect = element.getBoundingClientRect();
+                           // Only update if the element is still valid
+                           if (newRect.width > 0 && newRect.height > 0) {
+                               setTargetRect(newRect);
+                           }
+                        }, 400); 
                     } else {
                         setTargetRect(rect);
                     }
@@ -173,12 +187,11 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
         };
 
         tryFindingElement();
-    }, [currentStep]);
+    }, [currentStep, getSelectorForCurrentStep]);
 
     // Effect to handle view changes
     useEffect(() => {
         if (currentStep?.view && currentStep.view !== currentView) {
-            setIsTransitioning(true);
             setView(currentStep.view);
         }
     }, [currentStep, currentView, setView]);
@@ -186,21 +199,22 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
     // Effect to update the target rect when the view is stable
     useLayoutEffect(() => {
         if (currentStep?.view && currentStep.view !== currentView) {
+            setTargetRect(null); // Clear rect while view is changing
             return; // Wait for the correct view
-        }
-
-        // If we're in the middle of a transition (view change or click),
-        // acknowledge it and wait for the next render cycle for the DOM to be stable.
-        if (isTransitioning) {
-            setIsTransitioning(false);
-            return;
         }
         
         updateTargetRect();
         
         const handleResizeAndScroll = () => {
-            const element = document.querySelector(currentStep.targetSelector);
-            if(element) setTargetRect(element.getBoundingClientRect());
+            const selector = getSelectorForCurrentStep();
+            if (!selector) return;
+            const element = document.querySelector(selector);
+            if(element) {
+                setTargetRect(element.getBoundingClientRect());
+            } else {
+                // If element is not found on scroll (e.g., after a click transition), re-run finder logic
+                updateTargetRect();
+            }
         };
 
         window.addEventListener('resize', handleResizeAndScroll);
@@ -210,9 +224,9 @@ export const WalkthroughGuide: React.FC<WalkthroughGuideProps> = ({ onFinish, se
             window.removeEventListener('resize', handleResizeAndScroll);
             window.removeEventListener('scroll', handleResizeAndScroll, true);
         };
-    }, [currentStep, currentView, isTransitioning, updateTargetRect]);
+    }, [currentStep, currentView, updateTargetRect, getSelectorForCurrentStep]);
     
-    if (isTransitioning || !targetRect || !currentStep) {
+    if (!targetRect || !currentStep) {
         return null;
     }
 
