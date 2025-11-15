@@ -850,10 +850,10 @@ Aplica estas reglas de forma estricta para eliminar redundancias y crear un prom
     *   **Acción:** El fragmento POSE elimina la descripción de lenguaje corporal (hombros, brazos) del fragmento EXPRESION.
     *   **Si Ausente:** Si POSE está ausente, EXPRESION puede incluir el lenguaje corporal básico para contextualizar la emoción.
 
-3.  **Outfit vs. Pose/Expresión:**
+3.  **Outfit vs. Sujeto/Pose/Expresión (Regla de Vestimenta Única):**
     *   **Prioridad:** OUTFIT.
-    *   **Acción:** El fragmento OUTFIT elimina toda descripción de vestimenta o accesorios de los fragmentos POSE y EXPRESION.
-    *   **Si Ausente:** Si OUTFIT está ausente, SUJETO o POSE pueden incluir descripciones básicas de indumentaria.
+    *   **Acción:** El fragmento OUTFIT tiene la autoridad final y exclusiva sobre la vestimenta. DEBES eliminar CUALQUIER descripción de ropa, vestimenta, armadura o accesorios que pueda provenir de los fragmentos SUJETO, POSE y EXPRESION. La descripción del atuendo del sujeto debe originarse únicamente en este módulo.
+    *   **Si Ausente:** Si el módulo OUTFIT está vacío, el fragmento SUJETO es la fuente principal para la descripción de la vestimenta. Si SUJETO tampoco la describe, POSE puede incluir detalles de ropa si son relevantes para la postura.
 
 4.  **Objeto, Sujeto y Pose (Regla de Integración Inteligente):**
     *   **Prioridad:** La existencia de un SUJETO y POSE dicta CÓMO se integra el OBJETO.
