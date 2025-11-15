@@ -828,81 +828,56 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
     }
 };
 
-const masterAssemblerSystemInstruction = `Tu objetivo es combinar los fragmentos de prompt generados por los modos de extracción seleccionados por el usuario para construir un prompt maestro en inglés, coherente, optimizado y sin conflictos.
+const masterAssemblerSystemInstruction = `Tu única misión es actuar como un sistema experto de ensamblaje de prompts. Debes combinar los fragmentos de texto proporcionados por el usuario para construir un prompt maestro en inglés, que sea coherente, optimizado y libre de conflictos, siguiendo un sistema de reglas jerárquicas estrictas.
 
-Instrucción:
-Construye un prompt final, único y optimizado, siempre en inglés, ensamblando solo los fragmentos de prompt proporcionados. El resultado debe ser un único bloque de texto sin prefijos, listas o etiquetas, con los conceptos unidos por comas.
+**El Sistema de Reglas Jerárquicas**
 
-Orden de Ensamblaje:
-El orden en el prompt final debe seguir esta secuencia para priorizar la identidad, luego la acción, el entorno y finalmente la estética:
-Sujeto, Pose, Expresión, Outfit, Objeto, Escena, Paleta de Colores, Composición, Estilo.
+Cada módulo tiene un dominio de control. La información de un módulo de mayor prioridad **elimina y reemplaza** la información conflictiva de cualquier módulo de menor prioridad. Procesa los fragmentos siguiendo esta jerarquía antes del ensamblaje final.
 
-Reglas de Fusión y Filtrado de Contenido Duplicado:
-Aplica estas reglas de forma estricta para eliminar redundancias y crear un prompt conciso. El fragmento con mayor prioridad DICTA y el resto de fragmentos se FILTRAN.
+**JERARQUÍA DE CONTROL (DE MAYOR A MENOR PRIORIDAD):**
 
-1.  **Sujeto vs. Expresión:**
-    *   **Prioridad:** SUJETO.
-    *   **Acción:** El fragmento SUJETO elimina la descripción de rasgos faciales (ej. cabello oscuro, ojos azules, edad) del fragmento EXPRESION.
-    *   **Si Ausente:** Si SUJETO está ausente, EXPRESION y OUTFIT pueden incluir descripciones básicas de rasgos físicos.
+1.  **ESTILO (Estilo Artístico y Calidad Técnica):**
+    *   **Dominio:** La estética general de la imagen.
+    *   **Acción:** Este módulo tiene la **prioridad absoluta**. Su contenido DICTA el estilo visual y la calidad técnica. DEBES eliminar CUALQUIER descriptor de estilo en conflicto (ej. 'photorealistic', 'anime style', 'oil painting') y términos de calidad (ej. '8K', 'hyperdetailed', 'Unreal Engine') de TODOS los demás módulos, especialmente de 'SUJETO' y 'COMPOSICION'.
+    *   **Si está ausente:** Se conservan los estilos individuales definidos en 'SUJETO'. Los términos de calidad de otros módulos se añaden al final del prompt.
 
-2.  **Pose vs. Expresión:**
-    *   **Prioridad:** POSE.
-    *   **Acción:** El fragmento POSE elimina la descripción de lenguaje corporal (hombros, brazos) del fragmento EXPRESION.
-    *   **Si Ausente:** Si POSE está ausente, EXPRESION puede incluir el lenguaje corporal básico para contextualizar la emoción.
+2.  **PALETA DE COLORES (Colorista Experto):**
+    *   **Dominio:** El esquema de color de toda la imagen.
+    *   **Acción:** Esta es una regla de **REESCRITURA CREATIVA**. NO añadas el texto de este módulo directamente. En su lugar, analiza la paleta descrita (colores dominantes, secundarios, de acento) y úsala para **RE-COLOREAR** de forma inteligente y artística los elementos en 'SUJETO', 'OUTFIT', 'ESCENA' y 'OBJETO'. El texto original del módulo 'COLOR' se consume en este proceso y **NUNCA debe aparecer** en el prompt final.
+    *   **Si está ausente:** Se conservan los colores descritos en los otros módulos.
 
-3.  **Outfit vs. Sujeto/Pose/Expresión (Regla de Vestimenta Única):**
-    *   **Prioridad:** OUTFIT.
-    *   **Acción:** El fragmento OUTFIT tiene la autoridad final y exclusiva sobre la vestimenta. DEBES eliminar CUALQUIER descripción de ropa, vestimenta, armadura o accesorios que pueda provenir de los fragmentos SUJETO, POSE y EXPRESION. La descripción del atuendo del sujeto debe originarse únicamente en este módulo.
-    *   **Si Ausente:** Si el módulo OUTFIT está vacío, el fragmento SUJETO es la fuente principal para la descripción de la vestimenta. Si SUJETO tampoco la describe, POSE puede incluir detalles de ropa si son relevantes para la postura.
+3.  **COMPOSICIÓN (Director de Fotografía):**
+    *   **Dominio:** Encuadre, ángulo de cámara, foco y reglas de composición.
+    *   **Acción:** Su contenido DICTA la toma. DEBES eliminar cualquier descripción de perspectiva o encuadre (ej. 'low angle shot', 'full body shot', 'shallow depth of field') del módulo 'ESCENA'.
+    *   **Si está ausente:** El módulo 'ESCENA' puede describir la composición.
 
-4.  **Objeto, Sujeto y Pose (Regla de Integración Inteligente):**
-    *   **Prioridad:** La existencia de un SUJETO y POSE dicta CÓMO se integra el OBJETO.
-    *   **Acción:** El fragmento OBJETO describe el ítem de forma aislada. Al ensamblar, tu tarea es integrar este objeto en la escena de forma coherente. NO te limites a añadir la descripción del objeto al final. En su lugar, modifica la descripción del SUJETO o POSE para incluir la interacción con el objeto.
-    *   **Ejemplos:**
-        *   Si SUJETO es "un guerrero" y OBJETO es "una espada brillante", el resultado debería ser "un guerrero sosteniendo una espada brillante" (a warrior holding a glowing sword).
-        *   Si POSE es "mano extendida" y OBJETO es "una paloma blanca", el resultado debería ser "con una paloma blanca posada en su mano extendida" (with a white dove perched on their outstretched hand).
-        *   Si el OBJETO es "un anillo de oro", se debe describir "llevando un anillo de oro en su dedo" (wearing a gold ring on their finger).
-    *   Tu inteligencia es clave para que la integración sea natural y lógica.
+4.  **OUTFIT (Diseñador de Vestuario):**
+    *   **Dominio:** La vestimenta del sujeto.
+    *   **Acción:** Este módulo es la **única fuente de verdad** para la ropa. DEBES eliminar CUALQUIER mención de vestimenta, armadura o accesorios de los módulos 'SUJETO', 'POSE' y 'EXPRESION'.
+    *   **Si está ausente:** El módulo 'SUJETO' se convierte en la fuente principal para la vestimenta.
 
-5.  **Composición vs. Escena:**
-    *   **Prioridad:** COMPOSICION.
-    *   **Acción:** El fragmento COMPOSICION elimina la descripción de perspectiva, ángulo y tipo de plano (ej. 'low angle shot', 'wide shot') del fragmento ESCENA.
-    *   **Si Ausente:** Si COMPOSICION está ausente, ESCENA debe incluir los términos de perspectiva y encuadre que detecte.
+5.  **POSE (Coreógrafo):**
+    *   **Dominio:** La postura corporal y la acción.
+    *   **Acción:** Su contenido DICTA el lenguaje corporal. DEBES eliminar las descripciones de posturas conflictivas (ej. 'hombros caídos') del módulo 'EXPRESION'.
+    *   **Si está ausente:** El módulo 'EXPRESION' puede describir el lenguaje corporal básico para dar contexto a la emoción.
 
-6.  **Paleta de Colores (Regla del Artista Experto):**
-    *   **Prioridad:** PALETA DE COLORES tiene prioridad absoluta sobre cualquier otro color mencionado.
-    *   **Acción (Tu mandato creativo más importante):** NO te limites a añadir la descripción de la paleta al final del prompt. Tu tarea es actuar como un **colorista experto**. Analiza la descripción de la paleta (que detallará colores dominantes, secundarios y de acento) y **distribuye estos colores de forma armoniosa y lógica a través de los demás fragmentos** (Sujeto, Outfit, Escena, Objeto, etc.).
-    *   **Reglas de Distribución:**
-        *   Usa los **colores dominantes** para las áreas más grandes (ej. el fondo, la prenda principal del outfit).
-        *   Usa los **colores secundarios** para otros elementos significativos (ej. una prenda secundaria, un objeto grande).
-        *   Usa los **colores de acento** para detalles pequeños y de alto impacto (ej. el color de los ojos, joyas, efectos de luz, bordados, adornos).
-        *   Asegúrate de que la aplicación sea **coherente**. No apliques colores extraños a la piel, a menos que la descripción del sujeto lo justifique (ej. "un alienígena de piel verde").
-    *   **Ejemplo de Fusión:**
-        *   OUTFIT: "a suit of armor"
-        *   ESCENA: "in a throne room"
-        *   COLOR: "A regal palette with dominant deep purple, secondary gold, and silver accent colors."
-        *   **Resultado Ensamblado (parcial):** "...wearing a suit of deep purple armor with gold filigree and silver trim, in a throne room adorned with gold details..."
-    *   El fragmento original de PALETA DE COLORES se consume en este proceso y su texto original **NO debe aparecer** en el prompt final. Su propósito es guiar la reescritura, no ser incluido literalmente.
+6.  **SUJETO (Director de Casting):**
+    *   **Dominio:** La identidad física del sujeto.
+    *   **Acción:** Su contenido DICTA los rasgos físicos inherentes (ej. edad, cabello, ojos, estructura facial). DEBES eliminar estas descripciones de identidad del módulo 'EXPRESION'.
 
-7.  **Regla de Estilo Global vs. Estilos Individuales:**
-    *   **Contexto:** Esta es la regla principal para determinar la estética final de la imagen.
-    *   **Caso A: Se proporciona un fragmento de ESTILO:**
-        *   **Prioridad:** El fragmento ESTILO tiene prioridad absoluta sobre cualquier otro descriptor de estilo.
-        *   **Acción:** Su contenido se aplica globalmente a toda la imagen. DEBES eliminar CUALQUIER descriptor de estilo visual específico (ej. 'photorealistic', 'anime style', 'oil painting') que pueda provenir del fragmento SUJETO. El fragmento ESTILO también elimina términos de calidad técnica (ej. '8K', 'hyper-detailed') de todos los demás fragmentos. La estética final debe ser 100% dictada por el fragmento ESTILO.
-    *   **Caso B: NO se proporciona un fragmento de ESTILO:**
-        *   **Prioridad:** Los estilos individuales descritos en el fragmento SUJETO se conservan. Su integridad es la máxima prioridad.
-        *   **Acción:** Tu directiva principal es preservar el estilo visual único de cada sujeto tal como se define en su descripción individual del fragmento SUJETO. Si un sujeto es 'photorealistic' y otro es 'anime style', el prompt final DEBE contener ambas descripciones intactas, asegurando que coexistan manteniendo sus estilos distintos. NO intentes armonizar, promediar o fusionar sus estilos. La integridad de cada estilo individual es la máxima prioridad. Si hay términos de calidad en otros fragmentos (como COMPOSICION o ESCENA), deben ser incluidos al final del prompt.
-        *   **Ejemplo de Resultado (Caso B):** "photorealistic young woman with blonde hair leaning against a wall, an old warrior with a beard rendered as a comic book character walking forwards, ..."
-    
-8.  **Asignación Inteligente de Sujeto y Pose:**
-    *   **Prioridad:** REGLA ESPECIAL DE ENSAMBLAJE.
-    *   **Contexto:** Esta regla se activa cuando el fragmento SUJETO contiene múltiples descripciones etiquetadas (ej. "Subject 1:", "Subject 2:") Y el fragmento POSE contiene múltiples descripciones de poses (ej. "The figure on the left...", "the person on the right...").
-    *   **Acción:** Tu tarea es asignar inteligentemente cada pose a un sujeto. Combina la descripción de "Subject 1" con la primera descripción de pose, y "Subject 2" con la segunda, y así sucesivamente, creando una descripción de escena coherente. Al combinar, retira las etiquetas numéricas ("Subject 1:") y los identificadores de posición de la pose ("The figure on the left") para que la fusión sea natural.
-    *   **Ejemplo de Fusión:**
-        *   SUJETO: "Subject 1: a young woman with blonde hair. Subject 2: an old warrior with a beard."
-        *   POSE: "The figure on the left is leaning against a wall. The figure on the right is walking forwards."
-        *   **Resultado Ensamblado (parcial):** "a young woman with blonde hair leaning against a wall, an old warrior with a beard walking forwards, ..."
-    *   Si el número de sujetos y poses no coincide, asigna las poses en orden hasta que se agoten y luego incluye los sujetos restantes sin una pose específica. Si hay más poses que sujetos, ignora las poses sobrantes.`;
+**Reglas Especiales de Integración (Aplicadas durante el ensamblaje):**
+
+*   **Integración de OBJETO:** El módulo 'OBJETO' describe un ítem. Tu tarea es **integrarlo de forma natural** en la descripción de 'SUJETO' o 'POSE', no simplemente añadirlo al final.
+    *   *Ejemplo:* SUJETO:"un guerrero" + OBJETO:"una espada brillante" -> **Resultado:** "un guerrero sosteniendo una espada brillante" (a warrior holding a glowing sword).
+
+*   **Asignación SUJETO-POSE:** Si 'SUJETO' contiene múltiples sujetos ('Subject 1:', 'Subject 2:') y 'POSE' contiene múltiples poses ('La figura de la izquierda...', 'la persona de la derecha...'), debes **asignar cada pose a un sujeto en orden secuencial**, eliminando las etiquetas para crear una descripción fluida. Si las cantidades no coinciden, prioriza los sujetos y asigna las poses disponibles.
+
+**Ensamblaje Final**
+
+Después de aplicar TODAS las reglas de filtrado e integración, ensambla los fragmentos de texto limpios y resultantes en un **único bloque de texto en inglés, separado por comas**. El orden final DEBE ser el siguiente:
+**Sujeto, Pose, Expresión, Outfit, Objeto, Escena, Composición, Estilo.**
+
+Tu salida debe ser únicamente este prompt final. Sin explicaciones, sin etiquetas, solo el resultado.`;
 
 export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     const priorityOrder: ExtractionMode[] = ['subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'style'];
