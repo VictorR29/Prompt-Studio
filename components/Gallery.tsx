@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { SavedPrompt } from '../types';
 import { PromptCard } from './PromptCard';
 import { SearchIcon } from './icons/SearchIcon';
@@ -18,10 +18,15 @@ const filterOptions: { id: SavedPrompt['type']; label: string; className: string
         className: config.className.replace('hover:bg-', 'hover:bg-opacity-30 bg-'), // Adapt hover class
     }));
 
+const INITIAL_LOAD_COUNT = 20;
+const SUBSEQUENT_LOAD_COUNT = 10;
+
 
 export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, multiSelect = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Set<SavedPrompt['type']>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
   const handleFilterToggle = useCallback((type: SavedPrompt['type']) => {
     setActiveFilters(prevFilters => {
@@ -51,6 +56,33 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
       return titleMatch || notesMatch;
     });
   }, [prompts, searchQuery, activeFilters]);
+
+  // Reset visible count when filters or search query change
+  useEffect(() => {
+    setVisibleCount(INITIAL_LOAD_COUNT);
+  }, [searchQuery, activeFilters]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (!loaderRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleCount < filteredPrompts.length) {
+          setVisibleCount(prevCount => prevCount + SUBSEQUENT_LOAD_COUNT);
+        }
+      },
+      { rootMargin: '400px' } // Load content before it's visible
+    );
+
+    observer.observe(loaderRef.current);
+
+    return () => observer.disconnect();
+  }, [visibleCount, filteredPrompts.length]);
+
+  const promptsToShow = useMemo(() => {
+    return filteredPrompts.slice(0, visibleCount);
+  }, [filteredPrompts, visibleCount]);
 
 
   return (
@@ -110,9 +142,9 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
         </div>
       )}
 
-      {filteredPrompts.length > 0 && (
+      {promptsToShow.length > 0 && (
         <div className="columns-2 md:columns-3 lg:columns-4 gap-6">
-            {filteredPrompts.map((prompt) => {
+            {promptsToShow.map((prompt) => {
               const isSelected = multiSelect && selection ? selection.some(p => p.id === prompt.id) : false;
               return (
                 <PromptCard 
@@ -124,6 +156,11 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
               );
             })}
         </div>
+      )}
+
+      {/* Sentinel element for triggering infinite scroll */}
+      {visibleCount < filteredPrompts.length && (
+         <div ref={loaderRef} className="h-10 w-full" />
       )}
     </>
   );
