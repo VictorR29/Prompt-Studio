@@ -22,10 +22,11 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
           <img 
             src={promptData.coverImage} 
             alt={promptData.title} 
-            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" 
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105 bg-gray-800"
+            loading="lazy"
           />
         ) : (
-          <div className="w-full aspect-[3/4] bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
+          <div className="w-full aspect-square bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
             <svg className="w-16 h-16 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
           </div>
         )}
