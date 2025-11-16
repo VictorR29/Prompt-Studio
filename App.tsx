@@ -15,6 +15,7 @@ import { Loader } from './components/Loader';
 import { WalkthroughGuide } from './components/WalkthroughGuide';
 import { ApiKeySetup } from './components/ApiKeySetup';
 import { SettingsModal } from './components/SettingsModal';
+import { createImageCollage } from './utils/imageUtils';
 
 export type AppView = 'editor' | 'extractor' | 'gallery';
 
@@ -207,14 +208,22 @@ const App: React.FC = () => {
 
     setIsSaving(true);
     setError(null);
+    setGlobalLoaderState({ active: true, message: 'Guardando en galería...' });
 
     try {
+        let coverImageDataUrl = '';
+
+        if ((extractionMode === 'style' || extractionMode === 'subject') && images.length > 1) {
+            setGlobalLoaderState({ active: true, message: 'Creando collage para la portada...' });
+            coverImageDataUrl = await createImageCollage(images.map(img => ({ base64: img.base64, mimeType: img.mimeType })));
+        } else {
+            const coverImage = images[0];
+            coverImageDataUrl = `data:${coverImage.mimeType};base64,${coverImage.base64}`;
+        }
+        
+        setGlobalLoaderState({ active: true, message: 'Generando metadatos con IA...' });
         const imagePayload = images.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
         const metadata = await generateFeatureMetadata(extractionMode, prompt, imagePayload);
-
-        const randomIndex = Math.floor(Math.random() * images.length);
-        const coverImage = images[randomIndex];
-        const coverImageDataUrl = `data:${coverImage.mimeType};base64,${coverImage.base64}`;
 
         const newPrompt: SavedPrompt = {
             id: Date.now().toString(),
@@ -235,6 +244,7 @@ const App: React.FC = () => {
         console.error(err);
     } finally {
         setIsSaving(false);
+        setGlobalLoaderState({ active: false, message: '' });
     }
   };
 
