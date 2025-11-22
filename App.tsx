@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -6,7 +7,7 @@ import { Gallery } from './components/Gallery';
 import { PromptEditor } from './components/PromptEditor';
 import { generateFeatureMetadata, analyzeImageFeature } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
-import { SavedPrompt, ExtractionMode } from './types';
+import { SavedPrompt, ExtractionMode, AppView } from './types';
 import { ExtractorModeSelector } from './components/ExtractorModeSelector';
 import { PromptModal } from './components/PromptModal';
 import { EXTRACTION_MODE_MAP } from './config';
@@ -16,8 +17,7 @@ import { WalkthroughGuide } from './components/WalkthroughGuide';
 import { ApiKeySetup } from './components/ApiKeySetup';
 import { SettingsModal } from './components/SettingsModal';
 import { createImageCollage } from './utils/imageUtils';
-
-export type AppView = 'editor' | 'extractor' | 'gallery';
+import { Playground } from './components/Playground';
 
 interface ToastMessage {
   id: number;
@@ -60,6 +60,7 @@ const App: React.FC = () => {
   const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
   const [isApiKeySet, setIsApiKeySet] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [promptForPlayground, setPromptForPlayground] = useState<SavedPrompt | null>(null);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -101,6 +102,9 @@ const App: React.FC = () => {
   const handleSetView = (newView: AppView) => {
     if (view === 'editor' && newView !== 'editor') {
         setPromptForEditor(null);
+    }
+    if (view === 'playground' && newView !== 'playground') {
+        setPromptForPlayground(null);
     }
     setView(newView);
   };
@@ -253,8 +257,6 @@ const App: React.FC = () => {
   };
 
   const handleUseFeatureInEditor = useCallback((featurePrompt: string) => {
-    // This logic will be handled inside the new Editor Hub
-    // For now, it can load a temporary prompt into the editor
      const tempPrompt: SavedPrompt = {
       id: `temp-${Date.now()}`,
       type: 'style', // Generic type
@@ -354,6 +356,17 @@ const App: React.FC = () => {
                 />
             </div>
         )}
+        {view === 'playground' && (
+            <div className="animate-fade-slide-in-up">
+                <Playground
+                    initialPrompt={promptForPlayground}
+                    savedPrompts={savedPrompts}
+                    onSavePrompt={addPromptToGallery}
+                    addToast={addToast}
+                    setGlobalLoader={setGlobalLoaderState}
+                />
+            </div>
+        )}
       </main>
 
       <footer className="text-center p-4 text-gray-500 text-sm">
@@ -378,7 +391,7 @@ const App: React.FC = () => {
       {isWalkthroughActive && (
         <WalkthroughGuide 
           onFinish={finishWalkthrough}
-          setView={setView}
+          setView={handleSetView}
           currentView={view}
         />
       )}

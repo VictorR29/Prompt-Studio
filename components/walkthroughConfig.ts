@@ -1,4 +1,5 @@
-import { AppView } from '../App';
+
+import { AppView } from '../types';
 
 export interface WalkthroughStep {
   targetSelector: string;
@@ -23,6 +24,13 @@ export const walkthroughSteps: WalkthroughStep[] = [
     title: 'Galería Central',
     content: 'Todos tus prompts y fragmentos guardados viven aquí, listos para ser reutilizados en cualquier momento en el Editor.',
     view: 'gallery',
+    placement: 'bottom',
+  },
+  {
+    targetSelector: '[data-tour-id="nav-playground"]',
+    title: 'Refinador IA',
+    content: 'El lugar para perfeccionar tus prompts. Carga uno desde la galería o pega un texto y conversa con la IA para mejorarlo dinámicamente.',
+    view: 'playground',
     placement: 'bottom',
   },
   {

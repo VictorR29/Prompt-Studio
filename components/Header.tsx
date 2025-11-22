@@ -1,10 +1,12 @@
+
 import React from 'react';
-import { AppView } from '../App';
+import { AppView } from '../types';
 import { PencilIcon } from './icons/PencilIcon';
 import { GalleryIcon } from './icons/GalleryIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
 
-export type View = 'editor' | 'extractor' | 'gallery';
+export type View = 'editor' | 'extractor' | 'gallery' | 'playground';
 
 interface HeaderProps {
     view: View;
@@ -23,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
 
   const navButtons = [
     { view: 'editor', label: 'Editor', icon: <PencilIcon className="w-5 h-5" />, tourId: 'nav-editor' },
+    { view: 'playground', label: 'Refinador IA', icon: <SparklesIcon className="w-5 h-5" />, tourId: 'nav-playground' },
     { view: 'extractor', label: 'Extractor', icon: <ExtractorIcon />, tourId: 'nav-extractor' },
     { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" />, tourId: 'nav-gallery' },
   ];

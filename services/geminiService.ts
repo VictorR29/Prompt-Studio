@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
-import { SavedPrompt, ExtractionMode } from "../types";
+import { SavedPrompt, ExtractionMode, AssistantResponse } from "../types";
 
 // --- Throttling Logic to prevent 429 errors ---
 const requestQueue: Array<{
@@ -1101,7 +1101,7 @@ Reglas:
 2.  **Extrae y Asigna:** Identifica las frases y palabras clave que correspondan a cada una de las 9 categorías y asígnalas al campo correspondiente en el JSON.
 3.  **Completa Todos los Campos:** TODOS los 9 campos deben estar presentes en el JSON de salida.
 4.  **Manejo de Campos Vacíos:** Si un componente no se encuentra explícitamente en el prompt, deja el valor del campo como un string vacío (""). NO inventes contenido.
-5.  **Evita la Redundancia:** Una vez que una parte del prompt se asigna a una categoría, intenta no repetirla en otra, a menos que sea fundamental para ambas (por ejemplo, el color de una prenda).
+5.  **Evita la Redundancia:** Una vez que una parte del prompt se asigna a una categoría, intenta no repetirla en otra, a menos que sea fundamental para ambas (por ejemplo, el color del prenda).
 6.  **Definición de Categorías:**
     *   **subject:** Describe al personaje o sujeto principal (ej. "a young woman", "an old warrior").
     *   **pose:** Describe la postura corporal y la acción (ej. "sitting on a throne", "leaping through the air").
@@ -1400,4 +1400,74 @@ export const createJsonTemplate = async (jsonPrompt: string): Promise<string> =>
         }
         throw new Error("No se pudo crear la plantilla JSON.");
     }
+};
+
+const getCreativeAssistantResponseSystemInstruction = `You are an expert AI Prompt Engineer and Creative Director for an image generation tool.
+Your goal is to interpret the user's natural language requests (which may be in Spanish) and translate them into high-quality, detailed, and evocative PROMPT FRAGMENTS in ENGLISH.
+
+**The 9 Modules:** subject, pose, expression, outfit, object, scene, color, composition, style.
+
+**CRITICAL RULES FOR "UPDATES":**
+1.  **ALWAYS ENGLISH:** The 'value' field in the 'updates' array MUST be in English, regardless of the user's language.
+2.  **EXPAND & ENHANCE (MANDATORY):** Do NOT just transcribe the user's words.
+    *   If the user provides a short or vague concept (e.g., "cartoon", "cyberpunk", "happy"), you MUST expand it into a professional, descriptive prompt fragment.
+    *   *Bad:* User says "ponlo triste" -> Value: "sad".
+    *   *Good:* User says "ponlo triste" -> Value: "melancholic expression, teary eyes, downcast gaze, sorrowful vibe".
+    *   *Bad:* User says "estilo cartoon" -> Value: "cartoon".
+    *   *Good:* User says "estilo cartoon" -> Value: "vibrant cartoon style, cel shaded, bold outlines, flat colors, 2D animation aesthetic".
+    *   NEVER return a single word as a value unless explicitly requested to be minimal.
+3.  **CONTEXT AWARE:** Analyze the current context to ensure coherence.
+4.  **REPLACE vs. MERGE:**
+    *   If the user implies a total change (e.g., "change the outfit to armor"), replace the 'outfit' module entirely with a detailed description.
+    *   If the user implies an addition (e.g., "add a cape"), try to incorporate it into the existing description.
+5.  **BE CREATIVE:** If the user is vague (e.g., "make it better"), enhance the 'style', 'lighting', or 'composition' modules with professional keywords (e.g., "cinematic lighting, 8k, masterpiece").
+6.  **ASSEMBLE:** You must also return the \`assembled_prompt\`. This is the final, cohesive English prompt string resulting from applying your updates to the current context. It should follow the hierarchy: Style > Subject > Outfit > Pose > Expression > Object > Scene > Composition > Color (applied). Remove conflicts.
+
+**Response Format:**
+Return a JSON object:
+{
+  "updates": [
+    { "module": "style", "value": "..." },
+    { "module": "expression", "value": "..." }
+  ],
+  "assembled_prompt": "The full, coherent, master prompt in English...",
+  "message": "..." // A helpful response in SPANISH explaining what you did.
+}`;
+
+export const getCreativeAssistantResponse = async (
+  conversationHistory: { role: 'user' | 'model'; parts: { text: string }[] }[],
+  currentFragments: Partial<Record<ExtractionMode, string>>
+): Promise<string> => {
+
+  const fragmentsContext = Object.entries(currentFragments)
+    .filter(([, value]) => value && value.trim())
+    .map(([key, value]) => `- ${key.toUpperCase()}: "${value}"`)
+    .join('\n');
+
+  // We are not sending the context as a separate message, but rather including it in the history
+  // processing to be prepended to the user's *next* message for the model to see it.
+  // The logic inside PlaygroundModal will handle adding context to the user message.
+  
+  try {
+      const response = await callApiThrottled(ai => ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          config: {
+              systemInstruction: getCreativeAssistantResponseSystemInstruction,
+              responseMimeType: "application/json",
+          },
+          contents: conversationHistory,
+      })) as GenerateContentResponse;
+      
+      const text = response.text;
+      if (!text) {
+          throw new Error("El asistente de IA no devolvió ninguna respuesta.");
+      }
+      return text.trim();
+  } catch (error) {
+      console.error("Error calling Gemini API for creative assistant:", error);
+      if (error instanceof Error) {
+        throw new Error(error.message || "No se pudo obtener una respuesta del asistente de IA.");
+      }
+      throw new Error("No se pudo obtener una respuesta del asistente de IA.");
+  }
 };

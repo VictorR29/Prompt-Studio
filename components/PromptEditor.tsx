@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { SavedPrompt, ExtractionMode } from '../types';
-import { AppView } from '../App';
+import { SavedPrompt, ExtractionMode, AppView } from '../types';
 import { 
     modularizePrompt, 
     assembleMasterPrompt, 
@@ -25,7 +25,6 @@ import { ClipboardPasteIcon } from './icons/ClipboardPasteIcon';
 import { PromptModule } from './PromptModule';
 import { UndoIcon } from './icons/UndoIcon';
 import { GalleryModal } from './GalleryModal';
-import { JsonIcon } from './icons/JsonIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { fileToBase64 } from '../utils/fileUtils';
 import { createImageCollage } from '../utils/imageUtils';
@@ -401,7 +400,13 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     };
     
     const handleGenerateJson = () => {
-        const activeFragments = Object.values(fragments).some(v => typeof v === 'string' && v.trim() !== '');
+        // FIX: Separated type check from method call to avoid potential TS inference issues where 'v' is 'unknown'.
+        const activeFragments = Object.values(fragments).some(v => {
+            if (typeof v === 'string') {
+                return v.trim() !== '';
+            }
+            return false;
+        });
         if (!activeFragments) {
             setError("No hay contenido en los módulos para generar un JSON.");
             return;
@@ -413,8 +418,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleDirectJsonGeneration = () => {
         setIsJsonChoiceModalOpen(false);
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
-            if (typeof value === 'string' && value.trim() !== '') {
-                acc[key as ExtractionMode] = value;
+            // FIX: Separated type check from method call to avoid potential TS inference issues.
+            if (typeof value === 'string') {
+                if (value.trim() !== '') {
+                    acc[key as ExtractionMode] = value;
+                }
             }
             return acc;
         }, {} as Partial<Record<ExtractionMode, string>>);
@@ -435,7 +443,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setOutputType('json');
         setError(null);
         setFinalPrompt('');
-        setGlobalLoader({ active: true, message: 'Fusionando módulos con plantilla JSON...' });
+        setGlobalLoader({ active: true, message: 'Fusionando módulos com plantilla JSON...' });
         
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
             if (typeof value === 'string' && value.trim() !== '') {

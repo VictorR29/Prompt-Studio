@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
-import { AppView } from '../App';
+import { AppView } from '../types';
 import { walkthroughSteps, WalkthroughStep } from './walkthroughConfig';
 
 interface WalkthroughGuideProps {

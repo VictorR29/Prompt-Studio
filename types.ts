@@ -1,3 +1,4 @@
+
 export type ExtractionMode = 'style' | 'subject' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'object';
 
 export interface SavedPrompt {
@@ -10,3 +11,21 @@ export interface SavedPrompt {
   artType: string;
   notes: string;
 }
+
+export interface PlaygroundOperation {
+  module: ExtractionMode;
+  value: string;
+}
+
+export interface AssistantResponse {
+  message: string;
+  updates: PlaygroundOperation[];
+  assembled_prompt?: string;
+}
+
+export interface AssistantSuggestion {
+  module: ExtractionMode;
+  newValue: string;
+}
+
+export type AppView = 'editor' | 'extractor' | 'gallery' | 'playground';
