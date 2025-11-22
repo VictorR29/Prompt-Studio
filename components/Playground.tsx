@@ -59,7 +59,8 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     }]);
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [updatedModule, setUpdatedModule] = useState<ExtractionMode | null>(null);
+    // Change from single module to a Set of modules for persistent highlighting
+    const [updatedModules, setUpdatedModules] = useState<Set<ExtractionMode>>(new Set());
     const chatEndRef = useRef<HTMLDivElement>(null);
     const [pastedText, setPastedText] = useState('');
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -139,13 +140,15 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
             // Apply updates immediately
             if (parsedResponse.updates && parsedResponse.updates.length > 0) {
                 const newFragments = { ...fragments };
+                const nextUpdatedModules = new Set<ExtractionMode>();
+
                 parsedResponse.updates.forEach(op => {
                     newFragments[op.module] = op.value;
-                    // Trigger visual feedback for the last updated module
-                    setUpdatedModule(op.module);
-                    setTimeout(() => setUpdatedModule(null), 2000);
+                    nextUpdatedModules.add(op.module);
                 });
+                
                 setFragments(newFragments);
+                setUpdatedModules(nextUpdatedModules);
             }
             
             // Update the master prompt text directly from the AI's calculation
@@ -331,11 +334,12 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                         {fragmentOrder.map(mode => {
                             const value = fragments[mode];
                             const config = EXTRACTION_MODE_MAP[mode];
+                            const isUpdated = updatedModules.has(mode);
                             // Show active if it has value OR if it was just updated
-                            if (!value && updatedModule !== mode) return null; 
+                            if (!value && !isUpdated) return null; 
                             
                             return (
-                                <div key={mode} className={`p-3 rounded-lg border transition-all duration-500 ${updatedModule === mode ? 'ring-2 ring-teal-500 bg-teal-900/30 border-teal-500/50 scale-105 shadow-lg z-10' : 'bg-gray-900/50 border-white/5 hover:border-white/10'}`}>
+                                <div key={mode} className={`p-3 rounded-lg border transition-all duration-500 ${isUpdated ? 'ring-2 ring-teal-500 bg-teal-900/30 border-teal-500/50 scale-105 shadow-lg z-10' : 'bg-gray-900/50 border-white/5 hover:border-white/10'}`}>
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <span className={`w-2 h-2 rounded-full ${config.badgeClassName.replace('bg-', 'bg-').split(' ')[0]}`}></span>
                                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{config.label}</h3>
