@@ -151,6 +151,9 @@ const App: React.FC = () => {
     setSavedPrompts(prev => [newPrompt, ...prev]);
   }, []);
 
+  const handleUpdatePrompts = useCallback((newPrompts: SavedPrompt[]) => {
+    setSavedPrompts(newPrompts);
+  }, []);
 
   const handleImagesUpload = useCallback(async (files: File[]) => {
     if (images.length + files.length > maxImages) {
@@ -385,6 +388,8 @@ const App: React.FC = () => {
           onClose={() => setIsSettingsModalOpen(false)}
           onKeySaved={handleKeySaved}
           addToast={addToast}
+          savedPrompts={savedPrompts}
+          onPromptsUpdate={handleUpdatePrompts}
         />
       )}
       {globalLoaderState.active && <GlobalLoader message={globalLoaderState.message} />}
