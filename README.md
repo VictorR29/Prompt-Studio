@@ -1,72 +1,72 @@
-# Prompt Studio 🎨: Ingeniería de Prompts Modular e Inteligente
+# Prompt Studio 🎨: Ingeniería de Prompts de Nueva Generación
 
-Prompt Studio es la aplicación líder en **Ingeniería Inversa de Prompts** para la generación de imágenes con IA. Utiliza modelos avanzados de Gemini para **descomponer imágenes o texto en 9 fragmentos editables**, permitiéndote crear, mezclar y optimizar *prompts* con precisión quirúrgica.
+**Prompt Studio** es una suite avanzada para la **Ingeniería de Prompts** en la generación de imágenes con IA. Potenciada por **Google Gemini 2.5**, esta aplicación no solo organiza tus ideas, sino que actúa como un **Director Creativo**, expandiendo conceptos vagos en instrucciones técnicas precisas.
 
-Esta aplicación web fue programada usando **Vibe Coding** asistido por **Google AI Studio**.
-
----
-
-## 🚀 El Editor: Tu Entorno de Trabajo Modular
-
-Hemos consolidado el flujo de trabajo en torno al **Editor Modular**, el corazón de la aplicación, ahora enriquecido con las funciones del **Ensamblador** y **Estructurador**.
-
-![Captura del Editor Hub de Prompt Studio](assets/editor-nuevo.png)
-
-### ✨ Características Clave y Flujos de Entrada
-
-* **Análisis Inverso y Modularización (9 Fragmentos):** Descompón cualquier *prompt* de texto o JSON en **9 módulos editables** (Sujeto, Pose, Estilo, Composición, etc.) listos para ser modificados.
-* **Ensamblador Transparente:** La herramienta para trabajar con **múltiples imágenes**. Sube imágenes directamente a cada módulo (Pose, Outfit, etc.). El sistema analiza y rellena el fragmento de texto correspondiente para que lo edites antes del ensamblaje.
-* **Estructurador (Generación de JSON):** Usa una idea simple o una imagen de referencia para que la IA **genere una estructura JSON completa** que automáticamente llena los 9 módulos.
-
-### 🧠 Lógica Maestra de Consistencia
-
-El sistema aplica **Lógica de Prioridad y Filtrado** (Reglas Maestras) para eliminar redundancias y conflictos entre los fragmentos (ej., el color del Outfit vs. la Paleta de Colores) justo antes de generar el *prompt* final.
-
-![Captura del Prompt Final Ensamblado](assets/resultado-del-edit.png)
+Esta aplicación web está construida con **React, Vite y Tailwind CSS**, utilizando la última tecnología multimodal de Google.
 
 ---
 
-### 🖼️ Edición Granular y Optimización
+## 🌟 Novedad Principal: El Refinador IA (Playground)
 
-Cada uno de los 9 fragmentos tiene su propia herramienta de refinamiento.
+El **Refinador IA** transforma la ingeniería de prompts en una conversación fluida. Ya no necesitas editar texto manualmente; simplemente chatea con la IA.
 
-* **Optimización Contextual:** Recibe **sugerencias inteligentes** en tiempo real para cada módulo, basadas en el contexto del *prompt* completo que estás construyendo.
+![Concepto del Refinador IA](assets/editor-nuevo.png)
 
-![Captura del Módulo en Edición con Opciones de Optimización](assets/editando.png)
-
----
-
-### 🛡️ Seguridad y Tecnología Flexible
-
-La aplicación está construida sobre una arquitectura que respeta la seguridad de tu clave API y te da control total sobre tu consumo.
-
-* **Seguridad por Defecto:** La aplicación utiliza una clave API segura, inyectada vía **variables de entorno**, por lo que **tu clave privada nunca se expone** en el código del lado del cliente.
-* **Opción de Clave Propia:** Para uso intensivo o ilimitado, puedes ingresar tu propia clave API de Google en la sección de Configuración. Esta clave se almacena de forma segura en el **`localStorage`** de tu navegador, delegando el consumo de la API a tu propia cuota.
+*   **Rol de Experto:** La IA no transcribe; **interpreta**. Si pides *"hazlo estilo cartoon"*, el sistema generará automáticamente: *"vibrant cartoon style, cel shaded, bold outlines, 2D animation aesthetic"*.
+*   **Edición en Tiempo Real:** Cada mensaje actualiza instantáneamente uno de los 9 módulos estructurales (Sujeto, Estilo, Pose, etc.).
+*   **Ensamblaje Síncrono:** El prompt maestro se recalcula en tiempo real. Al pulsar "Copiar", obtienes el resultado final instantáneamente, sin esperas ni errores de permisos.
+*   **Modo Móvil Optimizado:** Una interfaz de pestañas inteligente que separa el chat de la visualización del estado del prompt para una experiencia perfecta en pantallas pequeñas.
 
 ---
 
-### 🛠️ Cómo Empezar
+## 🚀 El Editor Modular
 
-Para aprovechar las funciones de análisis y generación de *prompts*, solo necesitas una clave de API de Gemini.
+El corazón de la aplicación sigue siendo su capacidad para descomponer cualquier idea en **9 módulos editables**:
 
-1.  **Obtén tu API Key:** Ve a [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key) y haz clic en "Get API key".
-2.  **Configura tu Clave en Prompt Studio (Opcional):** Abre la aplicación, busca el ícono de configuración (⚙️) e ingresa tu clave para uso personal.
-3.  **¡Empieza a Crear Arte!** Usa el **Editor** para empezar, o el **Extractor** para analizar una imagen de forma aislada.
+1.  **Sujeto** (Subject)
+2.  **Pose** (Pose)
+3.  **Expresión** (Expression)
+4.  **Vestimenta** (Outfit)
+5.  **Objeto** (Object)
+6.  **Escena** (Scene)
+7.  **Color** (Color)
+8.  **Composición** (Composition)
+9.  **Estilo** (Style)
+
+### Flujos de Trabajo:
+*   **Empezar en Blanco:** Construye desde cero módulo a módulo.
+*   **Ingeniería Inversa (Extractor):** Sube imágenes a cualquier módulo y deja que la visión multimodal de Gemini extraiga la descripción técnica.
+*   **Estructurador IA:** Describe una idea vaga (ej: "un astronauta perdido") y la IA generará una estructura JSON completa inicial.
+*   **Importación de Texto/JSON:** Pega prompts existentes y el sistema los modularizará automáticamente.
 
 ---
 
-### 🤝 ¿Quieres Contribuir?
+## 🧠 Lógica Maestra de Ensamblaje
 
-Si eres un apasionado del arte con IA y quieres mejorar Prompt Studio, ¡tu ayuda es bienvenida!
+Prompt Studio utiliza un sistema jerárquico estricto para generar el prompt final:
 
-* Haz un Fork del repositorio.
-* Crea una nueva Rama para tu mejora (`git checkout -b feature/AmazingArtFeature`).
-* Haz tus Cambios y haz commit (`git commit -m 'Add some AmazingArtFeature'`).
-* Haz Push a tu rama (`git push origin feature/AmazingArtFeature`).
-* Abre un Pull Request.
+1.  **Prioridad de Estilo:** El módulo de "Estilo" dicta la estética global, sobrescribiendo descripciones conflictivas en otros módulos.
+2.  **Fusión Inteligente:** Si el módulo de "Color" define una paleta, esta se aplica semánticamente a la ropa y el entorno, en lugar de simplemente pegar las palabras clave al final.
+3.  **Sin Conflictos:** El sistema limpia redundancias antes de generar la salida final para maximizar la calidad en modelos como Midjourney, Stable Diffusion o DALL-E 3.
+
+---
+
+## 🛡️ Privacidad y Seguridad
+
+*   **API Key Local:** Tu clave de API se almacena exclusivamente en el `localStorage` de tu navegador. Nunca se envía a servidores intermedios.
+*   **Facturación Directa:** Al usar tu propia clave, tienes control total sobre tus cuotas y facturación directamente con Google Cloud Platform.
+
+---
+
+## 🛠️ Stack Tecnológico
+
+*   **Frontend:** React 19, TypeScript, Vite.
+*   **Estilos:** Tailwind CSS con diseño "Glassmorphism".
+*   **IA:** Google Gemini API (`gemini-2.5-flash` para texto/lógica, `gemini-2.5-flash-image` para visión).
+*   **Iconos:** Componentes SVG personalizados optimizados.
 
 ---
 
 ### 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Consulta el archivo `LICENSE` para más detalles.
+Este proyecto es de código abierto bajo la Licencia MIT. ¡Siéntete libre de hacer fork y contribuir!
