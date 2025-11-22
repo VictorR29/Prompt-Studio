@@ -51,6 +51,15 @@ Prompt Studio utiliza un sistema jerárquico estricto para generar el prompt fin
 
 ---
 
+## 💾 Gestión de Datos y Portabilidad
+
+Dado que Prompt Studio funciona completamente en el navegador para maximizar la privacidad, hemos incluido herramientas profesionales de gestión de datos en el menú de **Configuración**:
+
+*   **Exportar Galería:** Genera una copia de seguridad completa de todos tus prompts y configuraciones en un archivo JSON portable.
+*   **Importar Galería:** Restaura tus copias de seguridad en cualquier dispositivo o navegador. El sistema detecta duplicados automáticamente para fusionar librerías de forma segura.
+
+---
+
 ## 🛡️ Privacidad y Seguridad
 
 *   **API Key Local:** Tu clave de API se almacena exclusivamente en el `localStorage` de tu navegador. Nunca se envía a servidores intermedios.
