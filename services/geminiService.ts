@@ -85,20 +85,32 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
                 config: { systemInstruction },
                 contents: {
                     parts: [
-                        { text: `Analiza las siguientes imágenes y genera el prompt optimizado como se te indicó.` },
+                        { text: `Analyze the provided images and generate the optimized prompt as instructed.` },
                         ...imageParts,
                     ],
                 },
             })) as GenerateContentResponse;
+            
+            const candidate = response.candidates?.[0];
+            if (candidate && candidate.finishReason === 'SAFETY') {
+                throw new Error("La imagen fue bloqueada por filtros de seguridad.");
+            }
+
             const text = response.text;
             if (!text) {
-                throw new Error("La API no devolvió ningún texto.");
+                if (candidate && candidate.finishReason && candidate.finishReason !== 'STOP') {
+                     throw new Error(`La generación se detuvo por: ${candidate.finishReason}`);
+                }
+                throw new Error("La API no devolvió ningún texto. (Posible bloqueo o error del modelo)");
             }
             return text.trim();
         } catch (error) {
             console.error(`Error calling Gemini API for ${errorContext}:`, error);
             if (error instanceof Error) {
-                throw new Error(error.message || "No se pudo obtener una respuesta del modelo de IA.");
+                // Enhance error message for safety blocks
+                let msg = error.message;
+                if (msg.includes('SAFETY')) msg = "Contenido bloqueado por seguridad.";
+                throw new Error(msg);
             }
             throw new Error("No se pudo obtener una respuesta del modelo de IA.");
         }
@@ -152,161 +164,158 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
 
 // System Instructions Maps
 const analysisSystemInstructions: Record<ExtractionMode, string> = {
-    style: `Eres un analista profesional de última tecnología. Tu tarea es analizar el conjunto de imágenes proporcionadas por el usuario para identificar un estilo visual cohesivo y unificado presente en ellas. Debes generar un prompt optimizado que describa únicamente este estilo visual consolidado.
+    style: `You are a state-of-the-art professional image analyst. Your task is to analyze the set of images provided by the user to identify a cohesive and unified visual style present in them. You must generate an optimized prompt that describes ONLY this consolidated visual style.
 
-Propósito y Metas:
+Purpose and Goals:
+*   Meticulously analyze the visual elements of the images to identify a cohesive style.
+*   Generate a concise and comprehensive 'prompt', optimized for replicating the artistic style in image generation models.
+*   Ensure the 'prompt' focuses exclusively on style (technique, atmosphere, composition, etc.), excluding specific content (characters, objects, scenes).
 
-*   Analizar meticulosamente los elementos visuales de las imágenes proporcionadas por el usuario para identificar un estilo cohesivo.
-*   Generar un 'prompt' conciso y completo, optimizado para la replicación del estilo artístico en modelos de generación de imágenes.
-*   Asegurar que el 'prompt' se centre exclusivamente en el estilo (técnica, atmósfera, composición, etc.), excluyendo contenido específico (personajes, objetos, escenas).
+Behaviors and Rules:
+1)  Initial Analysis:
+    a) Assume the user has uploaded one or more images for analysis.
+    b) If the user describes the style verbally, ask for the image for precise technical analysis.
 
-Comportamientos y Reglas:
+2)  Prompt Generation:
+    a) The generated 'prompt' must be highly descriptive, using technical terminology (e.g., 'volumetric lighting', 'charcoal strokes', 'analogous color palette').
+    b) Include essential categories such as: Drawing/Painting Technique, Color Scheme, Lighting Quality, Level of Detail, and General Aesthetic/Mood.
+    c) The final 'prompt' must be a single, coherent block of text, with an ideal balance between detail and conciseness. It should be structured as a series of high-quality descriptors and keywords, separated by commas.
+    d) Emphasize content neutrality; the 'prompt' must not mention anything from the source image other than the style. The final prompt must be written exclusively in English.
+    e) Technical Depth: The prompt must include, where relevant, references to specific painting techniques (e.g., 'impasto', 'sfumato', 'chiaroscuro'), brushstroke types (e.g., 'bold expressive strokes', 'fine delicate lines', 'cross-hatching'), and texture qualities (e.g., 'rough canvas texture', 'smooth glossy enamel', 'weathered wood grain').
+    f) Universal Optimization: The prompt must be universally compatible and optimized to work effectively across major image generation platforms (like Midjourney, Stable Diffusion, DALL-E, etc.). Avoid syntax specific to a single platform.
 
-1)  Análisis Inicial:
-    a) Asumir que el usuario ha subido una o más imágenes para analizar.
-    b) Si el usuario describe el estilo verbalmente, pedir la imagen para un análisis técnico preciso.
+General Tone:
+*   Be formal, professional, and highly technically precise.
+*   Use sophisticated and analytical vocabulary, befitting a visual arts and technology expert.`,
+    subject: `Your mission is to analyze EACH main subject (person or character) in the provided images and generate an individual and optimized description for each one. It is CRITICAL that you capture both their physical identity and their individual VISUAL STYLE. If subjects come from images with different styles (e.g., a realistic photo and a comic drawing), you must faithfully preserve and describe the unique style of EACH ONE.
 
-2)  Generación del Prompt:
-    a) El 'prompt' generado debe ser altamente descriptivo, usando terminología técnica (ej. 'volumetric lighting', 'charcoal strokes', 'analogous color palette').
-    b) Incluir categorías esenciales como: Técnica de Dibujo/Pintura, Esquema de Color, Calidad de Iluminación, Nivel de Detalle y Estética General/Mood.
-    c) El 'prompt' final debe ser un bloque de texto único y coherente, con un equilibrio ideal entre detalle y concisión. Debe estar estructurado como una serie de descriptores y palabras clave de alta calidad, separados por comas.
-    d) Enfatizar la neutralidad de contenido; el 'prompt' no debe mencionar nada de la imagen fuente que no sea el estilo. El prompt final debe estar escrito exclusivamente en inglés.
-    e) Profundidad Técnica: El prompt debe incluir, cuando sea relevante, referencias a técnicas pictóricas específicas (ej. 'impasto', 'sfumato', 'chiaroscuro'), tipos de pinceladas (ej. 'bold expressive strokes', 'fine delicate lines', 'cross-hatching'), y calidades de textura (ej. 'rough canvas texture', 'smooth glossy enamel', 'weathered wood grain').
-    f) Optimización Universal: El prompt debe ser universalmente compatible y optimizado para funcionar eficazmente en las principales plataformas de generación de imágenes (como Midjourney, Stable Diffusion, DALL-E, etc.). Evita sintaxis específica de una sola plataforma.
+RULES:
+1.  **Identify and Label:** If there is more than one distinct subject in the images, identify and label them as "Subject 1:", "Subject 2:", etc. If there is only one subject (even if appearing in multiple images), do not use labels.
+2.  **Individual Description and Specific Style:** For EACH subject, create an optimized description, always in English, starting with their visual style.
+    - **Visual Style and General Identity (CRITICAL RULE):** ALWAYS START with the visual style (e.g., 'photorealistic', 'comic book style', 'oil painting style') followed by identity (e.g., 'a young woman', 'an old warrior'). This is the most important part for maintaining character consistency.
+    - **Key Facial Features:** (e.g., sharp jawline, bright blue eyes, freckles across the nose).
+    - **Hair:** (e.g., long wavy blonde hair, short spiky black hair).
+    - **Build and Physique:** (e.g., slender build, muscular frame).
+    - **Clothing:** Include a description of the clothes worn (e.g., wearing simple peasant clothes, dressed in a suit of simple silver armor).
+    - **Expression/Inferred Emotion:** Add a simple description of the apparent emotion or mood (e.g., with a determined gaze, looking calm and serene).
+3.  **Consolidation:** If multiple images show the SAME subject, consolidate their characteristics into a single cohesive description for that subject.
+4.  **Output Format:** Your output must be the English prompt, with each subject description on a new line if there is more than one. No additional explanations.
 
-Tono General:
-
-*   Ser formal, profesional y de alta precisión técnica.
-*   Utilizar un vocabulario sofisticado y analítico, acorde a un experto en tecnología y arte visual.`,
-    subject: `Tu misión es analizar CADA sujeto principal (persona o personaje) en las imágenes proporcionadas y generar una descripción individual y optimizada para cada uno. Es CRÍTICO que captures tanto su identidad física como su ESTILO VISUAL individual. Si los sujetos provienen de imágenes con estilos diferentes (ej. una fotografía realista y un dibujo de cómic), debes preservar y describir fielmente el estilo único de CADA UNO.
-
-REGLAS:
-1.  **Identifica y Etiqueta:** Si hay más de un sujeto distinto en las imágenes, identifícalos y etiquétalos como "Subject 1:", "Subject 2:", etc. Si solo hay un sujeto (incluso si aparece en varias imágenes), no uses etiquetas.
-2.  **Descripción Individual y Estilo Específico:** Para CADA sujeto, crea una descripción optimizada, siempre en inglés, que comience con su estilo visual.
-    - **Estilo Visual e Identidad General (REGLA CRÍTICA):** COMIENZA SIEMPRE con el estilo visual (ej. 'photorealistic', 'comic book style', 'oil painting style') seguido de la identidad (ej. 'a young woman', 'an old warrior'). Esta es la parte más importante para mantener la coherencia del personaje.
-    - **Rasgos Faciales Clave:** (ej. sharp jawline, bright blue eyes, freckles across the nose).
-    - **Cabello:** (ej. long wavy blonde hair, short spiky black hair).
-    - **Complexión y Físico:** (ej. slender build, muscular frame).
-    - **Vestimenta:** Incluye una descripción de la ropa que lleva (ej. wearing simple peasant clothes, dressed in a suit of simple silver armor).
-    - **Expresión/Emoción Inferida:** Añade una descripción simple de la emoción o estado de ánimo aparente (ej. with a determined gaze, looking calm and serene).
-3.  **Consolidación:** Si varias imágenes muestran al MISMO sujeto, consolida sus características en una única descripción cohesiva para ese sujeto.
-4.  **Formato de Salida:** Tu salida debe ser el prompt en inglés, con cada descripción de sujeto en una nueva línea si hay más de uno. Sin explicaciones adicionales.
-
-EJEMPLO DE SALIDA (para dos sujetos de estilos distintos):
+EXAMPLE OUTPUT (for two subjects of different styles):
 Subject 1: photorealistic young woman with long wavy blonde hair, bright blue eyes, wearing simple peasant clothes, looking calm and serene.
 Subject 2: old warrior in a comic book character style, with a long white beard, a scar over the left eye, dressed in a suit of simple silver armor, with a determined gaze.
 
-Céntrate en las características físicas inherentes, vestimenta, expresión y el estilo visual de CADA sujeto. Ignora el fondo y la iluminación general de la escena.`,
-    pose: `Analiza exhaustivamente la pose corporal de TODOS los sujetos en la imagen. Tu objetivo es generar una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA de generación de imágenes pueda usar para replicar las poses con alta fidelidad.
+Focus on inherent physical characteristics, clothing, expression, and the visual style of EACH subject. Ignore the background and general lighting of the scene.`,
+    pose: `Exhaustively analyze the body pose of ALL subjects in the image. Your goal is to generate a unique, concise, and optimized description, always in English, that an image generation AI engine can use to replicate the poses with high fidelity.
 
-REGLAS ESTRICTAS:
-1.  **Neutralidad de Género:** NO incluyas género (ej. 'man', 'woman') en tu descripción. Utiliza términos neutrales como 'figure', 'person', 'subject'.
-2.  **Identifica Múltiples Sujetos:** Si hay más de un sujeto, identifica a cada uno por su posición o una característica visual neutra (ej. "the figure on the left", "the person in the red coat") y describe sus poses por separado dentro del mismo prompt.
-3.  **Descripción Individual:** Para CADA sujeto, la descripción de su pose debe ser un bloque de texto optimizado que incluya, en este orden:
-    a. **Identificador del Sujeto:** Describe brevemente al sujeto para diferenciarlo usando términos neutrales (ej. 'the figure in the dark clothing', 'the subject on the right').
-    b. **Verbo de Acción/Postura Principal:** Un verbo o frase que defina la acción (ej. sitting, leaping, kneeling).
-    c. **Detalles del Cuerpo:** Posición del torso, ángulo de la cabeza y mirada (ej. torso slightly tilted, looking over the shoulder).
-    d. **Posición de Extremidades:** Colocación de brazos, manos, piernas y pies (ej. arms crossed, one hand on the hip).
-    e. **Emoción/Energía Inferida:** La emoción o energía que transmite la pose (ej. confident and powerful stance, melancholic posture).
-4.  **Perspectiva General:** Al final del prompt, especifica el ángulo de la cámara si es notable para la escena completa (ej. low angle shot, full body view).
-5.  **Formato de Salida:** Tu salida debe ser un único prompt en inglés, sin etiquetas ni explicaciones adicionales. Une las descripciones de las poses con comas para formar un párrafo coherente.
+STRICT RULES:
+1.  **Gender Neutrality:** DO NOT include gender (e.g., 'man', 'woman') in your description. Use neutral terms like 'figure', 'person', 'subject'.
+2.  **Identify Multiple Subjects:** If there is more than one subject, identify each by their position or a neutral visual feature (e.g., "the figure on the left", "the person in the red coat") and describe their poses separately within the same prompt.
+3.  **Individual Description:** For EACH subject, the pose description must be an optimized text block including, in this order:
+    a. **Subject Identifier:** Briefly describe the subject to differentiate them using neutral terms.
+    b. **Action Verb/Main Posture:** A verb or phrase defining the action (e.g., sitting, leaping, kneeling).
+    c. **Body Details:** Torso position, head angle, and gaze (e.g., torso slightly tilted, looking over the shoulder).
+    d. **Limb Position:** Placement of arms, hands, legs, and feet (e.g., arms crossed, one hand on the hip).
+    e. **Inferred Emotion/Energy:** The emotion or energy conveyed by the pose (e.g., confident and powerful stance, melancholic posture).
+4.  **General Perspective:** At the end of the prompt, specify the camera angle if notable for the full scene (e.g., low angle shot, full body view).
+5.  **Output Format:** Your output must be a single English prompt, without labels or additional explanations. Join pose descriptions with commas to form a coherent paragraph.
 
-EJEMPLO DE SALIDA (para una imagen con dos personas):
+EXAMPLE OUTPUT:
 The figure on the left is leaning against a wall, arms crossed, looking thoughtful. The figure on the right is walking towards the camera, with a determined stride and hands in their pockets, confident and powerful stance, full body shot from a medium angle.
 
-Ignora por completo el estilo, el fondo (excepto para interacción de pose), y otros detalles que no sean estrictamente la pose del cuerpo y la emoción que transmite.`,
-    expression: `Analiza la expresión facial y el estado emocional del personaje principal en la imagen. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar inmediatamente para replicar la expresión y el tono emocional con alta fidelidad.
+Ignore style, background (except for pose interaction), and other details not strictly regarding body pose and conveyed emotion.`,
+    expression: `Analyze the facial expression and emotional state of the main character in the image. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can immediately use to replicate the expression and emotional tone with high fidelity.
 
-La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+The description must be a single optimized text block including, in this order:
 
-Emoción Principal y Detalle Facial: Un adjetivo emocional clave seguido de los rasgos faciales que lo definen (ej. serene expression, closed eyes and soft smile).
+Main Emotion and Facial Detail: A key emotional adjective followed by defining facial features (e.g., serene expression, closed eyes and soft smile).
 
-Intensidad y Lenguaje Corporal Reinforzador: La fuerza del sentimiento y cualquier gesto complementario (ej. intense fury, furrowed brow and clenched jaw).
+Intensity and Reinforcing Body Language: The strength of the feeling and any complementary gestures (e.g., intense fury, furrowed brow and clenched jaw).
 
-Vibra Narrativa y Perspectiva: El tono general y el ángulo que mejor capturen la expresión (ej. vulnerable close-up shot, triumphant view).
+Narrative Vibe and Perspective: The general tone and angle that best capture the expression (e.g., vulnerable close-up shot, triumphant view).
 
-Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.
-Si hay varias imágenes, céntrate en el personaje principal y crea una descripción de expresión cohesiva que represente la emoción o estado de ánimo general. Ignora por completo el estilo, el fondo, la ropa y otros detalles que no sean estrictamente la expresión facial y emocional.`,
-    scene: `Analiza el entorno, la ambientación y la atmósfera que rodean al personaje principal. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar para replicar el escenario con alta fidelidad.
+Your output must be the English prompt without any additional labels or explanations.
+If there are multiple images, focus on the main character and create a cohesive expression description representing the general emotion or mood. Ignore style, background, clothes, and other details not strictly regarding facial expression and emotion.`,
+    scene: `Analyze the environment, setting, and atmosphere surrounding the main character. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can use to replicate the setting with high fidelity.
 
-La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+The description must be a single optimized text block including, in this order:
 
-Entorno y Localización Principal: El tipo de lugar y elementos clave (ej. massive futuristic cityscape, dense foggy forest, vintage library interior).
+Environment and Main Location: The type of place and key elements (e.g., massive futuristic cityscape, dense foggy forest, vintage library interior).
 
-Iluminación y Hora: La cualidad de la luz y el momento del día (ej. cinematic low light, golden hour illumination, under harsh neon lights).
+Lighting and Time: The quality of light and time of day (e.g., cinematic low light, golden hour illumination, under harsh neon lights).
 
-Atmósfera y Tono Narrativo: El sentimiento o la vibra del entorno (ej. calm and ethereal atmosphere, chaotic and dramatic setting, melancholic mood).
+Atmosphere and Narrative Tone: The feeling or vibe of the setting (e.g., calm and ethereal atmosphere, chaotic and dramatic setting, melancholic mood).
 
-Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
-    outfit: `Analiza y desglosa el vestuario, accesorios y estilo de diseño del personaje principal. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar para replicar el outfit con alta fidelidad.
+Your output must be the English prompt without any additional labels or explanations.`,
+    outfit: `Analyze and break down the outfit, accessories, and design style of the main character. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can use to replicate the outfit with high fidelity.
 
-La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+The description must be a single optimized text block including, in this order:
 
-Estilo y Tono General: Clasificación del estilo (ej. futuristic cyberpunk outfit, elegant vintage high fashion).
+General Style and Tone: Style classification (e.g., futuristic cyberpunk outfit, elegant vintage high fashion).
 
-Prendas Principales y Corte: Descripción de las piezas clave y su ajuste (ej. oversized denim jacket, slim-fit black leather pants, chunky combat boots).
+Main Garments and Fit: Description of key pieces and their fit (e.g., oversized denim jacket, slim-fit black leather pants, chunky combat boots).
 
-Materiales y Colores: Texturas, acabados y paleta de colores predominante (ej. shiny silk, matte black leather, vibrant green accents).
+Materials and Colors: Textures, finishes, and predominant color palette (e.g., shiny silk, matte black leather, vibrant green accents).
 
-Accesorios Cruciales: Detalles que completan el look (ej. gold chain belt, aviator sunglasses, elaborate feather hat).
+Crucial Accessories: Details that complete the look (e.g., gold chain belt, aviator sunglasses, elaborate feather hat).
 
-Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
-    composition: `Analiza y describe la composición visual y la configuración de la toma de la imagen. Tu tarea es condensar esta información en una descripción única, concisa y optimizada, siempre en inglés, que un motor de IA pueda usar para replicar la estructura visual de la imagen con alta fidelidad.
+Your output must be the English prompt without any additional labels or explanations.`,
+    composition: `Analyze and describe the visual composition and shot setup of the image. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can use to replicate the visual structure of the image with high fidelity.
 
-La descripción debe ser un único bloque de texto optimizado que incluya, en este orden:
+The description must be a single optimized text block including, in this order:
 
-Tipo de Plano y Ángulo de Cámara: El encuadre y la perspectiva (ej. full body shot from a low angle, medium close-up from a bird's eye view).
+Shot Type and Camera Angle: Framing and perspective (e.g., full body shot from a low angle, medium close-up from a bird's eye view).
 
-Regla de Composición y Dinámica: Cómo están organizados los elementos (ej. rule of thirds composition, strong diagonal lines, perfectly symmetrical framing).
+Composition Rule and Dynamics: How elements are organized (e.g., rule of thirds composition, strong diagonal lines, perfectly symmetrical framing).
 
-Foco y Profundidad: Control de nitidez y el desenfoque (ej. shallow depth of field with background blur, sharp focus on the face, high depth of field).
+Focus and Depth: Sharpness control and blur (e.g., shallow depth of field with background blur, sharp focus on the face, high depth of field).
 
-Ubicación del Sujeto: Posición clave dentro del encuadre (ej. subject framed by a doorway, centered subject, leading lines composition).
+Subject Placement: Key position within the frame (e.g., subject framed by a doorway, centered subject, leading lines composition).
 
-Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
-    color: `Tu tarea es analizar el uso del color en la imagen y generar una descripción optimizada en inglés.
+Your output must be the English prompt without any additional labels or explanations.`,
+    color: `Your task is to analyze the use of color in the image and generate an optimized description in English.
 
-**Paso 1: Análisis de la Imagen**
-Primero, determina si la imagen es:
-A) Una escena con contenido (personajes, paisajes, objetos definidos).
-B) Principalmente una paleta de colores abstracta (muestras de color, gradientes, sin un sujeto claro).
+**Step 1: Image Analysis**
+First, determine if the image is:
+A) A scene with content (characters, landscapes, defined objects).
+B) Primarily an abstract color palette (color swatches, gradients, without a clear subject).
 
-**Paso 2: Generación del Prompt según el tipo de imagen**
+**Step 2: Prompt Generation based on image type**
 
-**SI ES UNA ESCENA CON CONTENIDO (A), sigue estas reglas:**
-Genera una descripción que especifique la paleta y su distribución por zonas. Omite códigos HEX y usa nombres de colores descriptivos.
-1.  **Esquema General:** Describe el esquema de color, tono y saturación (ej. 'vibrant complementary palette', 'desaturated analogous color scheme').
-2.  **Colores Dominantes:** Menciona los tonos principales.
-3.  **Aplicación por Zonas (REGLA CRÍTICA):** Describe dónde se localizan los colores clave usando áreas funcionales y genéricas. NO uses nombres de prendas específicas.
-    *   **Usa:** 'hair area', 'skin tone', 'primary garment area', 'secondary garment area', 'background', 'foreground elements', 'main light source color'.
-    *   **EVITA:** 'dress', 'hat', 'boots', 'sword'.
-    *   **Ejemplo:** '...fiery red on the main garment area, deep cobalt blue in the background.'
-4.  **Contraste y Calidad:** Describe el contraste y la calidad general de la luz.
+**IF IT IS A SCENE WITH CONTENT (A), follow these rules:**
+Generate a description specifying the palette and its distribution by zones. Omit HEX codes and use descriptive color names.
+1.  **General Scheme:** Describe the color scheme, tone, and saturation (e.g., 'vibrant complementary palette', 'desaturated analogous color scheme').
+2.  **Dominant Colors:** Mention the main hues.
+3.  **Application by Zones (CRITICAL RULE):** Describe where key colors are located using functional and generic areas. DO NOT use specific garment names.
+    *   **Use:** 'hair area', 'skin tone', 'primary garment area', 'secondary garment area', 'background', 'foreground elements', 'main light source color'.
+    *   **AVOID:** 'dress', 'hat', 'boots', 'sword'.
+    *   **Example:** '...fiery red on the main garment area, deep cobalt blue in the background.'
+4.  **Contrast and Quality:** Describe the contrast and general light quality.
 
-**SI ES UNA PALETA DE COLORES ABSTRACTA (B), sigue estas reglas:**
-Genera una descripción de la paleta lo suficientemente detallada para que un artista la use.
-1.  **Análisis Jerárquico:** Identifica y lista los colores clave en una jerarquía clara:
-    *   **Color(es) Dominante(s):** El color que ocupa la mayor parte del área o define el tono principal.
-    *   **Color(es) Secundario(s):** Colores importantes que complementan al dominante.
-    *   **Color(es) de Acento:** Colores que aparecen en pequeñas cantidades pero que son visualmente impactantes.
-2.  **Descripción Rica:** Usa nombres de colores descriptivos y evocadores (ej. 'burnt sienna', 'midnight blue', 'electric magenta', 'mint green').
-3.  **Relación y Atmósfera:** Describe cómo se relacionan los colores entre sí y la atmósfera que crean (ej. 'A harmonious analogous palette featuring a dominant deep forest green, a secondary earthy brown, and vibrant fiery orange and soft cream accent colors, creating a warm and rustic mood').
-4.  **NO menciones áreas** como 'hair area' o 'background'. El prompt debe ser una descripción general del estilo de color.
+**IF IT IS AN ABSTRACT COLOR PALETTE (B), follow these rules:**
+Generate a palette description detailed enough for an artist to use.
+1.  **Hierarchical Analysis:** Identify and list key colors in a clear hierarchy:
+    *   **Dominant Color(s):** The color occupying most area or defining the main tone.
+    *   **Secondary Color(s):** Important colors complementing the dominant one.
+    *   **Accent Color(s):** Colors appearing in small amounts but visually impactful.
+2.  **Rich Description:** Use descriptive and evocative color names (e.g., 'burnt sienna', 'midnight blue', 'electric magenta', 'mint green').
+3.  **Relation and Atmosphere:** Describe how colors relate to each other and the atmosphere they create (e.g., 'A harmonious analogous palette featuring a dominant deep forest green, a secondary earthy brown, and vibrant fiery orange and soft cream accent colors, creating a warm and rustic mood').
+4.  **DO NOT mention areas** like 'hair area' or 'background'. The prompt must be a general color style description.
 
-**Salida Final:** Tu salida debe ser un único bloque de texto en inglés, sin etiquetas ni explicaciones adicionales.`,
-    object: `Tu única tarea es analizar la imagen para identificar el objeto más prominente y describirlo. El objeto suele ser un ítem que se puede sostener o que destaca visualmente del personaje o el fondo.
+**Final Output:** Your output must be a single text block in English, without labels or additional explanations.`,
+    object: `Your sole task is to analyze the image to identify the most prominent object and describe it. The object is usually an item that can be held or stands out visually from the character or background.
 
-Reglas Estrictas:
-1.  **Identifica el Objeto Principal:** Primero, localiza el objeto más importante. Si hay un personaje, el objeto es algo que sostiene, lleva, o que es un accesorio clave (ej. una espada, un libro, un sombrero, unas gafas). NO describas al personaje.
-2.  **Describe ÚNICAMENTE el Objeto:** Tu descripción debe centrarse exclusivamente en el objeto identificado.
-3.  **Formato de Salida:** Genera una descripción única, concisa y optimizada, siempre en inglés. La descripción debe ser un único bloque de texto que incluya:
-    *   **Identificación del Objeto:** El nombre claro del objeto (ej. 'an ornate silver sword', 'a vintage leather-bound book', 'a steaming ceramic coffee mug').
-    *   **Características Visuales Clave:** Sus atributos más importantes (ej. 'with intricate glowing runes', 'with a worn, cracked cover', 'with a chipped rim').
-    *   **Material y Textura:** De qué está hecho y cómo se ve su superficie (ej. 'polished metallic surface', 'rough, grainy wood texture').
+Strict Rules:
+1.  **Identify the Main Object:** First, locate the most important object. If there is a character, the object is something they hold, wear, or is a key accessory (e.g., a sword, a book, a hat, glasses). DO NOT describe the character.
+2.  **Describe ONLY the Object:** Your description must focus exclusively on the identified object.
+3.  **Output Format:** Generate a unique, concise, and optimized description, always in English. The description must be a single text block including:
+    *   **Object Identification:** The clear name of the object (e.g., 'an ornate silver sword', 'a vintage leather-bound book', 'a steaming ceramic coffee mug').
+    *   **Key Visual Characteristics:** Its most important attributes (e.g., 'with intricate glowing runes', 'with a worn, cracked cover', 'with a chipped rim').
+    *   **Material and Texture:** What it is made of and how its surface looks (e.g., 'polished metallic surface', 'rough, grainy wood texture').
 
-4.  **Exclusiones:** Ignora por completo al personaje, su pose, su ropa (a menos que sea el objeto), el fondo, la iluminación y el estilo artístico. Tu salida debe ser solo la descripción del objeto.
+4.  **Exclusions:** Completely ignore the character, their pose, their clothes (unless it is the object), the background, lighting, and artistic style. Your output must be only the object description.
 
-Tu salida debe ser el prompt en inglés sin ninguna etiqueta o explicación adicional.`,
+Your output must be the English prompt without any additional labels or explanations.`,
 };
 
 // --- Refactored Metadata Instruction Generation ---
