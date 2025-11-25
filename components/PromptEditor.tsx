@@ -31,6 +31,8 @@ import { createImageCollage } from '../utils/imageUtils';
 import { ImageUploader } from './ImageUploader';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { CollapsibleSection } from './CollapsibleSection';
+import { EyeIcon } from './icons/EyeIcon';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 
 type ImageState = { url: string; base64: string; mimeType: string; };
@@ -73,6 +75,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         character: true,
         aesthetic: true,
     });
+    const [showPreview, setShowPreview] = useState(false);
 
     // State for the new "Generate Structure" section
     const [structurerIdea, setStructurerIdea] = useState('');
@@ -780,9 +783,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                         value={finalPrompt}
                                         className="w-full h-48 bg-gray-900/70 rounded-lg p-4 pr-12 text-gray-300 whitespace-pre-wrap font-mono text-sm resize-none ring-1 ring-white/10 custom-scrollbar"
                                     />
-                                    <button onClick={handleCopy} className="absolute top-2 right-2 p-2 rounded-lg bg-white/10 hover:bg-white/20" aria-label="Copiar prompt">
-                                    {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
-                                </button>
+                                     <div className="absolute top-2 right-2 flex space-x-1">
+                                        <button onClick={() => setShowPreview(true)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20" aria-label="Vista Previa">
+                                            <EyeIcon className="w-5 h-5 text-indigo-400" />
+                                        </button>
+                                        <button onClick={handleCopy} className="p-2 rounded-lg bg-white/10 hover:bg-white/20" aria-label="Copiar prompt">
+                                            {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <button onClick={handleSave} disabled={isSaving} className="w-full bg-green-600 hover:bg-green-500 disabled:bg-green-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg">
                                     {isSaving ? 'Guardando...' : 'Guardar en Galería'}
@@ -853,6 +861,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     </div>
                 </div>
                 </div>
+            )}
+             {showPreview && (
+                <ImagePreviewModal 
+                    prompt={finalPrompt} 
+                    onClose={() => setShowPreview(false)} 
+                />
             )}
         </div>
     );

@@ -1,5 +1,5 @@
 {
-  "name": "Generador de Prompts de Estilo",
-  "description": "Una aplicación que analiza el estilo artístico de una imagen subida y genera un prompt de texto optimizado para replicar ese estilo en IAs de generación de imágenes.",
+  "name": "Prompt Studio",
+  "description": "Suite profesional para Ingeniería de Prompts con IA. Incluye Editor Modular, Refinador IA conversacional y Extractor de estilos multimodal.",
   "requestFramePermissions": []
 }

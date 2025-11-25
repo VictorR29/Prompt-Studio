@@ -82,7 +82,16 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
             }));
             const response = await callApiThrottled(ai => ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                config: { systemInstruction },
+                config: { 
+                    systemInstruction,
+                    // Add safety settings to minimize false positives in style analysis, allowing the model to process art.
+                    safetySettings: [
+                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+                    ]
+                },
                 contents: {
                     parts: [
                         { text: `Analyze the provided images and generate the optimized prompt as instructed.` },
@@ -93,23 +102,29 @@ const createImageAnalyzer = (systemInstruction: string, errorContext: string) =>
             
             const candidate = response.candidates?.[0];
             if (candidate && candidate.finishReason === 'SAFETY') {
-                throw new Error("La imagen fue bloqueada por filtros de seguridad.");
+                throw new Error("⚠️ CONTENIDO SENSIBLE DETECTADO: El sistema intentó optimizar el análisis ignorando partes explícitas, pero el filtro de seguridad impidió el proceso. Por favor, revisa tus imágenes y elimina aquellas que puedan contener desnudez explícita o violencia para continuar.");
             }
 
-            const text = response.text;
+            // Fallback: If response.text is empty, try to get text from parts.
+            let text = response.text;
+            if (!text && candidate?.content?.parts) {
+                text = candidate.content.parts.map(p => p.text).join(' ');
+            }
+
             if (!text) {
                 if (candidate && candidate.finishReason && candidate.finishReason !== 'STOP') {
-                     throw new Error(`La generación se detuvo por: ${candidate.finishReason}`);
+                     throw new Error(`La generación se detuvo por razón: ${candidate.finishReason}`);
                 }
-                throw new Error("La API no devolvió ningún texto. (Posible bloqueo o error del modelo)");
+                throw new Error("La API no devolvió ningún texto. Intenta con otra imagen.");
             }
             return text.trim();
         } catch (error) {
             console.error(`Error calling Gemini API for ${errorContext}:`, error);
             if (error instanceof Error) {
-                // Enhance error message for safety blocks
                 let msg = error.message;
-                if (msg.includes('SAFETY')) msg = "Contenido bloqueado por seguridad.";
+                // Translate common API errors to user friendly messages
+                if (msg.includes('SAFETY') || msg.includes('BLOCK')) msg = "⚠️ CONTENIDO SENSIBLE: Se detectaron elementos que los filtros de seguridad no pudieron procesar. Intenta usar imágenes menos explícitas o recórtalas.";
+                if (msg.includes('429')) msg = "Has excedido el límite de peticiones. Espera un momento.";
                 throw new Error(msg);
             }
             throw new Error("No se pudo obtener una respuesta del modelo de IA.");
@@ -171,6 +186,12 @@ Purpose and Goals:
 *   Generate a concise and comprehensive 'prompt', optimized for replicating the artistic style in image generation models.
 *   Ensure the 'prompt' focuses exclusively on style (technique, atmosphere, composition, etc.), excluding specific content (characters, objects, scenes).
 
+CRITICAL SAFETY & SANITIZATION PROTOCOL:
+*   If the provided images contain nudity, gore, or potentially sensitive/explicit content, **DO NOT REFUSE** the task.
+*   Instead, **SANITIZE** the output: COMPLETELY IGNORE the sensitive subject matter.
+*   Focus 100% on the artistic technique, brushstrokes, lighting, color palette, and composition.
+*   Your output must be purely technical and artistic, safe for all audiences.
+
 Behaviors and Rules:
 1)  Initial Analysis:
     a) Assume the user has uploaded one or more images for analysis.
@@ -188,6 +209,12 @@ General Tone:
 *   Be formal, professional, and highly technically precise.
 *   Use sophisticated and analytical vocabulary, befitting a visual arts and technology expert.`,
     subject: `Your mission is to analyze EACH main subject (person or character) in the provided images and generate an individual and optimized description for each one. It is CRITICAL that you capture both their physical identity and their individual VISUAL STYLE. If subjects come from images with different styles (e.g., a realistic photo and a comic drawing), you must faithfully preserve and describe the unique style of EACH ONE.
+
+CRITICAL SAFETY & SANITIZATION PROTOCOL:
+*   If a subject is depicted in a sensitive, nude, or explicitly provocative manner, **DO NOT REFUSE**.
+*   **SANITIZE** the description: Describe only the neutral physical features (hair, eyes, face structure) and any visible non-explicit clothing/armor.
+*   If the subject is nude, DO NOT mention it. Describe them as a "figure" or focus on the face and style.
+*   Ignore any explicit poses or gore. Focus on the character archetype.
 
 RULES:
 1.  **Identify and Label:** If there is more than one distinct subject in the images, identify and label them as "Subject 1:", "Subject 2:", etc. If there is only one subject (even if appearing in multiple images), do not use labels.
@@ -208,6 +235,11 @@ Subject 2: old warrior in a comic book character style, with a long white beard,
 Focus on inherent physical characteristics, clothing, expression, and the visual style of EACH subject. Ignore the background and general lighting of the scene.`,
     pose: `Exhaustively analyze the body pose of ALL subjects in the image. Your goal is to generate a unique, concise, and optimized description, always in English, that an image generation AI engine can use to replicate the poses with high fidelity.
 
+CRITICAL SAFETY & SANITIZATION PROTOCOL:
+*   If the pose is explicitly sexual or suggestive, **SANITIZE** it.
+*   Describe the pose in neutral, anatomical terms (e.g., "sitting", "reclining", "standing").
+*   Ignore any explicit interactions or contexts. Focus on the geometry of the body.
+
 STRICT RULES:
 1.  **Gender Neutrality:** DO NOT include gender (e.g., 'man', 'woman') in your description. Use neutral terms like 'figure', 'person', 'subject'.
 2.  **Identify Multiple Subjects:** If there is more than one subject, identify each by their position or a neutral visual feature (e.g., "the figure on the left", "the person in the red coat") and describe their poses separately within the same prompt.
@@ -226,6 +258,10 @@ The figure on the left is leaning against a wall, arms crossed, looking thoughtf
 Ignore style, background (except for pose interaction), and other details not strictly regarding body pose and conveyed emotion.`,
     expression: `Analyze the facial expression and emotional state of the main character in the image. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can immediately use to replicate the expression and emotional tone with high fidelity.
 
+CRITICAL SAFETY PROTOCOL:
+*   If the expression is associated with an explicit or violent act, **SANITIZE** it.
+*   Focus strictly on the facial muscles (eyes, mouth, brows) and the core emotion (fear, joy, anger) without describing the context or cause if it is sensitive.
+
 The description must be a single optimized text block including, in this order:
 
 Main Emotion and Facial Detail: A key emotional adjective followed by defining facial features (e.g., serene expression, closed eyes and soft smile).
@@ -238,6 +274,11 @@ Your output must be the English prompt without any additional labels or explanat
 If there are multiple images, focus on the main character and create a cohesive expression description representing the general emotion or mood. Ignore style, background, clothes, and other details not strictly regarding facial expression and emotion.`,
     scene: `Analyze the environment, setting, and atmosphere surrounding the main character. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can use to replicate the setting with high fidelity.
 
+CRITICAL SAFETY PROTOCOL:
+*   If the scene contains gore, violence, or explicit elements, **IGNORE** them.
+*   Describe the architectural style, the lighting, the weather, and the general location type (e.g., "a dark room", "an outdoor street").
+*   Focus on the atmosphere (e.g., "gloomy", "chaotic") without describing the specific sensitive elements.
+
 The description must be a single optimized text block including, in this order:
 
 Environment and Main Location: The type of place and key elements (e.g., massive futuristic cityscape, dense foggy forest, vintage library interior).
@@ -248,6 +289,10 @@ Atmosphere and Narrative Tone: The feeling or vibe of the setting (e.g., calm an
 
 Your output must be the English prompt without any additional labels or explanations.`,
     outfit: `Analyze and break down the outfit, accessories, and design style of the main character. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can use to replicate the outfit with high fidelity.
+
+CRITICAL SAFETY PROTOCOL:
+*   If the outfit is revealing or fetishistic in a way that triggers safety filters, describe it in neutral fashion terms (e.g., "leather bodysuit", "straps and buckles").
+*   Focus on materials, colors, and design lines. Do NOT use sexually explicit terminology.
 
 The description must be a single optimized text block including, in this order:
 
@@ -261,6 +306,10 @@ Crucial Accessories: Details that complete the look (e.g., gold chain belt, avia
 
 Your output must be the English prompt without any additional labels or explanations.`,
     composition: `Analyze and describe the visual composition and shot setup of the image. Your task is to condense this information into a unique, concise, and optimized description, always in English, that an AI engine can use to replicate the visual structure of the image with high fidelity.
+
+CRITICAL SAFETY PROTOCOL:
+*   If the subject matter is sensitive, ignore it entirely.
+*   Focus PURELY on the camera angle, lens choice, framing, depth of field, and lighting placement.
 
 The description must be a single optimized text block including, in this order:
 
@@ -318,17 +367,21 @@ Strict Rules:
 Your output must be the English prompt without any additional labels or explanations.`,
 };
 
-// --- Refactored Metadata Instruction Generation ---
-const createMetadataSystemInstruction = (expertType: string, featureName: string, rules: { title: string; category: string; artType: string; notes: string; }) =>
-`Eres un ${expertType}. Tu tarea es analizar un prompt que describe un ${featureName} y las imágenes de referencia que lo inspiraron. Basado en este análisis, debes generar metadatos estructurados en formato JSON.
+const createMetadataSystemInstruction = (
+    expert: string,
+    feature: string,
+    rules: { title: string; category: string; artType: string; notes: string }
+) => {
+    return `Eres un ${expert}. Tu tarea es analizar un prompt descriptivo de un ${feature} y las imágenes de referencia asociadas. Basado en este análisis, debes generar metadatos estructurados en formato JSON.
 
 Reglas:
 1.  **Título (title):** ${rules.title}
-2.  **Categoría/Estilo (category):** ${rules.category}
+2.  **Categoría (category):** ${rules.category}
 3.  **Tipo de Arte (artType):** ${rules.artType}
 4.  **Notas (notes):** ${rules.notes}
 
-Analiza el siguiente prompt de ${featureName} y las imágenes asociadas y devuelve SOLO el objeto JSON con la estructura especificada.`;
+Analiza el siguiente prompt y las imágenes asociadas y devuelve SOLO el objeto JSON con la estructura especificada.`;
+};
 
 const metadataInstructionConfig = {
     style: { expert: 'curador de arte y catalogador experto', feature: 'estilo artístico', rules: { title: 'Crea un título corto, evocador y descriptivo para el estilo. Debe ser atractivo y fácil de recordar. Máximo 5-7 palabras.', category: "Identifica la categoría principal del estilo. Sé específico. Ejemplos: 'Cyberpunk Noir', 'Impressionist Landscape', 'Vintage Cartoon', 'Gothic Fantasy'.", artType: "Clasifica el tipo de arte. Ejemplos: 'Digital Painting', 'Oil on Canvas', 'Watercolor', '3D Render', 'Charcoal Sketch'.", notes: 'Escribe una breve nota (1-2 frases) que describa la esencia del estilo o para qué tipo de escenas sería más adecuado.'}},

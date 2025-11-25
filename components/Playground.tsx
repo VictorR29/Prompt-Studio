@@ -10,6 +10,8 @@ import { CheckIcon } from './icons/CheckIcon';
 import { GalleryIcon } from './icons/GalleryIcon';
 import { FilePlusIcon } from './icons/FilePlusIcon';
 import { GalleryModal } from './GalleryModal';
+import { EyeIcon } from './icons/EyeIcon';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 const UserIcon: React.FC = () => (
     <div className="w-8 h-8 rounded-full bg-teal-600/80 flex items-center justify-center font-bold text-white flex-shrink-0 ring-2 ring-white/10">
@@ -67,6 +69,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     const [copied, setCopied] = useState(false);
     const [currentPromptText, setCurrentPromptText] = useState('');
     const [mobileTab, setMobileTab] = useState<'chat' | 'state'>('chat');
+    const [showPreview, setShowPreview] = useState(false);
 
     useEffect(() => {
         if (viewState === 'chat') {
@@ -284,6 +287,10 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                     Refinador IA
                 </h1>
                 <div className="flex space-x-2 md:space-x-3">
+                    <button onClick={() => setShowPreview(true)} className="flex items-center justify-center space-x-2 px-3 md:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base">
+                        <EyeIcon className="w-4 h-4" />
+                        <span className="hidden md:inline">Vista Previa</span>
+                    </button>
                     <button onClick={handleCopy} className="flex items-center justify-center space-x-2 px-3 md:px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base">
                          {copied ? <CheckIcon className="w-4 h-4 text-green-400" /> : <ClipboardIcon className="w-4 h-4" />}
                         <span className="hidden md:inline">Copiar Prompt</span>
@@ -405,6 +412,12 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                     </div>
                 </div>
             </div>
+             {showPreview && (
+                <ImagePreviewModal 
+                    prompt={currentPromptText} 
+                    onClose={() => setShowPreview(false)} 
+                />
+            )}
         </div>
     );
 };
