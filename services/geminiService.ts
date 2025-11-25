@@ -762,21 +762,24 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
   try {
     // A more descriptive prompt for better covers
     const generationPrompt = `Create a visually stunning, high-quality, cinematic image that artistically represents the following concept: ${prompt}`;
-    // FIX: Cast the response from callApiThrottled to a specific type to resolve TypeScript errors.
-    // The type is based on the Gemini API documentation for the generateImages method.
-    const response = await callApiThrottled(ai => ai.models.generateImages({
-      model: 'imagen-4.0-generate-001',
-      prompt: generationPrompt,
-      config: {
-        numberOfImages: 1,
-        outputMimeType: 'image/jpeg',
-        aspectRatio: '1:1',
+    
+    // Switch to gemini-2.5-flash-image which is generally available on free tier, unlike Imagen.
+    const response = await callApiThrottled(ai => ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+            { text: generationPrompt }
+        ],
       },
-    })) as { generatedImages: { image: { imageBytes: string } }[] };
+      config: {
+        responseModalities: [Modality.IMAGE],
+      },
+    })) as GenerateContentResponse;
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-      const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-      return `data:image/jpeg;base64,${base64ImageBytes}`;
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
     }
     
     throw new Error("La API no devolvió ninguna imagen.");
