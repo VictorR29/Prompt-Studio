@@ -849,6 +849,10 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
   } catch (error) {
     console.error("Error generating image from prompt with Gemini API:", error);
     if (error instanceof Error) {
+        const msg = error.message;
+        if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+            throw new Error("Límite de cuota excedido para generación de imágenes. Esta función puede requerir una API Key de pago o esperar a que se restablezca el límite diario del plan gratuito.");
+        }
         throw new Error(error.message || "No se pudo generar la imagen de portada.");
     }
     throw new Error("No se pudo generar la imagen de portada.");
