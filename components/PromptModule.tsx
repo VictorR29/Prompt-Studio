@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
 import { EXTRACTION_MODE_MAP } from '../config';
@@ -22,6 +23,7 @@ interface PromptModuleProps {
     savedPrompts: SavedPrompt[];
     onOpenGallery: (mode: ExtractionMode) => void;
     onOptimize: (mode: ExtractionMode) => void;
+    onClearSuggestions: (mode: ExtractionMode) => void;
     isAnalyzingImages: boolean;
     isOptimizing: boolean;
     suggestions: string[];
@@ -47,6 +49,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     onSavePrompt, 
     onOpenGallery,
     onOptimize,
+    onClearSuggestions,
     isAnalyzingImages,
     isOptimizing,
     suggestions,
@@ -183,7 +186,10 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             {suggestions.length > 0 && !isAnalyzingImages && (
                 <div className="space-y-2 animate-fade-slide-in-up">
                     {suggestions.map((s, i) => (
-                        <button key={i} onClick={() => onChange(mode, s)} className="w-full text-left p-2 text-xs rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-colors">
+                        <button key={i} onClick={() => {
+                            onChange(mode, s);
+                            onClearSuggestions(mode);
+                        }} className="w-full text-left p-2 text-xs rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-colors">
                             {s}
                         </button>
                     ))}

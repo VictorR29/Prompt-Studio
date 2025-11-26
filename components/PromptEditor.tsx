@@ -261,6 +261,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setFragments(prev => ({ ...prev, [mode]: value }));
     };
 
+    const handleClearSuggestions = useCallback((mode: ExtractionMode) => {
+        setSuggestions(prev => ({ ...prev, [mode]: [] }));
+    }, []);
+
     const analyzeImagesForModule = useCallback(async (mode: ExtractionMode, images: ImageState[]) => {
         setLoadingModules(prev => ({ ...prev, [mode]: true }));
         try {
@@ -699,6 +703,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                     savedPrompts={savedPrompts}
                                     onOpenGallery={handleOpenGalleryForModule}
                                     onOptimize={handleOptimizeModule}
+                                    onClearSuggestions={handleClearSuggestions}
                                     isAnalyzingImages={loadingModules[key] || false}
                                     isOptimizing={optimizingModule === key}
                                     suggestions={suggestions[key] || []}
@@ -732,6 +737,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                     savedPrompts={savedPrompts}
                                     onOpenGallery={handleOpenGalleryForModule}
                                     onOptimize={handleOptimizeModule}
+                                    onClearSuggestions={handleClearSuggestions}
                                     isAnalyzingImages={loadingModules[key] || false}
                                     isOptimizing={optimizingModule === key}
                                     suggestions={suggestions[key] || []}
