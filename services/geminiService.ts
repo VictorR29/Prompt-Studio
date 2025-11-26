@@ -1,7 +1,7 @@
-import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type, Modality } from "@google/genai";
 import { SavedPrompt, ExtractionMode, AssistantResponse } from "../types";
 
-// --- Throttling Logic to prevent 429 errors ---
+// ... existing throttle logic ...
 const requestQueue: Array<{
     apiCall: () => Promise<any>;
     resolve: (value: any) => void;
@@ -186,6 +186,13 @@ Purpose and Goals:
 *   Generate a concise and comprehensive 'prompt', optimized for replicating the artistic style in image generation models.
 *   Ensure the 'prompt' focuses exclusively on style (technique, atmosphere, composition, etc.), excluding specific content (characters, objects, scenes).
 
+CRITICAL OUTPUT FORMAT RULE:
+*   Your output must be the raw prompt text ONLY.
+*   Do NOT include introductory phrases like "The visual style is..." or "Here is the prompt:".
+*   Do NOT use markdown headers like "**Optimized Prompt:**".
+*   Do NOT provide explanations.
+*   The output should start directly with the first descriptor (e.g., "Photorealistic, cinematic lighting...").
+
 CRITICAL SAFETY & SANITIZATION PROTOCOL:
 *   If the provided images contain nudity, gore, or potentially sensitive/explicit content, **DO NOT REFUSE** the task.
 *   Instead, **SANITIZE** the output: COMPLETELY IGNORE the sensitive subject matter.
@@ -347,9 +354,9 @@ Generate a palette description detailed enough for an artist to use.
     *   **Dominant Color(s):** The color occupying most area or defining the main tone.
     *   **Secondary Color(s):** Important colors complementing the dominant one.
     *   **Accent Color(s):** Colors appearing in small amounts but visually impactful.
+    *   **Relation and Atmosphere:** Describe how colors relate to each other and the atmosphere they create (e.g., 'A harmonious analogous palette featuring a dominant deep forest green, a secondary earthy brown, and vibrant fiery orange and soft cream accent colors, creating a warm and rustic mood').
 2.  **Rich Description:** Use descriptive and evocative color names (e.g., 'burnt sienna', 'midnight blue', 'electric magenta', 'mint green').
-3.  **Relation and Atmosphere:** Describe how colors relate to each other and the atmosphere they create (e.g., 'A harmonious analogous palette featuring a dominant deep forest green, a secondary earthy brown, and vibrant fiery orange and soft cream accent colors, creating a warm and rustic mood').
-4.  **DO NOT mention areas** like 'hair area' or 'background'. The prompt must be a general color style description.
+3.  **DO NOT mention areas** like 'hair area' or 'background'. The prompt must be a general color style description.
 
 **Final Output:** Your output must be a single text block in English, without labels or additional explanations.`,
     object: `Your sole task is to analyze the image to identify the most prominent object and describe it. The object is usually an item that can be held or stands out visually from the character or background.
@@ -367,6 +374,7 @@ Strict Rules:
 Your output must be the English prompt without any additional labels or explanations.`,
 };
 
+// ... existing metadata logic ...
 const createMetadataSystemInstruction = (
     expert: string,
     feature: string,
@@ -398,7 +406,7 @@ const metadataInstructionConfig = {
 const metadataSystemInstructions = Object.fromEntries(
   Object.entries(metadataInstructionConfig).map(([mode, config]) => [
     mode,
-    createMetadataSystemInstruction(config.expert, config.feature, config.rules)
+    createMetadataSystemInstruction(config.expert, config.feature, config.rules),
   ])
 ) as Record<ExtractionMode, string>;
 
@@ -434,10 +442,7 @@ export const generateFeatureMetadata = (
   }
   return metadataFunctions[mode](prompt, images);
 };
-
-
-// --- Funciones existentes que se mantienen ---
-
+// ... existing helper functions (generateStructuredPromptMetadata, generateStructuredPrompt, etc.) ...
 export const generateStructuredPromptMetadata = async (
   prompt: string, 
   image?: ImagePayload
@@ -897,6 +902,7 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
     }
 };
 
+// ... existing assembler logic ...
 const masterAssemblerSystemInstruction = `Tu única misión es actuar como un sistema experto de ensamblaje de prompts. Debes combinar los fragmentos de texto proporcionados por el usuario para construir un prompt maestro en inglés, que sea coherente, optimizado y libre de conflictos, siguiendo un sistema de reglas jerárquicas estrictas.
 
 **El Sistema de Reglas Jerárquicas**
@@ -1024,7 +1030,7 @@ export const generateMasterPromptMetadata = async (prompt: string, images: Image
       throw new Error("No se pudo generar la categorización automática para el prompt maestro.");
     }
 };
-
+// ... existing functions (suggestTextPromptEdits, convertTextPromptToJson, etc.) ...
 export const suggestTextPromptEdits = async (prompt: string): Promise<PromptSuggestion[]> => {
     const systemInstruction = `You are an expert prompt engineer. Analyze the user's text prompt for an image generation AI. Your goal is to refine it for better results. Provide 3-4 concise, actionable suggestions in English.
     
@@ -1270,7 +1276,7 @@ Generate 3 concise suggestions to enhance and expand the '${targetMode.toUpperCa
         throw new Error("No se pudieron generar sugerencias contextuales para el fragmento.");
     }
 };
-
+// ... existing functions (adaptFragmentToContext, mergeModulesIntoJsonTemplate, etc.) ...
 const adaptFragmentSystemInstruction = `You are a prompt engineering expert. A user is importing a pre-written prompt fragment into a module. Your task is to intelligently adapt this fragment to fit the existing context of the other modules.
 
 Rules:
