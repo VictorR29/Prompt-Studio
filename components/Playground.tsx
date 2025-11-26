@@ -12,6 +12,8 @@ import { FilePlusIcon } from './icons/FilePlusIcon';
 import { GalleryModal } from './GalleryModal';
 import { EyeIcon } from './icons/EyeIcon';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { SaveIcon } from './icons/SaveIcon';
+import { CloseIcon } from './icons/CloseIcon';
 
 const UserIcon: React.FC = () => (
     <div className="w-8 h-8 rounded-full bg-teal-600/80 flex items-center justify-center font-bold text-white flex-shrink-0 ring-2 ring-white/10">
@@ -281,26 +283,49 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
 
     return (
         <div className="flex flex-col h-[calc(100vh-180px)] lg:h-[calc(100vh-140px)] animate-fade-in-subtle">
-            <div className="flex justify-between items-center mb-4">
+            {/* Header: Responsive Layout */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 md:gap-0">
                  <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center gap-2">
                     <SparklesIcon className="w-6 h-6 text-indigo-400" />
                     Refinador IA
                 </h1>
-                <div className="flex space-x-2 md:space-x-3">
-                    <button onClick={() => setShowPreview(true)} className="flex items-center justify-center space-x-2 px-3 md:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base">
-                        <EyeIcon className="w-4 h-4" />
+                
+                {/* Mobile: Grid for buttons to fit width. Desktop: Flex row */}
+                <div className="grid grid-cols-4 gap-2 w-full md:w-auto md:flex md:space-x-3">
+                    <button 
+                        onClick={() => setShowPreview(true)} 
+                        className="flex items-center justify-center space-x-2 px-2 md:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base"
+                        title="Vista Previa"
+                    >
+                        <EyeIcon className="w-5 h-5" />
                         <span className="hidden md:inline">Vista Previa</span>
                     </button>
-                    <button onClick={handleCopy} className="flex items-center justify-center space-x-2 px-3 md:px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base">
-                         {copied ? <CheckIcon className="w-4 h-4 text-green-400" /> : <ClipboardIcon className="w-4 h-4" />}
+                    
+                    <button 
+                        onClick={handleCopy} 
+                        className="flex items-center justify-center space-x-2 px-2 md:px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base"
+                        title="Copiar Prompt"
+                    >
+                         {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5" />}
                         <span className="hidden md:inline">Copiar Prompt</span>
-                        <span className="md:hidden">Copiar</span>
                     </button>
-                    <button onClick={handleSaveToGallery} className="flex items-center justify-center space-x-2 px-3 md:px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold transition-colors shadow-lg text-sm md:text-base">
-                        <span>Guardar</span>
+                    
+                    <button 
+                        onClick={handleSaveToGallery} 
+                        className="flex items-center justify-center space-x-2 px-2 md:px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold transition-colors shadow-lg text-sm md:text-base"
+                        title="Guardar en Galería"
+                    >
+                        <SaveIcon className="w-5 h-5" />
+                        <span className="hidden md:inline">Guardar</span>
                     </button>
-                    <button onClick={() => setViewState('setup')} className="px-3 md:px-4 py-2 rounded-lg hover:bg-white/10 text-gray-300 transition-colors text-sm md:text-base">
-                        Salir
+                    
+                    <button 
+                        onClick={() => setViewState('setup')} 
+                        className="flex items-center justify-center space-x-2 px-2 md:px-4 py-2 rounded-lg hover:bg-white/10 text-gray-300 transition-colors text-sm md:text-base"
+                        title="Salir del modo Refinador"
+                    >
+                        <CloseIcon className="w-5 h-5" />
+                        <span className="hidden md:inline">Salir</span>
                     </button>
                 </div>
             </div>
