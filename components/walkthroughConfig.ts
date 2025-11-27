@@ -65,6 +65,14 @@ export const walkthroughSteps: WalkthroughStep[] = [
     isRect: true,
   },
   {
+    targetSelector: '[data-tour-id="editor-save-external"]',
+    title: 'Guardar Prompt Externo',
+    content: '¿Tienes un prompt listo de otro sitio? Pégalo aquí para guardarlo directamente en tu galería con portada y metadatos generados por IA.',
+    view: 'editor',
+    placement: 'left',
+    isRect: true,
+  },
+  {
     targetSelector: '[data-tour-id="editor-start-blank"]',
     title: 'Empezar en Blanco',
     content: 'Y por supuesto, puedes empezar desde cero. Vamos a entrar para ver todas las herramientas a tu disposición. Haz clic en "Siguiente".',

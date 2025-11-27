@@ -1639,7 +1639,7 @@ Return a JSON object:
     { "module": "expression", "value": "..." }
   ],
   "assembled_prompt": "The full, coherent, master prompt in English...",
-  "message": "..." // A helpful response in SPANISH explaining what you did.
+  "message": "..." // A helpful response in SPANISH explaining what you did. Use Markdown (e.g., **bold** for key terms, *italics* for emphasis) to make it readable.
 }`;
 
 

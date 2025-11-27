@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface SimpleMarkdownProps {
@@ -23,12 +22,15 @@ export const SimpleMarkdown: React.FC<SimpleMarkdownProps> = ({ children }) => {
   };
 
   const parseInline = (text: string, keyPrefix: string): React.ReactNode => {
-    // Very simple inline parser for **bold** and `code`
-    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    // Regex matches: **bold**, *italic*, `code`
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
     return parts.map((part, index) => {
       const key = `${keyPrefix}-${index}`;
-      if (part.startsWith('**') && part.endsWith('**')) {
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
         return <strong key={key} className="font-bold text-teal-300">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) {
+         return <em key={key} className="italic text-indigo-300">{part.slice(1, -1)}</em>;
       }
       if (part.startsWith('`') && part.endsWith('`')) {
         return <code key={key} className="bg-black/30 px-1.5 py-0.5 rounded text-amber-300 font-mono text-xs border border-white/10">{part.slice(1, -1)}</code>;

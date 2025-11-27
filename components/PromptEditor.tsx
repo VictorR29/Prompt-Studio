@@ -705,7 +705,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 {loadingAction === 'import' ? 'Analizando...' : 'Guardar como Plantilla'}
                             </button>
                         </div>
-                        <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                        <div data-tour-id="editor-save-external" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
                             <div className="flex items-center gap-2">
                                 <BookmarkIcon className="w-5 h-5 text-indigo-400" />
                                 <h2 className="font-semibold text-gray-200">Guardar Prompt Externo</h2>
