@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode, AppView } from '../types';
 import { 
@@ -32,6 +33,7 @@ import { SparklesIcon } from './icons/SparklesIcon';
 import { CollapsibleSection } from './CollapsibleSection';
 import { EyeIcon } from './icons/EyeIcon';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { BookmarkIcon } from './icons/BookmarkIcon';
 
 
 type ImageState = { url: string; base64: string; mimeType: string; };
@@ -57,7 +59,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const [imagesByModule, setImagesByModule] = useState<Partial<Record<ExtractionMode, ImageState[]>>>({});
     const [pastedText, setPastedText] = useState('');
     const [pastedJson, setPastedJson] = useState('');
-    const [loadingAction, setLoadingAction] = useState<'analyze' | 'import' | 'structure' | null>(null);
+    const [pastedExternalPrompt, setPastedExternalPrompt] = useState('');
+    const [loadingAction, setLoadingAction] = useState<'analyze' | 'import' | 'structure' | 'save-external' | null>(null);
     const [isLoading, setIsLoading] = useState(false); // For editor-mode actions
     const [isSaving, setIsSaving] = useState(false);
     const [loadingModules, setLoadingModules] = useState<Partial<Record<ExtractionMode, boolean>>>({});
@@ -198,6 +201,51 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al importar plantilla: ${errorMessage}`);
             addToast(`Error al importar plantilla: ${errorMessage}`, 'error');
+        } finally {
+            setLoadingAction(null);
+            setGlobalLoader({ active: false, message: '' });
+        }
+    };
+
+    const handleSaveExternalPrompt = async () => {
+        if (!pastedExternalPrompt.trim()) return;
+
+        setLoadingAction('save-external');
+        setError(null);
+        setGlobalLoader({ active: true, message: 'Procesando prompt externo...' });
+        
+        try {
+            let coverImageDataUrl = '';
+            try {
+                setGlobalLoader({ active: true, message: 'Generando portada con IA...' });
+                coverImageDataUrl = await generateImageFromPrompt(pastedExternalPrompt);
+            } catch (imgErr) {
+                 console.error("Error generating cover image:", imgErr);
+            }
+
+            setGlobalLoader({ active: true, message: 'Generando metadatos...' });
+            // Generate metadata based on the text prompt
+            const metadata = await generateMasterPromptMetadata(pastedExternalPrompt, []);
+
+            const newPrompt: SavedPrompt = {
+                id: Date.now().toString(),
+                type: 'master', // Treat as a master prompt so it can be modularized later
+                prompt: pastedExternalPrompt,
+                coverImage: coverImageDataUrl,
+                title: metadata.title,
+                category: metadata.category,
+                artType: metadata.artType,
+                notes: metadata.notes,
+            };
+
+            onSavePrompt(newPrompt);
+            addToast(`Prompt "${metadata.title}" guardado en galería!`, 'success');
+            setPastedExternalPrompt('');
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setError(`Error al guardar prompt externo: ${errorMessage}`);
+            addToast(`Error: ${errorMessage}`, 'error');
         } finally {
             setLoadingAction(null);
             setGlobalLoader({ active: false, message: '' });
@@ -632,7 +680,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div id="paste-text-section" data-tour-id="editor-paste-text" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
                             <h2 className="font-semibold text-gray-200">Analizar Prompt de Texto</h2>
                             <textarea
@@ -645,7 +693,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 {loadingAction === 'analyze' ? 'Analizando...' : 'Analizar y Modularizar'}
                             </button>
                         </div>
-                         <div data-tour-id="editor-import-json" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                        <div data-tour-id="editor-import-json" className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
                             <h2 className="font-semibold text-gray-200">Importar Plantilla JSON</h2>
                             <textarea
                                 value={pastedJson}
@@ -655,6 +703,21 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                             />
                             <button onClick={handleImportTemplate} disabled={!pastedJson.trim() || loadingAction !== null} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
                                 {loadingAction === 'import' ? 'Analizando...' : 'Guardar como Plantilla'}
+                            </button>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-3 p-6 bg-gray-900/50 rounded-lg ring-1 ring-white/10">
+                            <div className="flex items-center gap-2">
+                                <BookmarkIcon className="w-5 h-5 text-indigo-400" />
+                                <h2 className="font-semibold text-gray-200">Guardar Prompt Externo</h2>
+                            </div>
+                            <textarea
+                                value={pastedExternalPrompt}
+                                onChange={(e) => setPastedExternalPrompt(e.target.value)}
+                                placeholder="Pega un prompt para guardarlo en la galería..."
+                                className="w-full mt-2 bg-gray-800/70 rounded-lg p-3 text-gray-200 ring-1 ring-gray-700/50 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm transition-all shadow-inner min-h-[100px]"
+                            />
+                            <button onClick={handleSaveExternalPrompt} disabled={!pastedExternalPrompt.trim() || loadingAction !== null} className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-all duration-300">
+                                {loadingAction === 'save-external' ? 'Guardando...' : 'Guardar en Galería'}
                             </button>
                         </div>
                     </div>
