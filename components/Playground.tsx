@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -13,6 +14,8 @@ import { EyeIcon } from './icons/EyeIcon';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { SaveIcon } from './icons/SaveIcon';
 import { CloseIcon } from './icons/CloseIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
+import { SimpleMarkdown } from './SimpleMarkdown';
 
 const UserIcon: React.FC = () => (
     <div className="w-8 h-8 rounded-full bg-teal-600/80 flex items-center justify-center font-bold text-white flex-shrink-0 ring-2 ring-white/10">
@@ -228,6 +231,14 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         }
     }
 
+    const handleResetChat = () => {
+        setMessages([{
+            role: 'assistant',
+            content: "Chat reiniciado. Sigo aquí para ayudarte con tu prompt actual."
+        }]);
+        addToast('Historial del chat limpiado.', 'success');
+    };
+
     const fragmentOrder: ExtractionMode[] = ['subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'style', 'composition', 'color'];
 
     if (viewState === 'setup') {
@@ -290,7 +301,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                 </h1>
                 
                 {/* Mobile: Grid for buttons to fit width. Desktop: Flex row */}
-                <div className="grid grid-cols-4 gap-2 w-full md:w-auto md:flex md:space-x-3">
+                <div className="grid grid-cols-5 gap-2 w-full md:w-auto md:flex md:space-x-3">
                     <button 
                         onClick={() => setShowPreview(true)} 
                         className="flex items-center justify-center space-x-2 px-2 md:px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors shadow-lg border border-white/10 text-sm md:text-base"
@@ -306,7 +317,16 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                         title="Copiar Prompt"
                     >
                          {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5" />}
-                        <span className="hidden md:inline">Copiar Prompt</span>
+                        <span className="hidden md:inline">Copiar</span>
+                    </button>
+
+                    <button 
+                        onClick={handleResetChat} 
+                        className="flex items-center justify-center space-x-2 px-2 md:px-4 py-2 rounded-lg hover:bg-white/10 text-gray-300 transition-colors text-sm md:text-base border border-transparent hover:border-white/10"
+                        title="Reiniciar Chat"
+                    >
+                        <RefreshIcon className="w-5 h-5" />
+                        <span className="hidden md:inline">Reiniciar</span>
                     </button>
                     
                     <button 
@@ -389,7 +409,11 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                             <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''} animate-fade-slide-in-up`}>
                                 {msg.role === 'assistant' && <AssistantIcon />}
                                 <div className={`max-w-2xl p-4 rounded-2xl text-sm leading-relaxed shadow-lg ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-800 text-gray-200 rounded-bl-none ring-1 ring-white/10'}`}>
-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    {msg.role === 'user' ? (
+                                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    ) : (
+                                        <SimpleMarkdown>{msg.content}</SimpleMarkdown>
+                                    )}
                                 </div>
                                 {msg.role === 'user' && <UserIcon />}
                             </div>
