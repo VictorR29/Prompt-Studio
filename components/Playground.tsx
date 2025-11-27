@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -45,7 +44,7 @@ interface PlaygroundProps {
     initialPrompt: SavedPrompt | null;
     savedPrompts: SavedPrompt[];
     onSavePrompt: (prompt: SavedPrompt) => void;
-    addToast: (message: string, type?: 'success' | 'error') => void;
+    addToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
     setGlobalLoader: (state: { active: boolean; message: string }) => void;
 }
 

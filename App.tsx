@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -22,7 +21,7 @@ import { Playground } from './components/Playground';
 interface ToastMessage {
   id: number;
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'warning';
 }
 
 const GlobalLoader: React.FC<{ message: string }> = ({ message }) => {
@@ -113,7 +112,7 @@ const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
 
-  const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Date.now();
     setToasts(prevToasts => [...prevToasts, { id, message, type }]);
   }, []);
@@ -198,8 +197,11 @@ const App: React.FC = () => {
 
     try {
       const imagePayload = images.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
-      const generatedPrompt = await analyzeImageFeature(extractionMode, imagePayload);
-      setPrompt(generatedPrompt);
+      const { result, warning } = await analyzeImageFeature(extractionMode, imagePayload);
+      setPrompt(result);
+      if (warning) {
+          addToast(warning, 'warning');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
       setError(`Error en el análisis: ${errorMessage}`);

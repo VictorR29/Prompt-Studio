@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 interface ApiKeySetupProps {
   onKeySaved: () => void;
-  addToast: (message: string, type?: 'success' | 'error') => void;
+  addToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
 }
 
 export const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onKeySaved, addToast }) => {

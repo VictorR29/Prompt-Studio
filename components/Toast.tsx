@@ -1,10 +1,12 @@
+
 import React, { useEffect, useState } from 'react';
 import { CheckIcon } from './icons/CheckIcon';
 import { CloseIcon } from './icons/CloseIcon';
+import { ExclamationIcon } from './icons/ExclamationIcon';
 
 interface ToastProps {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'warning';
   onClose: () => void;
 }
 
@@ -22,7 +24,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       handleClose();
-    }, 3000); // Auto close after 3 seconds
+    }, 5000); // Auto close after 5 seconds (slightly longer for warnings)
 
     return () => clearTimeout(timer);
   }, []);
@@ -32,12 +34,35 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
     setTimeout(onClose, 300); // Wait for animation to finish
   };
 
-  const isSuccess = type === 'success';
+  const getStyles = () => {
+      switch (type) {
+          case 'success':
+              return 'bg-teal-600/90 text-white';
+          case 'warning':
+              return 'bg-amber-500/90 text-white'; // Yellow/Amber for warning
+          case 'error':
+          default:
+              return 'bg-red-600/90 text-white';
+      }
+  };
+
+  const getIcon = () => {
+      switch (type) {
+          case 'success':
+              return <CheckIcon className="w-6 h-6" />;
+          case 'warning':
+              return <ExclamationIcon className="w-6 h-6" />;
+          case 'error':
+          default:
+              return <ErrorIcon className="w-6 h-6" />;
+      }
+  };
+
 
   const containerClasses = `
     relative w-full max-w-sm p-4 pr-12 rounded-xl shadow-lg flex items-center space-x-3
     transition-all duration-300 ease-in-out
-    ${isSuccess ? 'bg-teal-600/90 text-white' : 'bg-red-600/90 text-white'}
+    ${getStyles()}
     ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}
     animate-slide-in-right pointer-events-auto
   `;
@@ -50,7 +75,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
         role="alert"
       >
         <div className="flex-shrink-0">
-          {isSuccess ? <CheckIcon className="w-6 h-6" /> : <ErrorIcon className="w-6 h-6" />}
+          {getIcon()}
         </div>
         <div className="flex-grow text-sm font-semibold">
           {message}

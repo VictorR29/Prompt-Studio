@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
 import { EXTRACTION_MODE_MAP } from '../config';
@@ -27,7 +26,7 @@ interface PromptModuleProps {
     isAnalyzingImages: boolean;
     isOptimizing: boolean;
     suggestions: string[];
-    addToast: (message: string, type?: 'success' | 'error') => void;
+    addToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
     setGlobalLoader: (state: { active: boolean; message: string }) => void;
 }
 
@@ -141,6 +140,42 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
         setIsDragging(false);
     };
 
+    const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const items = e.clipboardData.items;
+        const imageFiles: File[] = [];
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    imageFiles.push(file);
+                }
+            }
+        }
+
+        if (imageFiles.length > 0) {
+            // Prevent default to avoid pasting filename/garbage text if an image is present
+            e.preventDefault();
+
+            if (images.length >= maxImages) {
+                addToast(`Límite de imágenes alcanzado (${maxImages}) para ${config.label}.`, 'warning');
+                return;
+            }
+
+            const availableSlots = maxImages - images.length;
+            const filesToProcess = imageFiles.slice(0, availableSlots);
+
+            if (filesToProcess.length < imageFiles.length) {
+                addToast(`Solo se añadieron ${filesToProcess.length} imágenes (límite alcanzado).`, 'warning');
+            }
+
+            if (filesToProcess.length > 0) {
+                onImageUpload(mode, filesToProcess);
+                addToast('Imagen pegada y procesando...', 'success');
+            }
+        }
+    };
+
     return (
         <div className="glass-pane p-4 rounded-xl flex flex-col space-y-3" data-tour-id={`editor-module-${mode}`}>
             <h3 className={`font-semibold text-lg ${config.badgeClassName.replace('bg-', 'text-').replace('/20', '')}`}>{config.label}</h3>
@@ -173,6 +208,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 <textarea
                     value={value}
                     onChange={(e) => onChange(mode, e.target.value)}
+                    onPaste={handlePaste}
                     placeholder={config.description}
                     className="w-full h-full min-h-[100px] bg-gray-900/70 rounded-lg p-3 text-gray-300 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner resize-none custom-scrollbar"
                 />
@@ -204,7 +240,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                     accept="image/png, image/jpeg, image/webp"
                     onChange={handleFileSelected}
                 />
-                <button onClick={handleImageUploadClick} disabled={!canUploadMore || isAnalyzingImages} title="Analizar desde Imagen" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-image-upload">
+                <button onClick={handleImageUploadClick} disabled={!canUploadMore || isAnalyzingImages} title="Analizar desde Imagen (Cargar, Soltar o Pegar)" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-image-upload">
                     {isAnalyzingImages ? <SmallLoader /> : <ImageIcon className="w-4 h-4 text-amber-400" />}
                 </button>
                 <button onClick={() => onOptimize(mode)} disabled={!value || isOptimizing || isAnalyzingImages} title="Optimizar con IA" className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors" data-tour-id="module-optimize-button">

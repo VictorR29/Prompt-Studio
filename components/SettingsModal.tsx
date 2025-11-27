@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CloseIcon } from './icons/CloseIcon';
 import { SavedPrompt } from '../types';
@@ -7,7 +6,7 @@ import { SaveIcon } from './icons/SaveIcon';
 interface SettingsModalProps {
   onClose: () => void;
   onKeySaved: () => void;
-  addToast: (message: string, type?: 'success' | 'error') => void;
+  addToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
   savedPrompts?: SavedPrompt[];
   onPromptsUpdate?: (prompts: SavedPrompt[]) => void;
 }

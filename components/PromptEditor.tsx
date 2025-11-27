@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode, AppView } from '../types';
 import { 
@@ -43,7 +42,7 @@ interface PromptEditorProps {
     savedPrompts: SavedPrompt[];
     setView: (view: AppView) => void;
     onNavigateToGallery: () => void;
-    addToast: (message: string, type?: 'success' | 'error') => void;
+    addToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
     setGlobalLoader: (state: { active: boolean; message: string }) => void;
 }
 
@@ -269,8 +268,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setLoadingModules(prev => ({ ...prev, [mode]: true }));
         try {
             const imagePayload = images.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
-            const result = await analyzeImageFeature(mode, imagePayload);
+            const { result, warning } = await analyzeImageFeature(mode, imagePayload);
             handleFragmentChange(mode, result);
+            if (warning) {
+                addToast(warning, 'warning');
+            }
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             addToast(`Error al analizar imagen para '${EXTRACTION_MODE_MAP[mode].label}': ${errorMessage}`, 'error');
