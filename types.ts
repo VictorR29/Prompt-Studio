@@ -11,6 +11,7 @@ export interface SavedPrompt {
   category: string;
   artType: string;
   notes: string;
+  isHybrid?: boolean;
 }
 
 export interface PlaygroundOperation {

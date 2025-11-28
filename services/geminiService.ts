@@ -235,14 +235,23 @@ export const generateFeatureMetadata = (mode: ExtractionMode, prompt: string, im
 };
 
 export const generateHybridFragment = async (targetModule: ExtractionMode, images: ImagePayload[], userFeedback: string): Promise<string> => {
-    const systemInstruction = `Synthesize a single coherent prompt fragment for '${targetModule}' based on provided images. Prioritize user feedback: "${userFeedback}". Output raw text only.`;
+    const systemInstruction = `Act as a world-class Concept Artist and Prompt Engineer.
+Your task is to SYNTHESIZE a single, rich, and cohesive prompt fragment for the '${targetModule}' module, based on the provided images.
+
+CRITICAL INSTRUCTIONS:
+1.  **DO NOT summarize briefly.** Create a lavish, detailed description that captures textures, lighting, nuances, and specific aesthetic elements from the input images.
+2.  **Create SYNERGY:** Do not just list features. Blend the distinct traits of the inputs into a unique, unified aesthetic concept.
+3.  **Prioritize User Feedback:** "${userFeedback}". If this feedback contradicts the images, the feedback WINS.
+4.  **Output Format:** Return ONLY the raw prompt text. No explanations.
+5.  **Quality:** The output must be evocative and suitable for high-end image generation (Midjourney/Flux quality).`;
+
     const imageParts = images.map(image => ({ inlineData: { data: image.imageBase64, mimeType: image.mimeType } }));
     
     try {
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             config: { systemInstruction },
-            contents: { parts: [{ text: `Fuse for ${targetModule}.` }, ...imageParts] },
+            contents: { parts: [{ text: `Create a high-quality hybrid prompt for ${targetModule}.` }, ...imageParts] },
         })) as GenerateContentResponse;
         return response.text.trim();
     } catch (error) {
@@ -301,13 +310,14 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
             color: { type: Type.STRING },
             composition: { type: Type.STRING },
             style: { type: Type.STRING },
+            negative: { type: Type.STRING },
         },
     };
     try {
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             config: { 
-                systemInstruction: "You are an expert prompt engineer. Analyze the text prompt and decompose it into specific visual modules. Return a JSON object.",
+                systemInstruction: "You are an expert prompt engineer. Analyze the text prompt and decompose it into specific visual modules. Extract any negative/exclusionary constraints into the 'negative' module. Return a JSON object.",
                 responseMimeType: 'application/json',
                 responseSchema: schema
             },
@@ -321,17 +331,28 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
 
 export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     try {
-        const inputs = Object.entries(fragments)
+        // Extract negative prompt to handle it separately
+        const { negative, ...positiveFragments } = fragments;
+        
+        const inputs = Object.entries(positiveFragments)
             .filter(([_, v]) => v && v.trim())
             .map(([k, v]) => `${k.toUpperCase()}: ${v}`)
             .join('\n');
             
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            config: { systemInstruction: "Combine these visual modules into a single, cohesive, high-quality image generation prompt. Optimize flow and coherence." },
+            config: { systemInstruction: "Combine these visual modules into a single, cohesive, high-quality image generation prompt. Optimize flow and coherence. DO NOT include negative constraints in the main text." },
             contents: { parts: [{ text: inputs }] }
         })) as GenerateContentResponse;
-        return response.text.trim();
+        
+        let masterPrompt = response.text.trim();
+        
+        // Append negative prompt if it exists
+        if (negative && negative.trim()) {
+            masterPrompt += `\n\n|| NEGATIVE PROMPT: ${negative.trim()}`;
+        }
+        
+        return masterPrompt;
     } catch (error) {
         return "";
     }
@@ -418,6 +439,21 @@ export const mergeModulesIntoJsonTemplate = async (modules: Partial<Record<Extra
     }
 };
 
+export const getCreativeAssistantResponseSystemInstruction = () => {
+    return `You are a creative AI assistant for prompt engineering. Help the user refine their image prompt. 
+    You can update specific modules or the whole prompt. 
+    
+    IMPORTANT:
+    1. Act as a Creative Director. If the user request is vague (e.g. "make it cartoon"), DO NOT just swap the word. Expand it into a rich technical description (e.g. "vibrant cartoon style, cel shaded, bold outlines, 2D animation aesthetic").
+    2. Use Markdown in your 'message' response to highlight changes (e.g. **bold** for new terms, *italics* for emphasis).
+    3. The 'assembled_prompt' must be the full, cohesive prompt text resulting from all updates.
+    
+    Return a JSON object with:
+    - 'message': Your conversational response in Spanish (using Markdown).
+    - 'updates': A list of objects { module, value } for the fields you changed.
+    - 'assembled_prompt': The final assembled text prompt.`;
+};
+
 export const getCreativeAssistantResponse = async (history: { role: string, parts: { text: string }[] }[], currentFragments: any): Promise<string> => {
     const schema = {
         type: Type.OBJECT,
@@ -442,7 +478,7 @@ export const getCreativeAssistantResponse = async (history: { role: string, part
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             config: { 
-                systemInstruction: "You are a creative AI assistant for prompt engineering. Help the user refine their image prompt. You can update specific modules or the whole prompt. Return a JSON object with a chat 'message', a list of 'updates' (module name and new value), and an 'assembled_prompt'.",
+                systemInstruction: getCreativeAssistantResponseSystemInstruction(),
                 responseMimeType: 'application/json',
                 responseSchema: schema
             },

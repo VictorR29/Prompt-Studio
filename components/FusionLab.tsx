@@ -33,6 +33,7 @@ const Slot: React.FC<{
     label: string;
 }> = ({ slot, onUpload, onClear, label }) => {
     const inputId = `slot-input-${slot.id}`;
+    const [isDragging, setIsDragging] = useState(false);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -40,8 +41,40 @@ const Slot: React.FC<{
         }
     };
 
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            onUpload(slot.id, e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
     return (
-        <div className="relative group w-full aspect-square bg-gray-900/50 rounded-xl border-2 border-dashed border-gray-700 hover:border-indigo-500 hover:bg-gray-900/80 transition-all flex flex-col items-center justify-center overflow-hidden">
+        <div 
+            className={`relative group w-full aspect-square bg-gray-900/50 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden ${isDragging ? 'border-teal-400 bg-teal-500/10' : 'border-gray-700 hover:border-indigo-500 hover:bg-gray-900/80'}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+        >
             {slot.url ? (
                 <>
                     <img src={slot.url} alt="Slot content" className="w-full h-full object-cover" />
@@ -61,7 +94,7 @@ const Slot: React.FC<{
                 <label htmlFor={inputId} className="cursor-pointer w-full h-full flex flex-col items-center justify-center text-gray-500 hover:text-indigo-400">
                     <ImageIcon className="w-8 h-8 mb-2" />
                     <span className="text-xs font-semibold">{label}</span>
-                    <span className="text-[10px] mt-1 opacity-60">Clic para cargar</span>
+                    <span className="text-[10px] mt-1 opacity-60">Clic o Arrastrar</span>
                     <input
                         id={inputId}
                         type="file"
@@ -142,9 +175,12 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
             const collageImages = activeImages.map(img => ({ base64: img.base64!, mimeType: img.mimeType! }));
             const coverUrl = await createImageCollage(collageImages);
             
+            // NOTE: We save the 'type' as the targetModule (e.g. 'style') so the Editor recognizes it.
+            // We use the new 'isHybrid' flag to mark it visually as a hybrid.
             const newPrompt: SavedPrompt = {
                 id: Date.now().toString(),
-                type: 'hybrid', // Special type for hybrids
+                type: targetModule as any, 
+                isHybrid: true,
                 prompt: result,
                 coverImage: coverUrl,
                 title: `Híbrido: ${EXTRACTION_MODE_MAP[targetModule].label}`,
@@ -156,6 +192,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
             onSavePrompt(newPrompt);
             addToast("Fragmento híbrido guardado.", 'success');
         } catch (e) {
+            console.error(e);
             addToast("Error al guardar.", 'error');
         } finally {
             setGlobalLoader({ active: false, message: '' });
