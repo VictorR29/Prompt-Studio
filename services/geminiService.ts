@@ -1108,6 +1108,40 @@ Tu salida debe ser únicamente este prompt final. Sin explicaciones, sin etiquet
     }
 };
 
+export const generateNegativePrompt = async (positivePrompt: string): Promise<string> => {
+    const systemInstruction = `You are an expert AI Prompt Engineer. Your task is to generate a comprehensive "Negative Prompt" based on the provided positive prompt. 
+    
+    A negative prompt lists elements that should be EXCLUDED from the image generation to ensure high quality and adhere to the intended style.
+
+    **Rules:**
+    1.  **Analyze the Positive Prompt:** Understand the style (e.g., photorealistic, anime, sketch) and content.
+    2.  **Standard Quality Exclusions:** Always include standard quality assurance terms (e.g., "blurry, low quality, bad anatomy, watermark, text, signature").
+    3.  **Context-Aware Exclusions:**
+        *   If the style is "photorealistic", exclude terms like "cartoon, drawing, illustration, 3d render, anime".
+        *   If the style is "drawing/sketch", exclude "photorealistic, photograph".
+        *   If the subject is a "solo portrait", exclude "multiple people, extra limbs".
+    4.  **Output:** Return ONLY the negative prompt string, separated by commas. Do not add labels like "Negative Prompt:".`;
+
+    try {
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            config: {
+                systemInstruction,
+            },
+            contents: { parts: [{ text: `Generate a negative prompt for this positive prompt: "${positivePrompt}"` }] },
+        })) as GenerateContentResponse;
+
+        const text = response.text;
+        if (!text) {
+             throw new Error("La API no devolvió ningún texto para el prompt negativo.");
+        }
+        return text.trim();
+    } catch (error) {
+        console.error("Error generating negative prompt:", error);
+        throw new Error("No se pudo generar el prompt negativo.");
+    }
+};
+
 export const generateMasterPromptMetadata = async (prompt: string, images: ImagePayload[]): Promise<Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>> => {
      // ... implementation same as before
      const metadataSystemInstruction = `Eres un curador de arte y catalogador experto. Tu tarea es analizar un prompt maestro que ha sido ensamblado a partir de varios componentes (pose, estilo, escena, etc.) y las imágenes de referencia que lo inspiraron. Basado en este análisis, debes generar metadatos estructurados en formato JSON.

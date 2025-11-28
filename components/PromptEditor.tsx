@@ -13,7 +13,8 @@ import {
     generateStructuredPrompt,
     generateStructuredPromptFromImage,
     generateMasterPromptMetadata,
-    generateImageFromPrompt
+    generateImageFromPrompt,
+    generateNegativePrompt
 } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
@@ -34,6 +35,8 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { EyeIcon } from './icons/EyeIcon';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { BookmarkIcon } from './icons/BookmarkIcon';
+import { BanIcon } from './icons/BanIcon';
+import { ChevronDownIcon } from './icons/ChevronDownIcon';
 
 
 type ImageState = { url: string; base64: string; mimeType: string; };
@@ -78,6 +81,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         aesthetic: true,
     });
     const [showPreview, setShowPreview] = useState(false);
+    
+    // Negative Prompt States
+    const [negativePrompt, setNegativePrompt] = useState('');
+    const [showNegativeSection, setShowNegativeSection] = useState(false);
+    const [isGeneratingNegative, setIsGeneratingNegative] = useState(false);
+    const [copiedNegative, setCopiedNegative] = useState(false);
 
     // State for the new "Generate Structure" section
     const [structurerIdea, setStructurerIdea] = useState('');
@@ -122,14 +131,22 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         // including cleanup for when the component unmounts mid-load.
         let isMounted = true;
 
-        const loadInitialPrompt = async (promptText: string) => {
+        const loadInitialPrompt = async (promptData: SavedPrompt) => {
             setLoadingAction('analyze');
             setError(null);
             setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
+            
+            // Populate negative prompt if present
+            if (promptData.negativePrompt) {
+                setNegativePrompt(promptData.negativePrompt);
+                setShowNegativeSection(true);
+            }
+
             try {
-                const modularized = await modularizePrompt(promptText);
+                const modularized = await modularizePrompt(promptData.prompt);
                 if (isMounted) {
                     setFragments(modularized as Record<ExtractionMode, string>);
+                    setFinalPrompt(promptData.prompt); // Pre-fill final prompt
                     setViewMode('editor');
                 }
             } catch (err) {
@@ -147,7 +164,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         };
 
         if (initialPrompt) {
-            loadInitialPrompt(initialPrompt.prompt);
+            loadInitialPrompt(initialPrompt);
         }
 
         return () => {
@@ -287,6 +304,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setFragments(initialFragments);
         setImagesByModule({});
         setFinalPrompt('');
+        setNegativePrompt('');
         setError(null);
         setViewMode('editor');
     };
@@ -297,6 +315,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setPastedText('');
         setError(null);
         setFinalPrompt('');
+        setNegativePrompt('');
         setOutputType(null);
         setCopied(false);
         setIsLoading(false);
@@ -455,6 +474,34 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setGlobalLoader({ active: false, message: '' });
         }
     };
+
+    const handleGenerateNegative = async () => {
+        if (!finalPrompt.trim()) {
+            addToast('Primero genera el prompt positivo.', 'warning');
+            return;
+        }
+        setIsGeneratingNegative(true);
+        setGlobalLoader({ active: true, message: 'Generando prompt negativo con IA...' });
+        try {
+            const negative = await generateNegativePrompt(finalPrompt);
+            setNegativePrompt(negative);
+            addToast('Prompt negativo generado.', 'success');
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+            addToast(`Error: ${errorMessage}`, 'error');
+        } finally {
+            setIsGeneratingNegative(false);
+            setGlobalLoader({ active: false, message: '' });
+        }
+    };
+
+    const handleCopyNegative = () => {
+        if (negativePrompt) {
+            navigator.clipboard.writeText(negativePrompt);
+            setCopiedNegative(true);
+            setTimeout(() => setCopiedNegative(false), 2000);
+        }
+    };
     
     const handleGenerateJson = () => {
         // FIX: Separated type check from method call to avoid potential TS inference issues where 'v' is 'unknown'.
@@ -569,6 +616,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     id: Date.now().toString(),
                     type: 'master',
                     prompt: finalPrompt,
+                    negativePrompt: negativePrompt || undefined,
                     coverImage: coverImageDataUrl,
                     ...metadata,
                 };
@@ -863,6 +911,47 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Optional Negative Prompt Section */}
+                                <div className="border-t border-white/10 pt-4">
+                                    <button 
+                                        onClick={() => setShowNegativeSection(!showNegativeSection)}
+                                        className="flex items-center space-x-2 text-sm font-semibold text-red-300 hover:text-red-200 transition-colors w-full"
+                                    >
+                                        <BanIcon className="w-4 h-4" />
+                                        <span>Prompt Negativo (Opcional)</span>
+                                        <ChevronDownIcon className={`w-4 h-4 transition-transform ${showNegativeSection ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    
+                                    {showNegativeSection && (
+                                        <div className="mt-3 space-y-3 animate-fade-in-subtle">
+                                            <div className="relative">
+                                                <textarea
+                                                    value={negativePrompt}
+                                                    onChange={(e) => setNegativePrompt(e.target.value)}
+                                                    placeholder="Describe lo que quieres evitar (ej. blurry, low quality)..."
+                                                    className="w-full h-24 bg-red-900/20 rounded-lg p-3 text-red-100 placeholder-red-300/50 ring-1 ring-red-500/30 focus:ring-2 focus:ring-red-500 focus:outline-none text-sm resize-none"
+                                                />
+                                                 <button 
+                                                    onClick={handleCopyNegative} 
+                                                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-200 transition-colors"
+                                                    title="Copiar solo negativo"
+                                                >
+                                                     {copiedNegative ? <CheckIcon className="w-4 h-4" /> : <ClipboardIcon className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                            <button 
+                                                onClick={handleGenerateNegative}
+                                                disabled={isGeneratingNegative}
+                                                className="w-full py-2 bg-red-600/80 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                {isGeneratingNegative ? <Loader /> : <SparklesIcon className="w-4 h-4" />}
+                                                {isGeneratingNegative ? 'Generando...' : 'Generar con IA'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <button onClick={handleSave} disabled={isSaving} className="w-full bg-green-600 hover:bg-green-500 disabled:bg-green-500/20 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-2.5 px-4 rounded-lg">
                                     {isSaving ? 'Guardando...' : 'Guardar en Galería'}
                                 </button>

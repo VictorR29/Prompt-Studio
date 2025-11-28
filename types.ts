@@ -5,6 +5,7 @@ export interface SavedPrompt {
   id: string;
   type: 'style' | 'structured' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'master' | 'subject' | 'object';
   prompt: string;
+  negativePrompt?: string; // Optional field for negative prompt
   coverImage: string; // base64 data URL
   title: string;
   category: string;
