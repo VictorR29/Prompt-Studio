@@ -1,3 +1,4 @@
+
 import { SavedPrompt, ExtractionMode } from './types';
 
 interface ModeConfig {
@@ -17,6 +18,7 @@ export const EXTRACTION_MODES: ModeConfig[] = [
   { id: 'object', label: 'Objeto', description: 'Objeto o elemento aislado', badgeClassName: 'bg-indigo-500/20 text-indigo-300 ring-indigo-500/30 hover:bg-indigo-500/30' },
   { id: 'composition', label: 'Composición', description: 'Encuadre, ángulo y foco', badgeClassName: 'bg-cyan-500/20 text-cyan-300 ring-cyan-500/30 hover:bg-cyan-500/30' },
   { id: 'color', label: 'Color', description: 'Esquema, tonos y contraste', badgeClassName: 'bg-orange-500/20 text-orange-300 ring-orange-500/30 hover:bg-orange-500/30' },
+  { id: 'negative', label: 'Negativo', description: 'Elementos a evitar', badgeClassName: 'bg-red-900/20 text-red-400 ring-red-500/30 hover:bg-red-500/30' },
 ];
 
 
@@ -29,6 +31,7 @@ export const PROMPT_TYPE_CONFIG: Record<SavedPrompt['type'], PromptTypeInfo> = {
     style: { className: 'bg-green-500/20 text-green-300 ring-green-500/30', text: 'Estilo' },
     structured: { className: 'bg-purple-500/20 text-purple-300 ring-purple-500/30', text: 'JSON' },
     master: { className: 'bg-gray-500/20 text-gray-300 ring-gray-500/30', text: 'Maestro' },
+    hybrid: { className: 'bg-indigo-500/20 text-indigo-300 ring-indigo-500/30', text: 'Híbrido' },
     subject: { className: 'bg-red-500/20 text-red-300 ring-red-500/30', text: 'Sujeto' },
     pose: { className: 'bg-blue-500/20 text-blue-300 ring-blue-500/30', text: 'Pose' },
     expression: { className: 'bg-amber-500/20 text-amber-300 ring-amber-500/30', text: 'Expresión' },

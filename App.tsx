@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -17,6 +18,7 @@ import { ApiKeySetup } from './components/ApiKeySetup';
 import { SettingsModal } from './components/SettingsModal';
 import { createImageCollage } from './utils/imageUtils';
 import { Playground } from './components/Playground';
+import { FusionLab } from './components/FusionLab';
 
 interface ToastMessage {
   id: number;
@@ -366,6 +368,15 @@ const App: React.FC = () => {
                 <Playground
                     initialPrompt={promptForPlayground}
                     savedPrompts={savedPrompts}
+                    onSavePrompt={addPromptToGallery}
+                    addToast={addToast}
+                    setGlobalLoader={setGlobalLoaderState}
+                />
+            </div>
+        )}
+        {view === 'fusion' && (
+            <div className="animate-fade-slide-in-up">
+                <FusionLab
                     onSavePrompt={addPromptToGallery}
                     addToast={addToast}
                     setGlobalLoader={setGlobalLoaderState}

@@ -1,9 +1,9 @@
 
-export type ExtractionMode = 'style' | 'subject' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'object';
+export type ExtractionMode = 'style' | 'subject' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'object' | 'negative';
 
 export interface SavedPrompt {
   id: string;
-  type: 'style' | 'structured' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'master' | 'subject' | 'object';
+  type: 'style' | 'structured' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'master' | 'subject' | 'object' | 'hybrid';
   prompt: string;
   negativePrompt?: string; // Optional field for negative prompt
   coverImage: string; // base64 data URL
@@ -29,4 +29,4 @@ export interface AssistantSuggestion {
   newValue: string;
 }
 
-export type AppView = 'editor' | 'extractor' | 'gallery' | 'playground';
+export type AppView = 'editor' | 'extractor' | 'gallery' | 'playground' | 'fusion';
