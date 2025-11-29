@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -390,7 +389,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                             if (!value && !isUpdated) return null; 
                             
                             return (
-                                <div key={mode} className={`p-3 rounded-lg border transition-all duration-500 ${isUpdated ? 'ring-2 ring-teal-500 bg-teal-900/30 border-teal-500/50 scale-105 shadow-lg z-10' : 'bg-gray-900/50 border-white/5 hover:border-white/10'}`}>
+                                <div key={mode} className={`p-3 rounded-lg border transition-all duration-500 ${isUpdated ? 'ring-2 ring-teal-400 bg-teal-500/20 border-teal-400 shadow-[0_0_15px_rgba(45,212,191,0.3)] scale-105 z-10' : 'bg-gray-900/50 border-white/5 hover:border-white/10'}`}>
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <span className={`w-2 h-2 rounded-full ${config.badgeClassName.replace('bg-', 'bg-').split(' ')[0]}`}></span>
                                         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{config.label}</h3>

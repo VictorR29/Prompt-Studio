@@ -241,7 +241,7 @@ Your task is to SYNTHESIZE a single, rich, and cohesive prompt fragment for the 
 
 CRITICAL INSTRUCTIONS:
 1.  **RICHNESS & DETAIL:** DO NOT create a short or generic summary. You must generate a lavish, detailed description that captures textures, lighting nuances, specific materials, artistic techniques, and aesthetic vibes from the input images.
-2.  **SYNERGY:** Blend the distinct traits of the inputs into a unique, unified aesthetic concept. Use evocative language (e.g., instead of "blue shirt", use "cobalt blue silk shirt with iridescent sheen").
+2.  **SYNERGY:** Blend the distinct traits of the inputs into a unique, unified aesthetic concept. Use evocative language (e.g. instead of "blue shirt", use "cobalt blue silk shirt with iridescent sheen").
 3.  **USER PRIORITY:** "${userFeedback}". If this user instruction contradicts the visual data, the user instruction RULES.
 4.  **OUTPUT FORMAT:** Return ONLY the raw prompt text. No introductory phrases.
 5.  **QUALITY:** The output should be suitable for high-end generative models (Midjourney v6, Flux, etc.).`;
@@ -521,10 +521,12 @@ export const getCreativeAssistantResponseSystemInstruction = () => {
     return `You are a creative AI assistant for prompt engineering. Help the user refine their image prompt. 
     You can update specific modules or the whole prompt. 
     
-    IMPORTANT:
-    1. Act as a Creative Director. If the user request is vague (e.g. "make it cartoon"), DO NOT just swap the word. Expand it into a rich technical description (e.g. "vibrant cartoon style, cel shaded, bold outlines, 2D animation aesthetic").
-    2. Use Markdown in your 'message' response to highlight changes (e.g. **bold** for new terms, *italics* for emphasis).
-    3. The 'assembled_prompt' must be the full, cohesive prompt text resulting from all updates.
+    CRITICAL INSTRUCTIONS:
+    1. **LANGUAGE:** You must converse with the user in Spanish (in the 'message' field), BUT ALL prompt content ('value' in updates and 'assembled_prompt') MUST BE IN ENGLISH.
+    2. **MODULE KEYS:** In the 'updates' array, the 'module' key MUST be one of these exact English strings: 'subject', 'style', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'negative'. DO NOT translate module names (e.g. never use 'estilo' or 'vestimenta').
+    3. **CREATIVE EXPANSION:** Act as a Creative Director. If the user request is vague (e.g. "hazlo cartoon"), DO NOT just swap the word. Expand it into a rich technical description in English (e.g. "vibrant cartoon style, cel shaded, bold outlines, 2D animation aesthetic").
+    4. **MARKDOWN:** Use Markdown in your 'message' response to highlight changes (e.g. **bold** for new terms, *italics* for emphasis).
+    5. **ASSEMBLY:** The 'assembled_prompt' must be the full, cohesive prompt text resulting from all updates, in English.
     
     Return a JSON object with:
     - 'message': Your conversational response in Spanish (using Markdown).
