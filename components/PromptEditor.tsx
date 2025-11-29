@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode, AppView } from '../types';
 import { 
@@ -14,7 +13,8 @@ import {
     generateStructuredPromptFromImage,
     generateMasterPromptMetadata,
     generateImageFromPrompt,
-    generateNegativePrompt
+    generateNegativePrompt,
+    assembleOptimizedJson
 } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
@@ -115,6 +115,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
             setFragments(modularized);
+            if (modularized.negative) {
+                setNegativePrompt(modularized.negative);
+                setShowNegativeSection(true);
+            }
             setViewMode('editor');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -462,8 +466,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setError(null);
         setFinalPrompt('');
         setGlobalLoader({ active: true, message: 'Ensamblando prompt de texto...' });
+        
+        const fragmentsToAssemble = { ...fragments };
+        if (negativePrompt) fragmentsToAssemble.negative = negativePrompt;
+
         try {
-            const result = String(await assembleMasterPrompt(fragments));
+            const result = String(await assembleMasterPrompt(fragmentsToAssemble));
             setFinalPrompt(result);
         } catch (err) {
             setOutputType(null);
@@ -504,7 +512,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     };
     
     const handleGenerateJson = () => {
-        // FIX: Separated type check from method call to avoid potential TS inference issues where 'v' is 'unknown'.
+        // Check active fragments properly
         const activeFragments = Object.values(fragments).some(v => {
             if (typeof v === 'string') {
                 return v.trim() !== '';
@@ -519,21 +527,36 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setIsJsonChoiceModalOpen(true);
     };
 
-    const handleDirectJsonGeneration = () => {
+    const handleDirectJsonGeneration = async () => {
         setIsJsonChoiceModalOpen(false);
+        setIsLoading(true);
+        setOutputType('json');
+        setError(null);
+        setFinalPrompt('');
+        setGlobalLoader({ active: true, message: 'Optimizando y estructurando JSON...' });
+
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
-            // FIX: Separated type check from method call to avoid potential TS inference issues.
-            if (typeof value === 'string') {
-                if (value.trim() !== '') {
-                    acc[key as ExtractionMode] = value;
-                }
+            if (typeof value === 'string' && value.trim() !== '') {
+                acc[key as ExtractionMode] = value;
             }
             return acc;
         }, {} as Partial<Record<ExtractionMode, string>>);
         
-        const jsonString = JSON.stringify(activeFragments, null, 2);
-        setFinalPrompt(jsonString);
-        setOutputType('json');
+        if (negativePrompt.trim()) {
+            activeFragments.negative = negativePrompt;
+        }
+
+        try {
+            const result = await assembleOptimizedJson(activeFragments);
+            setFinalPrompt(result);
+        } catch (err) {
+            setOutputType(null);
+            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+            setError(`Error al generar JSON: ${errorMessage}`);
+        } finally {
+            setIsLoading(false);
+            setGlobalLoader({ active: false, message: '' });
+        }
     };
 
     const handleTemplateJsonGeneration = () => {
@@ -555,6 +578,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             }
             return acc;
         }, {} as Partial<Record<ExtractionMode, string>>);
+        
+        if (negativePrompt.trim()) {
+            activeFragments.negative = negativePrompt;
+        }
 
         try {
             const result = String(await mergeModulesIntoJsonTemplate(activeFragments, template.prompt));

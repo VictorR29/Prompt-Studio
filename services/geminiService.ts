@@ -372,6 +372,50 @@ Output ONLY the final raw prompt string.`;
     }
 };
 
+export const assembleOptimizedJson = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    try {
+        const { negative, ...positiveFragments } = fragments;
+        
+        const systemInstruction = `You are an elite Prompt Engineer specialized in JSON structures.
+Your task is to CLEAN, OPTIMIZE, and REORDER a set of prompt modules into a final JSON object.
+
+CRITICAL INSTRUCTIONS:
+1.  **DEDUPLICATION:** Remove redundant info (e.g. if 'style' says "anime" and 'subject' says "anime girl", keep "anime" in style and just "girl" in subject).
+2.  **VISUAL ORDERING:** The output JSON keys MUST be ordered logically for human reading. You MUST output the JSON string with keys in this exact order if they exist:
+    - 1st: 'subject'
+    - 2nd: 'action' / 'pose'
+    - 3rd: 'expression'
+    - 4th: 'outfit' / 'object'
+    - 5th: 'scene' / 'lighting'
+    - 6th: 'color'
+    - 7th: 'composition'
+    - Last: 'style'
+3.  **FORMAT:** Return only valid JSON.
+4.  **NEGATIVE PROMPT:** If provided, include a 'negative' key at the very end.`;
+
+        const response = await callApiThrottled(ai => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            config: { systemInstruction, responseMimeType: 'application/json' },
+            contents: { parts: [{ text: `Optimize these fragments into structured JSON:\n${JSON.stringify(positiveFragments)}${negative ? `\nNegative Context: ${negative}` : ''}` }] }
+        })) as GenerateContentResponse;
+
+        // Ensure pretty print
+        try {
+            return JSON.stringify(JSON.parse(response.text), null, 2);
+        } catch {
+            return response.text;
+        }
+
+    } catch (error) {
+        // Fallback to simple stringify if AI fails
+        const ordered: any = {};
+        const order: ExtractionMode[] = ['subject', 'pose', 'expression', 'outfit', 'object', 'scene', 'color', 'composition', 'style'];
+        order.forEach(k => { if (fragments[k]) ordered[k] = fragments[k]; });
+        if (fragments.negative) ordered.negative = fragments.negative;
+        return JSON.stringify(ordered, null, 2);
+    }
+};
+
 export const generateNegativePrompt = async (positivePrompt: string): Promise<string> => {
     try {
         const response = await callApiThrottled(ai => ai.models.generateContent({
@@ -452,10 +496,20 @@ export const createJsonTemplate = async (jsonString: string): Promise<string> =>
 
 export const mergeModulesIntoJsonTemplate = async (modules: Partial<Record<ExtractionMode, string>>, template: string): Promise<string> => {
     try {
+        const { negative, ...positiveModules } = modules;
+        
+        const systemInstruction = `You are an expert Prompt Engineer.
+        Merge the provided modules into the JSON template.
+        CRITICAL: 
+        1. Replace placeholders or relevant fields in the template.
+        2. Clean up and deduplicate content (e.g., don't repeat 'style' details in 'subject').
+        3. Ensure the final JSON is valid and visually structured with 'subject' appearing early if possible.
+        4. If a 'negative' module is provided, ensure it is added to a 'negative' or 'exclude' field in the JSON.`;
+
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: `Merge these modules into the provided JSON template. Replace placeholders or relevant fields.\nModules: ${JSON.stringify(modules)}\nTemplate: ${template}\nReturn updated JSON.` }] },
-            config: { responseMimeType: 'application/json' }
+            config: { systemInstruction, responseMimeType: 'application/json' },
+            contents: { parts: [{ text: `Merge these modules into the provided JSON template.\nModules: ${JSON.stringify(positiveModules)}\nNegative: ${negative || ''}\nTemplate: ${template}\nReturn updated JSON.` }] }
         })) as GenerateContentResponse;
         return response.text;
     } catch (error) {
