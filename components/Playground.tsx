@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -55,6 +56,31 @@ const initialFragments: Partial<Record<ExtractionMode, string>> = {
     scene: '', color: '', composition: '', style: ''
 };
 
+// Fallback map to handle common AI hallucinations (Spanish keys or capitalization)
+const MODULE_FALLBACK_MAP: Record<string, ExtractionMode> = {
+    'estilo': 'style',
+    'sujeto': 'subject',
+    'personaje': 'subject',
+    'pose': 'pose',
+    'postura': 'pose',
+    'expresion': 'expression',
+    'expresión': 'expression',
+    'escena': 'scene',
+    'entorno': 'scene',
+    'fondo': 'scene',
+    'vestimenta': 'outfit',
+    'ropa': 'outfit',
+    'outfit': 'outfit',
+    'objeto': 'object',
+    'props': 'object',
+    'color': 'color',
+    'colores': 'color',
+    'composicion': 'composition',
+    'composición': 'composition',
+    'negativo': 'negative',
+    'negative': 'negative'
+};
+
 export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedPrompts, onSavePrompt, addToast, setGlobalLoader }) => {
     const [viewState, setViewState] = useState<'setup' | 'chat'>('setup');
     const [fragments, setFragments] = useState<Partial<Record<ExtractionMode, string>>>(initialFragments);
@@ -71,7 +97,6 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const [currentPromptText, setCurrentPromptText] = useState('');
-    const [mobileTab, setMobileTab] = useState<'chat' | 'state'>('chat');
     const [showPreview, setShowPreview] = useState(false);
 
     useEffect(() => {
@@ -108,6 +133,42 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         }
     };
 
+    // Helper to extract JSON from AI response even if it includes Markdown or extra text
+    const cleanAndParseResponse = (text: string): AssistantResponse => {
+        try {
+            // 1. Try simple parse first
+            return JSON.parse(text);
+        } catch (e) {
+            // 2. Try extracting from markdown code blocks
+            const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (codeBlockMatch) {
+                try {
+                    return JSON.parse(codeBlockMatch[1]);
+                } catch (e2) {
+                    // continue
+                }
+            }
+            
+            // 3. Try finding the outer braces
+            const firstBrace = text.indexOf('{');
+            const lastBrace = text.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                try {
+                    return JSON.parse(text.substring(firstBrace, lastBrace + 1));
+                } catch (e3) {
+                    // continue
+                }
+            }
+
+            // 4. Failed to parse JSON, assume plain text error or message
+            console.warn("Could not parse JSON from AI response:", text);
+            return {
+                message: text,
+                updates: []
+            };
+        }
+    };
+
     const handleSendMessage = async () => {
         if (!userInput.trim() || isLoading) return;
 
@@ -134,14 +195,8 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         try {
             const responseText = await getCreativeAssistantResponse(geminiHistory, fragments);
             
-            // Parse JSON response
-            let parsedResponse: AssistantResponse;
-            try {
-                parsedResponse = JSON.parse(responseText);
-            } catch (e) {
-                // Fallback if model returns plain text
-                parsedResponse = { message: responseText, updates: [] };
-            }
+            // Robust parsing
+            const parsedResponse = cleanAndParseResponse(responseText);
 
             // Apply updates immediately
             if (parsedResponse.updates && parsedResponse.updates.length > 0) {
@@ -149,8 +204,19 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                 const nextUpdatedModules = new Set<ExtractionMode>();
 
                 parsedResponse.updates.forEach(op => {
-                    newFragments[op.module] = op.value;
-                    nextUpdatedModules.add(op.module);
+                    // Normalize the module key (lowercase, strip whitespace)
+                    let moduleKey = op.module.toLowerCase().trim();
+                    
+                    // Check fallback map if the exact key isn't a valid mode
+                    if (!EXTRACTION_MODE_MAP[moduleKey as ExtractionMode] && MODULE_FALLBACK_MAP[moduleKey]) {
+                        moduleKey = MODULE_FALLBACK_MAP[moduleKey];
+                    }
+
+                    // Only apply if it's a valid mode now
+                    if (EXTRACTION_MODE_MAP[moduleKey as ExtractionMode] || moduleKey === 'negative') {
+                        newFragments[moduleKey as ExtractionMode] = op.value;
+                        nextUpdatedModules.add(moduleKey as ExtractionMode);
+                    }
                 });
                 
                 setFragments(newFragments);
@@ -348,25 +414,9 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                 </div>
             </div>
 
-             {/* Mobile Tabs */}
-            <div className="lg:hidden flex space-x-2 mb-4 px-1">
-                <button 
-                    onClick={() => setMobileTab('chat')} 
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${mobileTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'}`}
-                >
-                    Chat con IA
-                </button>
-                <button 
-                    onClick={() => setMobileTab('state')} 
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${mobileTab === 'state' ? 'bg-teal-600 text-white shadow-lg' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'}`}
-                >
-                    Ver Detalles ({Object.values(fragments).filter(Boolean).length})
-                </button>
-            </div>
-
             <div className="flex-grow flex flex-col lg:flex-row gap-6 overflow-hidden relative">
-                {/* Left Panel: Fragments (Read Only / Context) */}
-                <div className={`w-full lg:w-1/3 flex flex-col glass-pane rounded-2xl overflow-hidden shadow-2xl border border-white/5 ${mobileTab === 'state' ? 'flex absolute inset-0 z-20 lg:static bg-gray-900' : 'hidden lg:flex'}`}>
+                {/* Left Panel: Fragments (Read Only / Context) - Hidden on Mobile */}
+                <div className="hidden lg:flex w-full lg:w-1/3 flex-col glass-pane rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                     <div className="p-4 border-b border-white/10 bg-gray-900/50 flex justify-between items-center flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <h2 className="font-bold text-gray-200">Estado del Prompt</h2>
@@ -375,10 +425,6 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                                 <span className="text-xs text-teal-400 uppercase tracking-wider font-semibold">En vivo</span>
                             </div>
                         </div>
-                        {/* Mobile close button for state view */}
-                        <button className="lg:hidden text-gray-400 hover:text-white" onClick={() => setMobileTab('chat')}>
-                            Cerrar
-                        </button>
                     </div>
                     <div className="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar bg-black/20">
                         {fragmentOrder.map(mode => {
@@ -401,8 +447,8 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                     </div>
                 </div>
 
-                {/* Right Panel: Chat */}
-                <div className={`w-full lg:w-2/3 flex flex-col glass-pane rounded-2xl overflow-hidden shadow-2xl border border-white/5 ${mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
+                {/* Right Panel: Chat - Full width on mobile */}
+                <div className="flex w-full lg:w-2/3 flex-col glass-pane rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                     <div className="flex-grow overflow-y-auto p-6 space-y-6 custom-scrollbar">
                         {messages.map((msg, index) => (
                             <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''} animate-fade-slide-in-up`}>
