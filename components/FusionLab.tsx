@@ -104,6 +104,11 @@ const Slot: React.FC<{
                     />
                 </label>
             )}
+            {isDragging && (
+                <div className="absolute inset-0 bg-teal-500/20 border-2 border-dashed border-teal-400 rounded-lg flex flex-col items-center justify-center pointer-events-none transition-opacity">
+                    <p className="text-sm font-semibold text-teal-300">Suelta aquí</p>
+                </div>
+            )}
         </div>
     );
 };

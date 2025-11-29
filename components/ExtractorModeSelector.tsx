@@ -1,3 +1,4 @@
+
 import React, { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { ExtractionMode } from '../types';
 import { EXTRACTION_MODES } from '../config';

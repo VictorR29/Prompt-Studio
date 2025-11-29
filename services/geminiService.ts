@@ -235,15 +235,16 @@ export const generateFeatureMetadata = (mode: ExtractionMode, prompt: string, im
 };
 
 export const generateHybridFragment = async (targetModule: ExtractionMode, images: ImagePayload[], userFeedback: string): Promise<string> => {
-    const systemInstruction = `Act as a world-class Concept Artist and Prompt Engineer.
+    // UPDATED SYSTEM INSTRUCTION: Focus on richness and detail (Concept Artist)
+    const systemInstruction = `Act as a world-class Concept Artist and Prompt Engineer specializing in Visual Synthesis.
 Your task is to SYNTHESIZE a single, rich, and cohesive prompt fragment for the '${targetModule}' module, based on the provided images.
 
 CRITICAL INSTRUCTIONS:
-1.  **DO NOT summarize briefly.** Create a lavish, detailed description that captures textures, lighting, nuances, and specific aesthetic elements from the input images.
-2.  **Create SYNERGY:** Do not just list features. Blend the distinct traits of the inputs into a unique, unified aesthetic concept.
-3.  **Prioritize User Feedback:** "${userFeedback}". If this feedback contradicts the images, the feedback WINS.
-4.  **Output Format:** Return ONLY the raw prompt text. No explanations.
-5.  **Quality:** The output must be evocative and suitable for high-end image generation (Midjourney/Flux quality).`;
+1.  **RICHNESS & DETAIL:** DO NOT create a short or generic summary. You must generate a lavish, detailed description that captures textures, lighting nuances, specific materials, artistic techniques, and aesthetic vibes from the input images.
+2.  **SYNERGY:** Blend the distinct traits of the inputs into a unique, unified aesthetic concept. Use evocative language (e.g., instead of "blue shirt", use "cobalt blue silk shirt with iridescent sheen").
+3.  **USER PRIORITY:** "${userFeedback}". If this user instruction contradicts the visual data, the user instruction RULES.
+4.  **OUTPUT FORMAT:** Return ONLY the raw prompt text. No introductory phrases.
+5.  **QUALITY:** The output should be suitable for high-end generative models (Midjourney v6, Flux, etc.).`;
 
     const imageParts = images.map(image => ({ inlineData: { data: image.imageBase64, mimeType: image.mimeType } }));
     
@@ -251,7 +252,7 @@ CRITICAL INSTRUCTIONS:
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             config: { systemInstruction },
-            contents: { parts: [{ text: `Create a high-quality hybrid prompt for ${targetModule}.` }, ...imageParts] },
+            contents: { parts: [{ text: `Create a rich, high-quality hybrid prompt for ${targetModule}.` }, ...imageParts] },
         })) as GenerateContentResponse;
         return response.text.trim();
     } catch (error) {
@@ -402,10 +403,20 @@ export const optimizePromptFragment = async (mode: ExtractionMode, contextFragme
 
 export const adaptFragmentToContext = async (mode: ExtractionMode, fragment: string, contextFragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     const context = Object.entries(contextFragments).map(([k,v]) => `${k}: ${v}`).join('\n');
+    
+    // UPDATED SYSTEM INSTRUCTION: Stricter rules to preserve input details
+    const systemInstruction = `You are a careful editor. Your task is to fit the provided '${mode}' description into a prompt context.
+CRITICAL RULES:
+1.  **INTEGRATE WITHOUT DESTROYING:** Do NOT summarize, simplify, or shorten the input description.
+2.  **PRESERVE DETAILS:** You must keep specific adjectives, technical terms, artistic references, and visual nuances from the input.
+3.  **ADJUST FLOW ONLY:** Only change grammatical connectors (like 'with', 'featuring', 'in the style of') to make it grammatically consistent with the context.
+4.  **OUTPUT:** Return the adjusted description text only.`;
+
     try {
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: `Adapt this '${mode}' description: "${fragment}" to fit coherently into this context:\n${context}\n\nReturn the adapted description text only.` }] }
+            config: { systemInstruction },
+            contents: { parts: [{ text: `Adapt this '${mode}' description:\n"${fragment}"\n\nTo fit into this context:\n${context}` }] }
         })) as GenerateContentResponse;
         return response.text.trim();
     } catch (error) {
