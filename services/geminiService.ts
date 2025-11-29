@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { SavedPrompt, ExtractionMode, AssistantResponse } from "../types";
 
@@ -234,28 +235,45 @@ export const generateFeatureMetadata = (mode: ExtractionMode, prompt: string, im
   return metadataFunctions[mode](prompt, images);
 };
 
-export const generateHybridFragment = async (targetModule: ExtractionMode, images: ImagePayload[], userFeedback: string): Promise<string> => {
+export const generateHybridFragment = async (
+    targetModule: ExtractionMode, 
+    inputs: (ImagePayload | { text: string })[], 
+    userFeedback: string
+): Promise<string> => {
     // UPDATED SYSTEM INSTRUCTION: Focus on richness and detail (Concept Artist)
     const systemInstruction = `Act as a world-class Concept Artist and Prompt Engineer specializing in Visual Synthesis.
-Your task is to SYNTHESIZE a single, rich, and cohesive prompt fragment for the '${targetModule}' module, based on the provided images.
+Your task is to SYNTHESIZE a single, rich, and cohesive prompt fragment for the '${targetModule}' module, based on the provided inputs (images and/or text concepts).
 
 CRITICAL INSTRUCTIONS:
-1.  **RICHNESS & DETAIL:** DO NOT create a short or generic summary. You must generate a lavish, detailed description that captures textures, lighting nuances, specific materials, artistic techniques, and aesthetic vibes from the input images.
+1.  **RICHNESS & DETAIL:** DO NOT create a short or generic summary. You must generate a lavish, detailed description that captures textures, lighting nuances, specific materials, artistic techniques, and aesthetic vibes from the inputs.
 2.  **SYNERGY:** Blend the distinct traits of the inputs into a unique, unified aesthetic concept. Use evocative language (e.g. instead of "blue shirt", use "cobalt blue silk shirt with iridescent sheen").
-3.  **USER PRIORITY:** "${userFeedback}". If this user instruction contradicts the visual data, the user instruction RULES.
-4.  **OUTPUT FORMAT:** Return ONLY the raw prompt text. No introductory phrases.
-5.  **QUALITY:** The output should be suitable for high-end generative models (Midjourney v6, Flux, etc.).`;
+3.  **MIXED MEDIA:** You may receive images and text. Treat text descriptions as visual DNA to be woven into the final image description.
+4.  **USER PRIORITY:** "${userFeedback}". If this user instruction contradicts the visual data, the user instruction RULES.
+5.  **OUTPUT FORMAT:** Return ONLY the raw prompt text. No introductory phrases.
+6.  **QUALITY:** The output should be suitable for high-end generative models (Midjourney v6, Flux, etc.).`;
 
-    const imageParts = images.map(image => ({ inlineData: { data: image.imageBase64, mimeType: image.mimeType } }));
+    const contents = inputs.map(input => {
+        if ('text' in input) {
+            return { text: `[TEXT DNA REFERENCE]: ${input.text}` };
+        } else {
+            return { inlineData: { data: input.imageBase64, mimeType: input.mimeType } };
+        }
+    });
     
     try {
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             config: { systemInstruction },
-            contents: { parts: [{ text: `Create a rich, high-quality hybrid prompt for ${targetModule}.` }, ...imageParts] },
+            contents: { 
+                parts: [
+                    { text: `Create a rich, high-quality hybrid prompt for ${targetModule} using these references:` }, 
+                    ...contents
+                ] 
+            },
         })) as GenerateContentResponse;
         return response.text.trim();
     } catch (error) {
+        console.error(error);
         throw new Error("Failed to generate hybrid fragment.");
     }
 };

@@ -11,27 +11,34 @@ import { ClipboardIcon } from './icons/ClipboardIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import { SaveIcon } from './icons/SaveIcon';
 import { ImageIcon } from './icons/ImageIcon';
+import { GalleryIcon } from './icons/GalleryIcon';
 import { Loader } from './Loader';
+import { GalleryModal } from './GalleryModal';
 
 interface FusionLabProps {
     onSavePrompt: (prompt: SavedPrompt) => void;
     addToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
     setGlobalLoader: (state: { active: boolean; message: string }) => void;
+    savedPrompts: SavedPrompt[];
 }
 
-type ImageSlot = {
+type SlotData = {
     id: string;
-    url: string | null;
-    base64: string | null;
-    mimeType: string | null;
+    type: 'image' | 'text' | 'empty';
+    url: string | null; // Display URL (image blob or text cover)
+    base64: string | null; // For image content
+    mimeType: string | null; // For image content
+    text: string | null; // For text content
+    label: string | null; // Title for text content
 };
 
 const Slot: React.FC<{
-    slot: ImageSlot;
+    slot: SlotData;
     onUpload: (id: string, file: File) => void;
     onClear: (id: string) => void;
+    onOpenGallery: (id: string) => void;
     label: string;
-}> = ({ slot, onUpload, onClear, label }) => {
+}> = ({ slot, onUpload, onClear, onOpenGallery, label }) => {
     const inputId = `slot-input-${slot.id}`;
     const [isDragging, setIsDragging] = useState(false);
 
@@ -39,6 +46,7 @@ const Slot: React.FC<{
         if (e.target.files && e.target.files[0]) {
             onUpload(slot.id, e.target.files[0]);
         }
+        e.target.value = ''; // Reset
     };
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -75,74 +83,130 @@ const Slot: React.FC<{
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
         >
-            {slot.url ? (
+            {slot.type !== 'empty' ? (
                 <>
-                    <img src={slot.url} alt="Slot content" className="w-full h-full object-cover" />
+                    {slot.type === 'image' && slot.url && (
+                        <img src={slot.url} alt="Slot content" className="w-full h-full object-cover" />
+                    )}
+                    {slot.type === 'text' && (
+                        <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-indigo-900/20">
+                            {slot.url ? (
+                                <div className="absolute inset-0 opacity-30">
+                                    <img src={slot.url} alt="Cover" className="w-full h-full object-cover" />
+                                </div>
+                            ) : null}
+                            <div className="relative z-10">
+                                <span className="text-2xl mb-2 block">📝</span>
+                                <p className="text-xs font-bold text-indigo-300 line-clamp-3">{slot.label}</p>
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <button
                             onClick={() => onClear(slot.id)}
-                            className="bg-red-500/80 p-2 rounded-full text-white hover:bg-red-600 transition-colors"
+                            className="bg-red-500/80 p-2 rounded-full text-white hover:bg-red-600 transition-colors shadow-lg"
+                            title="Limpiar slot"
                         >
                             <CloseIcon className="w-5 h-5" />
                         </button>
                     </div>
-                    <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-white">
-                        {label}
+                    <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
+                        <span>{label}</span>
+                        <span className="text-[10px] text-gray-400 uppercase ml-1">({slot.type === 'image' ? 'IMG' : 'TXT'})</span>
                     </div>
                 </>
             ) : (
-                <label htmlFor={inputId} className="cursor-pointer w-full h-full flex flex-col items-center justify-center text-gray-500 hover:text-indigo-400">
-                    <ImageIcon className="w-8 h-8 mb-2" />
-                    <span className="text-xs font-semibold">{label}</span>
-                    <span className="text-[10px] mt-1 opacity-60">Clic o Arrastrar</span>
-                    <input
-                        id={inputId}
-                        type="file"
-                        className="hidden"
-                        accept="image/png, image/jpeg, image/webp"
-                        onChange={handleFileChange}
-                    />
-                </label>
+                <div className="flex flex-col items-center justify-center gap-2 p-2 w-full h-full">
+                    <span className="text-xs font-semibold text-gray-500 mb-1">{label}</span>
+                    <div className="flex gap-2">
+                        <label htmlFor={inputId} className="cursor-pointer bg-gray-800 hover:bg-gray-700 p-2 rounded-lg transition-colors group/btn" title="Subir Imagen">
+                            <ImageIcon className="w-5 h-5 text-gray-400 group-hover/btn:text-white" />
+                            <input
+                                id={inputId}
+                                type="file"
+                                className="hidden"
+                                accept="image/png, image/jpeg, image/webp"
+                                onChange={handleFileChange}
+                            />
+                        </label>
+                        <button 
+                            onClick={() => onOpenGallery(slot.id)} 
+                            className="bg-gray-800 hover:bg-gray-700 p-2 rounded-lg transition-colors group/btn" 
+                            title="Seleccionar de Galería"
+                        >
+                            <GalleryIcon className="w-5 h-5 text-gray-400 group-hover/btn:text-white" />
+                        </button>
+                    </div>
+                    <span className="text-[10px] text-gray-600 mt-1">Arrastra o selecciona</span>
+                </div>
             )}
             {isDragging && (
-                <div className="absolute inset-0 bg-teal-500/20 border-2 border-dashed border-teal-400 rounded-lg flex flex-col items-center justify-center pointer-events-none transition-opacity">
-                    <p className="text-sm font-semibold text-teal-300">Suelta aquí</p>
+                <div className="absolute inset-0 bg-teal-500/20 border-2 border-dashed border-teal-400 rounded-lg flex flex-col items-center justify-center pointer-events-none transition-opacity bg-gray-900/90 z-20">
+                    <p className="text-sm font-semibold text-teal-300">Suelta imagen aquí</p>
                 </div>
             )}
         </div>
     );
 };
 
-export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, setGlobalLoader }) => {
+export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, setGlobalLoader, savedPrompts }) => {
     const [targetModule, setTargetModule] = useState<ExtractionMode>('style');
-    const [slots, setSlots] = useState<ImageSlot[]>([
-        { id: 'A', url: null, base64: null, mimeType: null },
-        { id: 'B', url: null, base64: null, mimeType: null },
-        { id: 'C', url: null, base64: null, mimeType: null },
+    const [slots, setSlots] = useState<SlotData[]>([
+        { id: 'A', type: 'empty', url: null, base64: null, mimeType: null, text: null, label: null },
+        { id: 'B', type: 'empty', url: null, base64: null, mimeType: null, text: null, label: null },
+        { id: 'C', type: 'empty', url: null, base64: null, mimeType: null, text: null, label: null },
     ]);
     const [userFeedback, setUserFeedback] = useState('');
     const [result, setResult] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [copied, setCopied] = useState(false);
+    
+    // Gallery Modal State
+    const [gallerySlotId, setGallerySlotId] = useState<string | null>(null);
 
     const handleUpload = async (id: string, file: File) => {
         try {
             const { base64, mimeType } = await fileToBase64(file);
-            setSlots(prev => prev.map(s => s.id === id ? { ...s, url: URL.createObjectURL(file), base64, mimeType } : s));
+            setSlots(prev => prev.map(s => s.id === id ? { 
+                ...s, 
+                type: 'image',
+                url: URL.createObjectURL(file), 
+                base64, 
+                mimeType,
+                text: null,
+                label: null
+            } : s));
         } catch (e) {
             addToast("Error al procesar imagen", 'error');
         }
     };
 
-    const handleClearSlot = (id: string) => {
-        setSlots(prev => prev.map(s => s.id === id ? { ...s, url: null, base64: null, mimeType: null } : s));
+    const handleGallerySelect = (prompt: SavedPrompt | SavedPrompt[]) => {
+        const selected = Array.isArray(prompt) ? prompt[0] : prompt;
+        if (gallerySlotId && selected) {
+            setSlots(prev => prev.map(s => s.id === gallerySlotId ? {
+                ...s,
+                type: 'text',
+                url: selected.coverImage || null, // Use cover image as visual if available
+                text: selected.prompt,
+                label: selected.title,
+                base64: null,
+                mimeType: null
+            } : s));
+        }
+        setGallerySlotId(null);
     };
 
-    const activeImages = slots.filter(s => s.base64 !== null);
+    const handleClearSlot = (id: string) => {
+        setSlots(prev => prev.map(s => s.id === id ? { id, type: 'empty', url: null, base64: null, mimeType: null, text: null, label: null } : s));
+    };
+
+    const activeSlots = slots.filter(s => s.type !== 'empty');
 
     const handleFuse = async () => {
-        if (activeImages.length < 2) {
-            addToast("Sube al menos 2 imágenes para fusionar.", 'warning');
+        if (activeSlots.length < 2) {
+            addToast("Añade al menos 2 referencias (imagen o texto) para fusionar.", 'warning');
             return;
         }
         
@@ -150,15 +214,20 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
         setGlobalLoader({ active: true, message: 'Alquimizando conceptos...' });
         
         try {
-            const imagesPayload = activeImages.map(img => ({ 
-                imageBase64: img.base64!, 
-                mimeType: img.mimeType! 
-            }));
+            const payload = activeSlots.map(slot => {
+                if (slot.type === 'image' && slot.base64 && slot.mimeType) {
+                    return { imageBase64: slot.base64, mimeType: slot.mimeType };
+                } else if (slot.type === 'text' && slot.text) {
+                    return { text: slot.text };
+                }
+                throw new Error("Invalid slot state");
+            });
             
-            const hybridFragment = await generateHybridFragment(targetModule, imagesPayload, userFeedback);
+            const hybridFragment = await generateHybridFragment(targetModule, payload, userFeedback);
             setResult(hybridFragment);
             addToast("¡Fusión completada!", 'success');
         } catch (e) {
+            console.error(e);
             addToast("La fusión falló. Intenta de nuevo.", 'error');
         } finally {
             setIsLoading(false);
@@ -176,12 +245,24 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
         if (!result) return;
         setGlobalLoader({ active: true, message: 'Guardando híbrido...' });
         try {
-            // Generate collage cover
-            const collageImages = activeImages.map(img => ({ base64: img.base64!, mimeType: img.mimeType! }));
-            const coverUrl = await createImageCollage(collageImages);
+            let coverUrl = '';
             
-            // NOTE: We save the 'type' as the targetModule (e.g. 'style') so the Editor recognizes it.
-            // We use the new 'isHybrid' flag to mark it visually as a hybrid.
+            // Generate collage cover only if we have images
+            const imageInputs = activeSlots.filter(s => s.type === 'image' && s.base64);
+            if (imageInputs.length > 0) {
+                const collageImages = imageInputs.map(img => ({ base64: img.base64!, mimeType: img.mimeType! }));
+                // If we have mixed text inputs, we might want to just use the images we have
+                coverUrl = await createImageCollage(collageImages);
+            } else {
+                // Text only fusion? Try generating a cover with AI
+                try {
+                    setGlobalLoader({ active: true, message: 'Generando portada conceptual...' });
+                    coverUrl = await generateImageFromPrompt(result);
+                } catch (e) {
+                    console.warn("Cover generation failed");
+                }
+            }
+            
             const newPrompt: SavedPrompt = {
                 id: Date.now().toString(),
                 type: targetModule as any, 
@@ -191,7 +272,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
                 title: `Híbrido: ${EXTRACTION_MODE_MAP[targetModule].label}`,
                 category: EXTRACTION_MODE_MAP[targetModule].label,
                 artType: 'Fragmento Híbrido',
-                notes: `Fusión de ${activeImages.length} imágenes. Feedback: ${userFeedback || 'Ninguno'}.`,
+                notes: `Fusión de ${activeSlots.length} fuentes (${imageInputs.length} img, ${activeSlots.length - imageInputs.length} txt). Feedback: ${userFeedback || 'Ninguno'}.`,
             };
             
             onSavePrompt(newPrompt);
@@ -210,7 +291,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
                 <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center gap-3">
                     <span className="text-4xl">🧪</span> Laboratorio de Fusión
                 </h1>
-                <p className="mt-2 text-gray-400">Combina el ADN visual de múltiples imágenes para crear nuevos conceptos híbridos.</p>
+                <p className="mt-2 text-gray-400">Combina el ADN visual de imágenes y textos guardados para crear nuevos conceptos híbridos.</p>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-8 flex-grow">
@@ -246,6 +327,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
                                     slot={slot} 
                                     onUpload={handleUpload} 
                                     onClear={handleClearSlot} 
+                                    onOpenGallery={setGallerySlotId}
                                     label={`Ref ${idx + 1}`} 
                                 />
                             ))}
@@ -265,7 +347,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
 
                     <button
                         onClick={handleFuse}
-                        disabled={activeImages.length < 2 || isLoading}
+                        disabled={activeSlots.length < 2 || isLoading}
                         className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 text-lg"
                     >
                         {isLoading ? <Loader /> : <SparklesIcon className="w-6 h-6" />}
@@ -313,6 +395,15 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
                     </div>
                 </div>
             </div>
+            
+            {gallerySlotId && (
+                <GalleryModal
+                    prompts={savedPrompts}
+                    onSelect={handleGallerySelect}
+                    onClose={() => setGallerySlotId(null)}
+                    title="Seleccionar Fuente de ADN"
+                />
+            )}
         </div>
     );
 };

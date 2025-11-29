@@ -378,6 +378,7 @@ const App: React.FC = () => {
             <div className="animate-fade-slide-in-up">
                 <FusionLab
                     onSavePrompt={addPromptToGallery}
+                    savedPrompts={savedPrompts}
                     addToast={addToast}
                     setGlobalLoader={setGlobalLoaderState}
                 />
