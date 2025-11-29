@@ -55,7 +55,7 @@ export const ExtractorModeSelector: React.FC<ExtractorModeSelectorProps> = ({ mo
                     style={indicatorStyle}
                     aria-hidden="true"
                 />
-                {EXTRACTION_MODES.map((item) => (
+                {EXTRACTION_MODES.filter(item => item.id !== 'negative').map((item) => (
                     <button
                         key={item.id}
                         onClick={() => setMode(item.id)}
