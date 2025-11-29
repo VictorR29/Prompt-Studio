@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { SavedPrompt, ExtractionMode, AssistantResponse } from "../types";
 
@@ -307,7 +306,7 @@ export const generateIdeasForStyle = async (prompt: string): Promise<string[]> =
     try {
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: `Suggest 3 creative additions or variations for this style prompt: "${prompt}". Return ONLY a JSON array of strings.` }] },
+            contents: { parts: [{ text: `Analyze this visual style description: "${prompt}". Suggest 3 distinct, creative SUBJECT CONCEPTS (scenes, characters, or objects) that would demonstrate this style perfectly. Do not describe the style itself, just the subject matter to test the style with. Return ONLY a JSON array of strings.` }] },
             config: { responseMimeType: 'application/json' }
         })) as GenerateContentResponse;
         return JSON.parse(response.text);

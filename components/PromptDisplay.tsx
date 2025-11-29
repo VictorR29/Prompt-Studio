@@ -114,8 +114,8 @@ export const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, isLoading,
                 
                 {(isStyleMode && (ideas.length > 0 || isSuggestingIdeas || ideasError)) && (
                   <div className="border-t border-white/10 pt-4">
-                    <h3 className="text-lg font-semibold text-gray-300 mb-2">Ideas Sugeridas:</h3>
-                    {isSuggestingIdeas && <p className="text-gray-400 text-sm">Generando...</p>}
+                    <h3 className="text-lg font-semibold text-gray-300 mb-2">Sujetos para probar el estilo:</h3>
+                    {isSuggestingIdeas && <p className="text-gray-400 text-sm">Buscando conceptos compatibles...</p>}
                     {ideasError && <p className="text-red-400 text-sm">{ideasError}</p>}
                     {ideas.length > 0 && (
                       <div className="overflow-y-auto max-h-56 space-y-2 custom-scrollbar pr-2">
@@ -156,7 +156,7 @@ export const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, isLoading,
                     disabled={isSuggestingIdeas}
                     className="bg-teal-600 hover:bg-teal-500 text-white focus:ring-teal-500/50 disabled:bg-teal-500/20 disabled:text-gray-400"
                   >
-                    {isSuggestingIdeas ? 'Buscando inspiración...' : 'Sugerir Ideas'}
+                    {isSuggestingIdeas ? 'Buscando inspiración...' : 'Sugerir Sujetos para Probar'}
                   </ActionButton>
                 )}
             </div>
