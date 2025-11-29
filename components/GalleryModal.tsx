@@ -1,5 +1,4 @@
 
-
 import React, { useCallback, useEffect, useState } from 'react';
 import { SavedPrompt } from '../types';
 import { Gallery } from './Gallery';
@@ -39,7 +38,14 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     };
   }, [handleKeyDown]);
 
-  const filteredPrompts = filter ? prompts.filter(p => filter.includes(p.type)) : prompts;
+  const filteredPrompts = filter 
+    ? prompts.filter(p => {
+        if (filter.includes(p.type)) return true;
+        // If filter includes 'hybrid', also show items marked as isHybrid
+        if (filter.includes('hybrid') && p.isHybrid) return true;
+        return false;
+      }) 
+    : prompts;
 
   const handleCardSelect = (prompt: SavedPrompt) => {
     if (multiSelect) {

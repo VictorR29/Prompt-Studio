@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { SavedPrompt } from '../types';
 import { PromptCard } from './PromptCard';
@@ -43,8 +44,13 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
   const filteredPrompts = useMemo(() => {
     return prompts.filter(prompt => {
       // Filter by type
-      const typeMatch = activeFilters.size === 0 || activeFilters.has(prompt.type);
-      if (!typeMatch) return false;
+      if (activeFilters.size > 0) {
+          const matchesDirectType = activeFilters.has(prompt.type);
+          // If the 'hybrid' filter is active, include any prompt marked as isHybrid
+          const matchesHybridFilter = activeFilters.has('hybrid') && !!prompt.isHybrid;
+          
+          if (!matchesDirectType && !matchesHybridFilter) return false;
+      }
 
       // Filter by search query
       const query = searchQuery.toLowerCase().trim();
