@@ -339,10 +339,23 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
             .filter(([_, v]) => v && v.trim())
             .map(([k, v]) => `${k.toUpperCase()}: ${v}`)
             .join('\n');
+
+        // UPDATED: Elite system instruction for true optimization
+        const systemInstruction = `You are an elite Prompt Engineer for high-end generative AI (Midjourney v6, Flux, Stable Diffusion).
+Your task is to ASSEMBLE and OPTIMIZE a set of distinct visual modules into a single, high-performance master prompt.
+
+CRITICAL OPTIMIZATION RULES:
+1.  **DEDUPLICATION:** Aggressively identify and merge redundant details. (e.g. If 'Subject' says "wearing a red suit" and 'Outfit' says "red suit", mention it once).
+2.  **FLOW & COHESION:** Do not just concatenate strings. Rewrite the text so it flows naturally. Use a mix of natural language for the subject/action and comma-separated keywords for style/technical specs.
+3.  **LOGICAL ORDERING:** Structure the prompt logically: [Subject + Action] > [Outfit/Details] > [Environment/Scene] > [Lighting/Camera] > [Style/Aesthetics].
+4.  **ENHANCEMENT:** Polish the phrasing for maximum visual impact without altering the user's original intent.
+5.  **EXCLUSION:** Do NOT include any negative constraints (no "--no" parameters) in this text.
+
+Output ONLY the final raw prompt string.`;
             
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            config: { systemInstruction: "Combine these visual modules into a single, cohesive, high-quality image generation prompt. Optimize flow and coherence. DO NOT include negative constraints in the main text." },
+            config: { systemInstruction },
             contents: { parts: [{ text: inputs }] }
         })) as GenerateContentResponse;
         
