@@ -23,7 +23,12 @@ const analysisSystemInstructions: Record<ExtractionMode, string> = {
     pose: `Analyze body pose. Describe strictly the geometry of limbs, head, and torso (e.g., "sitting cross-legged", "arms akimbo"). DO NOT describe clothing, gender, or physical appearance. Output raw prompt text only.`,
     expression: `Analyze facial expression. Describe emotion, muscle state (eyes, mouth), and mood. DO NOT describe hair, makeup (unless emotional), or racial features. Output raw prompt text only.`,
     scene: `Analyze environment and setting. Describe the background, location, lighting, and weather. DO NOT describe the subject in the foreground. Output raw prompt text only.`,
-    outfit: `Analyze outfit and accessories. List the garments, materials, textures, and specific items DIRECTLY. DO NOT use phrases like "A woman wearing..." or "The character has...". Just list the items (e.g., "Red leather jacket, blue jeans"). Output raw prompt text only.`,
+    outfit: `Analyze ONLY the clothing, footwear, and accessories.
+    CRITICAL RESTRICTIONS:
+    1. IGNORE ALL PHYSICAL TRAITS: Do NOT describe hair (color/style), eyes, skin tone, makeup, or body type.
+    2. Focus strictly on the garments themselves: materials, cuts, textures, and their specific colors.
+    3. List items directly (e.g., "Silk bomber jacket, ripped jeans"). Do not say "He is wearing...".
+    Output raw prompt text only.`,
     composition: `Analyze composition, framing, and camera work. Describe camera angle, shot size, depth of field, perspective. DO NOT describe the subject's appearance (use "the subject" or "the figure" only to indicate position). Output raw prompt text only.`,
     color: `Analyze the color palette. Extract the dominant colors and map them to GENERIC structural zones.
     CRITICAL RULES:

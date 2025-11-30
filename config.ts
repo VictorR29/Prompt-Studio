@@ -1,7 +1,7 @@
 
 import { SavedPrompt, ExtractionMode } from './types';
 
-interface ModeConfig {
+export interface ModeConfig {
   id: ExtractionMode;
   label: string;
   description: string;

@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
-import { EXTRACTION_MODE_MAP } from '../config';
+import { ModeConfig } from '../config';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { GalleryIcon } from './icons/GalleryIcon';
 import { SaveIcon } from './icons/SaveIcon';
@@ -12,7 +13,7 @@ type ImageState = { url: string; base64: string; mimeType: string; };
 
 interface PromptModuleProps {
     mode: ExtractionMode;
-    config: typeof EXTRACTION_MODE_MAP[ExtractionMode];
+    config: ModeConfig;
     value: string;
     images: ImageState[];
     onChange: (mode: ExtractionMode, value: string) => void;
