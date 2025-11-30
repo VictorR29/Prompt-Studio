@@ -172,22 +172,57 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
     };
 };
 
-// --- Analysis System Instructions (Shortened for brevity but functionally equivalent to input) ---
+// --- Analysis System Instructions (UPDATED FOR STRICT SPECIALIZATION) ---
 const analysisSystemInstructions: Record<ExtractionMode, string> = {
     style: `Analyze the visual style. Generate a prompt focusing ONLY on technique, atmosphere, and composition. Ignore specific subjects. Output raw prompt text only.`,
+    
     subject: `Analyze the main subject(s). 
     CRITICAL: 
     1. If there is ONE subject, describe physical identity and individual visual style. 
     2. If there are MULTIPLE DISTINCT SUBJECTS (e.g. two people, a person and a creature), you MUST describe them SEPARATELY using the format: "Subject 1: [Description]... Subject 2: [Description]...".
     3. Do NOT merge distinct characters into a single description.
     Output raw prompt text only.`,
-    pose: `Analyze body pose. Describe pose, action, and angle in neutral terms. Output raw prompt text only.`,
-    expression: `Analyze facial expression and emotion. Describe emotion, key features, and mood. Output raw prompt text only.`,
-    scene: `Analyze environment and setting. Describe location, lighting, and atmosphere. Output raw prompt text only.`,
-    outfit: `Analyze outfit and accessories. Describe style, garments, materials, and colors. Output raw prompt text only.`,
-    composition: `Analyze composition and camera work. Describe angle, framing, depth, and lighting. Output raw prompt text only.`,
+    
+    pose: `Analyze body pose. 
+    CRITICAL:
+    1. Describe strictly the position of limbs, head, and torso (e.g. "Sitting with legs crossed", "Arms raised in triumph").
+    2. DO NOT describe the character's physical appearance, clothes, or gender. Use neutral terms like "the figure".
+    Output raw prompt text only.`,
+    
+    expression: `Analyze facial expression. 
+    CRITICAL:
+    1. Describe emotion, eyes state, mouth state, and mood.
+    2. DO NOT describe hair color, skin tone, or accessories unless they are vital to the emotion.
+    Output raw prompt text only.`,
+    
+    scene: `Analyze environment and setting. 
+    CRITICAL:
+    1. Describe the background, location, lighting, and weather.
+    2. DO NOT describe the subject in the foreground. Assume the subject is a placeholder.
+    Output raw prompt text only.`,
+    
+    outfit: `Analyze outfit and accessories. 
+    CRITICAL:
+    1. List the garments, materials, textures, and colors DIRECTLY (e.g. "Red silk dress", "Tactical armored vest").
+    2. DO NOT mention the wearer (e.g. NEVER say "A woman wearing...", "He is dressed in...").
+    3. Focus strictly on the clothing items themselves.
+    Output raw prompt text only.`,
+    
+    composition: `Analyze composition, framing, and camera work. 
+    CRITICAL: 
+    1. Describe camera angle (low, high, dutch), shot size (close-up, wide, macro), depth of field, perspective, and lighting placement.
+    2. DO NOT describe the subject's physical appearance, gender, or clothing. 
+    3. Refer to the subject simply as "the subject" or "the figure" ONLY to describe their placement in the frame (e.g. "center-framed subject", "subject in lower third").
+    Output raw prompt text only.`,
+    
     color: `Analyze color usage. Describe palette, dominant colors, and distribution. Output raw prompt text only.`,
-    object: `Analyze the most prominent object/prop. Describe it in detail, ignoring the holder. Output raw prompt text only.`,
+    
+    object: `Analyze the most prominent object/prop. 
+    CRITICAL:
+    1. Describe the object's details, texture, and form.
+    2. DO NOT describe the person holding it. Treat the object as isolated.
+    Output raw prompt text only.`,
+    
     negative: `Identify negative space and unwanted elements (blur, distortion, etc.) to exclude.`
 };
 
