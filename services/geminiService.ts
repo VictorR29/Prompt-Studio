@@ -183,6 +183,14 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
         4. GRAMMAR: Use natural flow, not a list.
         5. COLOR AUTHORITY: The 'COLOR' parameter is the MASTER PALETTE. It OVERRIDES and REPLACES specific colors found in 'Outfit', 'Scene', or 'Object' if they conflict. If 'Outfit' says "red dress" but 'Color' dictates "Blue and Silver", the prompt MUST describe a "Blue and Silver dress".
         
+        OUTPUT FORMAT REQUIREMENTS:
+        - Return strictly a SINGLE CONTINUOUS BLOCK of text.
+        - Do NOT separate into paragraphs.
+        - Do NOT include any introductory text like "Here is your prompt".
+        - Do NOT use markdown code blocks.
+        - Use commas and periods intelligently for separation.
+        - Return ONLY the raw prompt string.
+        
         Input Parameters:
         ${inputs}`,
     });
@@ -242,9 +250,12 @@ export const adaptFragmentToContext = async (targetMode: ExtractionMode, fragmen
         2. GRAMMAR ONLY: You may only adjust grammatical connectors to make it fit.
         3. PRIORITY: The content of the fragment takes precedence over existing context if there is a conflict.
         
-        Context: ${contextStr}
+        OUTPUT FORMAT:
+        - Return ONLY the adapted text string as a single continuous block.
+        - No newlines.
+        - No markdown.
         
-        Return ONLY the adapted text string.`,
+        Context: ${contextStr}`,
     });
     return response.text || "";
 };
@@ -300,7 +311,7 @@ export const generateNegativePrompt = async (positivePrompt: string) => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Generate a negative prompt for this positive prompt: "${positivePrompt}". List unwanted elements like blur, distortion, bad anatomy, etc. Return raw text.`,
+        contents: `Generate a negative prompt for this positive prompt: "${positivePrompt}". List unwanted elements like blur, distortion, bad anatomy, etc. Return raw text only. No introductory text.`,
     });
     return response.text || "";
 };
@@ -354,7 +365,7 @@ export const getCreativeAssistantResponse = async (history: any[], fragments: an
             2. VAGUE REQUESTS: If user says "make it cartoon", you must EXPAND it to "vibrant cartoon style, cel shaded, bold outlines". Be an expert prompt engineer.
             3. LANGUAGE: User talks in Spanish, but 'module' keys MUST be in ENGLISH (subject, style, etc.) and 'value' content MUST be in ENGLISH.
             4. FORMATTING: Use Markdown (bold, italic) in the 'message' field to highlight changes.
-            5. ASSEMBLED PROMPT: Always return the full, updated prompt text in 'assembled_prompt'.`,
+            5. ASSEMBLED PROMPT: In the 'assembled_prompt' field, return the full prompt as a SINGLE CONTINUOUS BLOCK of text. No newlines, no markdown code blocks, no introductory text like "Here is your prompt". Just the raw, cohesive prompt.`,
             responseMimeType: "application/json",
             responseSchema: responseSchema
         }
@@ -381,7 +392,11 @@ export const generateHybridFragment = async (mode: ExtractionMode, sources: any[
     2. RICHNESS: Be detailed and artistic (Midjourney style). Avoid short summaries.
     3. USER FEEDBACK: Prioritize this instruction: "${feedback}".
     
-    Return raw text only.` });
+    OUTPUT FORMAT: 
+    - SINGLE CONTINUOUS PARAGRAPH. 
+    - No line breaks. 
+    - No conversational filler. 
+    - Return ONLY the raw prompt text.` });
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
