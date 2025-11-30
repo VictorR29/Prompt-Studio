@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ExtractionMode, SavedPrompt, AssistantResponse, PlaygroundOperation } from '../types';
 
@@ -177,6 +176,7 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
         2. DEDUPLICATION: Merge redundant descriptions. If 'Subject' says "red dress" and 'Outfit' says "red dress", say it ONCE.
         3. LOGICAL FLOW: Subject > Action/Pose > Outfit > Environment > Lighting > Style.
         4. GRAMMAR: Use natural flow, not a list.
+        5. COLOR AUTHORITY: The 'COLOR' parameter is the MASTER PALETTE. It OVERRIDES and REPLACES specific colors found in 'Outfit', 'Scene', or 'Object' if they conflict. If 'Outfit' says "red dress" but 'Color' dictates "Blue and Silver", the prompt MUST describe a "Blue and Silver dress".
         
         Input Parameters:
         ${inputs}`,
@@ -310,6 +310,7 @@ export const assembleOptimizedJson = async (fragments: any) => {
         1. KEY ORDERING: The output JSON MUST start with 'subject' key. This is for human readability.
         2. MULTI-SUBJECT: If 'subject' contains multiple characters, preserve them distinctively.
         3. DEDUPLICATION: Remove redundant descriptors across fields.
+        4. COLOR AUTHORITY: The 'color' key is the MASTER PALETTE. It OVERRIDES conflicting colors in 'outfit', 'scene', or 'object'. Update those fields to match the master palette.
         
         Fragments: ${JSON.stringify(fragments)}`,
         config: { responseMimeType: "application/json" }
