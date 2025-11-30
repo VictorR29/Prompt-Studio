@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt } from '../types';
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -6,6 +7,7 @@ import { TrashIcon } from './icons/TrashIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { JsonEditor } from './JsonEditor';
+import { BanIcon } from './icons/BanIcon';
 
 interface PromptModalProps {
   promptData: SavedPrompt;
@@ -103,7 +105,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                 </button>
             </div>
           
-            <div className="flex-grow overflow-y-auto pr-2 -mr-4 space-y-4 custom-scrollbar">
+            <div className="flex-grow overflow-y-auto pr-2 -mr-4 space-y-6 custom-scrollbar">
                 <div>
                     <h4 className="font-bold text-teal-300 mb-1 text-sm uppercase tracking-wider">Notas</h4>
                     <p className="text-gray-300 italic text-sm">"{promptData.notes}"</p>
@@ -120,6 +122,19 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                         )}
                     </div>
                 </div>
+
+                {promptData.negativePrompt && (
+                    <div>
+                        <h4 className="font-bold text-red-400 mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
+                            <BanIcon className="w-4 h-4" /> Prompt Negativo
+                        </h4>
+                        <div className="bg-red-900/10 rounded-lg p-3 ring-1 ring-red-500/30">
+                            <pre className="font-mono text-xs text-red-200 leading-relaxed whitespace-pre-wrap">
+                                {promptData.negativePrompt}
+                            </pre>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="flex items-center space-x-3 mt-6 pt-4 border-t border-white/10">

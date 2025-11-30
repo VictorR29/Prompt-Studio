@@ -175,7 +175,12 @@ const createMetadataGenerator = (systemInstruction: string, errorContext: string
 // --- Analysis System Instructions (Shortened for brevity but functionally equivalent to input) ---
 const analysisSystemInstructions: Record<ExtractionMode, string> = {
     style: `Analyze the visual style. Generate a prompt focusing ONLY on technique, atmosphere, and composition. Ignore specific subjects. Output raw prompt text only.`,
-    subject: `Analyze the main subject(s). Describe physical identity and individual visual style. Start with style (e.g. 'photorealistic'). Output raw prompt text only.`,
+    subject: `Analyze the main subject(s). 
+    CRITICAL: 
+    1. If there is ONE subject, describe physical identity and individual visual style. 
+    2. If there are MULTIPLE DISTINCT SUBJECTS (e.g. two people, a person and a creature), you MUST describe them SEPARATELY using the format: "Subject 1: [Description]... Subject 2: [Description]...".
+    3. Do NOT merge distinct characters into a single description.
+    Output raw prompt text only.`,
     pose: `Analyze body pose. Describe pose, action, and angle in neutral terms. Output raw prompt text only.`,
     expression: `Analyze facial expression and emotion. Describe emotion, key features, and mood. Output raw prompt text only.`,
     scene: `Analyze environment and setting. Describe location, lighting, and atmosphere. Output raw prompt text only.`,
@@ -357,16 +362,17 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
             .map(([k, v]) => `${k.toUpperCase()}: ${v}`)
             .join('\n');
 
-        // UPDATED: Elite system instruction for true optimization
+        // UPDATED: Elite system instruction for true optimization with Multi-Subject support
         const systemInstruction = `You are an elite Prompt Engineer for high-end generative AI (Midjourney v6, Flux, Stable Diffusion).
 Your task is to ASSEMBLE and OPTIMIZE a set of distinct visual modules into a single, high-performance master prompt.
 
 CRITICAL OPTIMIZATION RULES:
-1.  **DEDUPLICATION:** Aggressively identify and merge redundant details. (e.g. If 'Subject' says "wearing a red suit" and 'Outfit' says "red suit", mention it once).
-2.  **FLOW & COHESION:** Do not just concatenate strings. Rewrite the text so it flows naturally. Use a mix of natural language for the subject/action and comma-separated keywords for style/technical specs.
-3.  **LOGICAL ORDERING:** Structure the prompt logically: [Subject + Action] > [Outfit/Details] > [Environment/Scene] > [Lighting/Camera] > [Style/Aesthetics].
-4.  **ENHANCEMENT:** Polish the phrasing for maximum visual impact without altering the user's original intent.
-5.  **EXCLUSION:** Do NOT include any negative constraints (no "--no" parameters) in this text.
+1.  **MULTI-SUBJECT INTEGRITY:** Analyze the 'SUBJECT' module carefully. If it mentions multiple distinct entities (e.g., "Subject 1: A warrior... Subject 2: A mage..." or "Two women..."), you MUST ensure the final prompt describes BOTH of them clearly. Adjust grammar to plural (e.g., "Two women wearing..." instead of "A woman wearing...") and apply attributes (outfit, pose) logically to the group or specific individuals. DO NOT merge distinct characters into a single hybrid unless explicitly asked.
+2.  **DEDUPLICATION:** Aggressively identify and merge redundant details *only if they apply to the same entity*. (e.g. If 'Subject' says "wearing a red suit" and 'Outfit' says "red suit", mention it once).
+3.  **FLOW & COHESION:** Do not just concatenate strings. Rewrite the text so it flows naturally. Use a mix of natural language for the subject/action and comma-separated keywords for style/technical specs.
+4.  **LOGICAL ORDERING:** Structure the prompt logically: [Subject(s) + Action] > [Outfit/Details] > [Environment/Scene] > [Lighting/Camera] > [Style/Aesthetics].
+5.  **ENHANCEMENT:** Polish the phrasing for maximum visual impact without altering the user's original intent.
+6.  **EXCLUSION:** Do NOT include any negative constraints (no "--no" parameters) in this text.
 
 Output ONLY the final raw prompt string.`;
             
@@ -397,8 +403,9 @@ export const assembleOptimizedJson = async (fragments: Partial<Record<Extraction
 Your task is to CLEAN, OPTIMIZE, and REORDER a set of prompt modules into a final JSON object.
 
 CRITICAL INSTRUCTIONS:
-1.  **DEDUPLICATION:** Remove redundant info (e.g. if 'style' says "anime" and 'subject' says "anime girl", keep "anime" in style and just "girl" in subject).
-2.  **VISUAL ORDERING:** The output JSON keys MUST be ordered logically for human reading. You MUST output the JSON string with keys in this exact order if they exist:
+1.  **MULTI-SUBJECT HANDLING:** If the 'subject' module contains multiple distinct entities (e.g. "Two girls...", "Batman and Superman"), ensure the 'subject' field in the output JSON reflects this plurality clearly. Do not reduce them to a single singular entity.
+2.  **DEDUPLICATION:** Remove redundant info (e.g. if 'style' says "anime" and 'subject' says "anime girl", keep "anime" in style and just "girl" in subject).
+3.  **VISUAL ORDERING:** The output JSON keys MUST be ordered logically for human reading. You MUST output the JSON string with keys in this exact order if they exist:
     - 1st: 'subject'
     - 2nd: 'action' / 'pose'
     - 3rd: 'expression'
@@ -407,8 +414,8 @@ CRITICAL INSTRUCTIONS:
     - 6th: 'color'
     - 7th: 'composition'
     - Last: 'style'
-3.  **FORMAT:** Return only valid JSON.
-4.  **NEGATIVE PROMPT:** If provided, include a 'negative' key at the very end.`;
+4.  **FORMAT:** Return only valid JSON.
+5.  **NEGATIVE PROMPT:** If provided, include a 'negative' key at the very end.`;
 
         const response = await callApiThrottled(ai => ai.models.generateContent({
             model: 'gemini-2.5-flash',

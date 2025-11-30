@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode, AppView } from '../types';
 import { 
@@ -659,6 +660,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     id: Date.now().toString(),
                     type: 'structured',
                     prompt: finalPrompt,
+                    negativePrompt: negativePrompt || undefined,
                     coverImage: coverImageDataUrl,
                     ...metadata
                 };
