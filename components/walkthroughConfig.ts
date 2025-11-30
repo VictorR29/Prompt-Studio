@@ -34,6 +34,13 @@ export const walkthroughSteps: WalkthroughStep[] = [
     placement: 'bottom',
   },
   {
+    targetSelector: '[data-tour-id="nav-fusion"]',
+    title: 'Laboratorio de Fusión 🧪',
+    content: 'Experimenta con la "Alquimia Visual". Mezcla hasta 3 imágenes o conceptos de texto y deja que la IA sintetice un híbrido perfecto combinando su ADN visual.',
+    view: 'fusion',
+    placement: 'bottom',
+  },
+  {
     targetSelector: '[data-tour-id="nav-editor"]',
     title: 'El Editor Hub',
     content: 'Este es tu panel de control principal. Aquí es donde la magia ocurre. Vamos a explorar las diferentes formas de empezar.',

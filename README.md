@@ -1,81 +1,67 @@
-# Prompt Studio 🎨: Ingeniería de Prompts de Nueva Generación
 
-**Prompt Studio** es una suite avanzada para la **Ingeniería de Prompts** en la generación de imágenes con IA. Potenciada por **Google Gemini 2.5**, esta aplicación no solo organiza tus ideas, sino que actúa como un **Director Creativo**, expandiendo conceptos vagos en instrucciones técnicas precisas.
+# Prompt Studio 🎨: Suite Profesional de Ingeniería de Prompts
 
-Esta aplicación web está construida con **React, Vite y Tailwind CSS**, utilizando la última tecnología multimodal de Google.
+**Prompt Studio** es la herramienta definitiva para creadores de IA generativa (Midjourney, Stable Diffusion, Flux, DALL-E). No es solo un editor; es un **Director Creativo Asistido por IA** que te ayuda a construir, refinar, fusionar y organizar prompts complejos con precisión quirúrgica.
 
----
-
-## 🌟 Novedad Principal: El Refinador IA (Playground)
-
-El **Refinador IA** transforma la ingeniería de prompts en una conversación fluida. Ya no necesitas editar texto manualmente; simplemente chatea con la IA.
-
-![Concepto del Refinador IA](assets/editor-nuevo.png)
-
-*   **Rol de Experto:** La IA no transcribe; **interpreta**. Si pides *"hazlo estilo cartoon"*, el sistema generará automáticamente: *"vibrant cartoon style, cel shaded, bold outlines, 2D animation aesthetic"*.
-*   **Edición en Tiempo Real:** Cada mensaje actualiza instantáneamente uno de los 9 módulos estructurales (Sujeto, Estilo, Pose, etc.).
-*   **Ensamblaje Síncrono:** El prompt maestro se recalcula en tiempo real. Al pulsar "Copiar", obtienes el resultado final instantáneamente, sin esperas ni errores de permisos.
-*   **Modo Móvil Optimizado:** Una interfaz de pestañas inteligente que separa el chat de la visualización del estado del prompt para una experiencia perfecta en pantallas pequeñas.
+Potenciada por **Google Gemini 2.5**, esta aplicación ofrece un flujo de trabajo modular y multimodal único.
 
 ---
 
-## 🚀 El Editor Modular
+## 🌟 Funcionalidades Principales
 
-El corazón de la aplicación sigue siendo su capacidad para descomponer cualquier idea en **9 módulos editables**:
+### 1. 🧬 Laboratorio de Fusión (Nuevo)
+Experimenta con la **"Alquimia Visual"**.
+*   **Mezcla de Conceptos:** Sube hasta 3 imágenes o selecciona fragmentos de texto de tu galería.
+*   **Síntesis Inteligente:** La IA analiza el "ADN visual" de cada referencia y genera un nuevo fragmento híbrido que combina lo mejor de cada fuente.
+*   **Control del Usuario:** Añade instrucciones específicas (ej: "Conserva la luz de la imagen A pero usa la ropa de la imagen B") para guiar la fusión.
 
-1.  **Sujeto** (Subject)
-2.  **Pose** (Pose)
-3.  **Expresión** (Expression)
-4.  **Vestimenta** (Outfit)
-5.  **Objeto** (Object)
-6.  **Escena** (Scene)
-7.  **Color** (Color)
-8.  **Composición** (Composition)
-9.  **Estilo** (Style)
+### 2. ✨ Refinador IA (Playground)
+Transforma la edición de prompts en una conversación fluida.
+*   **Chat en Tiempo Real:** Habla con la IA ("hazlo más oscuro", "cambia el estilo a cyberpunk") y observa cómo se actualizan los módulos al instante.
+*   **Rol de Experto:** La IA actúa como un Ingeniero de Prompts Senior, expandiendo términos vagos en descripciones técnicas ricas en inglés.
+*   **Feedback Visual:** Los módulos modificados se iluminan para que sepas exactamente qué ha cambiado.
 
-### Flujos de Trabajo:
-*   **Empezar en Blanco:** Construye desde cero módulo a módulo.
-*   **Ingeniería Inversa (Extractor):** Sube imágenes a cualquier módulo y deja que la visión multimodal de Gemini extraiga la descripción técnica.
-*   **Estructurador IA:** Describe una idea vaga (ej: "un astronauta perdido") y la IA generará una estructura JSON completa inicial.
-*   **Importación de Texto/JSON:** Pega prompts existentes y el sistema los modularizará automáticamente.
+### 3. 🚀 Editor Modular Avanzado
+Descompón cualquier idea en **9 módulos estructurales** más un **Módulo Negativo**:
+*   *Sujeto, Pose, Expresión, Outfit, Objeto, Escena, Color, Composición, Estilo.*
+*   **Prompt Negativo Opcional:** Define qué evitar (ej: "borroso", "deforme") y guárdalo junto con tu prompt.
+*   **Ensamblaje Optimizado:** Al generar el prompt final, la IA limpia redundancias, mejora la gramática y ordena lógicamente los elementos.
 
----
+### 4. ☀️ Extractor Multimodal
+Ingeniería inversa de imágenes.
+*   Sube imágenes de referencia y extrae características aisladas (ej: solo la pose, solo la paleta de colores o solo el estilo artístico) para usarlas en tus propias creaciones.
 
-## 🧠 Lógica Maestra de Ensamblaje
-
-Prompt Studio utiliza un sistema jerárquico estricto para generar el prompt final:
-
-1.  **Prioridad de Estilo:** El módulo de "Estilo" dicta la estética global, sobrescribiendo descripciones conflictivas en otros módulos.
-2.  **Fusión Inteligente:** Si el módulo de "Color" define una paleta, esta se aplica semánticamente a la ropa y el entorno, en lugar de simplemente pegar las palabras clave al final.
-3.  **Sin Conflictos:** El sistema limpia redundancias antes de generar la salida final para maximizar la calidad en modelos como Midjourney, Stable Diffusion o DALL-E 3.
-
----
-
-## 💾 Gestión de Datos y Portabilidad
-
-Dado que Prompt Studio funciona completamente en el navegador para maximizar la privacidad, hemos incluido herramientas profesionales de gestión de datos en el menú de **Configuración**:
-
-*   **Exportar Galería:** Genera una copia de seguridad completa de todos tus prompts y configuraciones en un archivo JSON portable.
-*   **Importar Galería:** Restaura tus copias de seguridad en cualquier dispositivo o navegador. El sistema detecta duplicados automáticamente para fusionar librerías de forma segura.
+### 5. 📚 Galería y Gestión de Activos
+*   **Sistema de Fragmentos:** Guarda partes de prompts (ej: "Iluminación Cinematográfica") para reutilizarlas en el futuro.
+*   **Búsqueda y Filtrado:** Encuentra rápidamente tus prompts híbridos, estilos o sujetos.
+*   **Portabilidad:** Exporta toda tu galería a un archivo JSON para copias de seguridad o para compartirla entre dispositivos.
 
 ---
 
-## 🛡️ Privacidad y Seguridad
+## 🧠 Lógica de Optimización "Elite"
 
-*   **API Key Local:** Tu clave de API se almacena exclusivamente en el `localStorage` de tu navegador. Nunca se envía a servidores intermedios.
-*   **Facturación Directa:** Al usar tu propia clave, tienes control total sobre tus cuotas y facturación directamente con Google Cloud Platform.
+Prompt Studio no se limita a concatenar texto. Utiliza algoritmos de IA para:
+1.  **Deduplicación:** Elimina repeticiones (ej: si el Sujeto dice "traje rojo" y el Outfit dice "traje rojo", lo fusiona).
+2.  **Orden Lógico (JSON):** Al generar salidas JSON, fuerza un orden visual humano (Sujeto primero -> Estilo al final).
+3.  **Preservación de Detalles:** Al adaptar fragmentos, respeta los términos técnicos y artísticos originales.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
 *   **Frontend:** React 19, TypeScript, Vite.
-*   **Estilos:** Tailwind CSS con diseño "Glassmorphism".
-*   **IA:** Google Gemini API (`gemini-2.5-flash` para texto/lógica, `gemini-2.5-flash-image` para visión).
-*   **Iconos:** Componentes SVG personalizados optimizados.
+*   **Estilos:** Tailwind CSS con diseño "Glassmorphism" y soporte móvil nativo (PWA-ready).
+*   **IA:** Google Gemini API (`gemini-2.5-flash` para lógica/texto, `gemini-2.5-flash-image` para visión).
+*   **Almacenamiento:** LocalStorage (Client-Side) para máxima privacidad.
+
+---
+
+### 🛡️ Privacidad
+
+Tu API Key y tus prompts se almacenan **localmente en tu navegador**. La aplicación conecta directamente con la API de Google, sin servidores intermedios que lean tus datos.
 
 ---
 
 ### 📄 Licencia
 
-Este proyecto es de código abierto bajo la Licencia MIT. ¡Siéntete libre de hacer fork y contribuir!
+Este proyecto es de código abierto bajo la Licencia MIT.
