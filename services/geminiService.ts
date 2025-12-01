@@ -22,6 +22,7 @@ export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: stri
     };
 
     const textPrompt = `Generate metadata for this ${mode} prompt: "${prompt}". 
+    Return JSON.
     REQUIREMENTS:
     1. Title: Concise and evocative (2-5 words) in English.
     2. Category: Broad style/theme (e.g., Sci-Fi, Portrait) in English.
@@ -31,7 +32,7 @@ export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: stri
        - Identify Key Elements: Extract essential descriptors (aesthetics, technique, lighting, shading).
        - Grouping: Group elements into themes (style, line, color/lighting, composition).
        - Synthesis: Write a single concise paragraph in Spanish using connecting phrases like "Caracterizado por," "Utiliza," "Presenta," and "Se enfoca en".
-       - Translate technical terms to Spanish where appropriate but keep standard art terms precise (e.g., "cel-shading", "lineart").
+       - Terminology: Translate general descriptions to Spanish but keep specific technical art terms precise (e.g., "cel-shading", "lineart", "bokeh").
        - Goal: A technical executive summary of the visual requirements.`;
 
     const parts: Part[] = [];
@@ -209,13 +210,15 @@ export const generateStructuredPromptMetadata = async (prompt: string, image?: {
         parts.push({ inlineData: { mimeType: image.mimeType, data: image.imageBase64 } });
     }
     parts.push({ text: `Generate metadata for this structured JSON prompt: ${prompt}.
-    Return JSON with keys: title, category, notes.
+    Return JSON.
     REQUIREMENTS:
     1. Title: Concise and evocative (2-5 words) in English.
     2. Category: Broad style/theme (e.g., Sci-Fi, Portrait) in English.
     3. Notes: A detailed technical analysis of the visual style in SPANISH.
+       Follow this logic:
        - Identify Key Elements: Extract essential descriptors.
        - Synthesis: Write a single concise paragraph in Spanish using connecting phrases like "Caracterizado por," "Utiliza," "Presenta,".
+       - Terminology: Translate but keep technical terms precise.
        - Goal: A technical executive summary of the visual requirements.` });
     
     const response = await ai.models.generateContent({
@@ -252,12 +255,22 @@ export const adaptFragmentToContext = async (targetModule: ExtractionMode, sourc
 
 export const generateStructuredPrompt = async (input: { idea: string; style?: string }) => {
     const ai = getAiClient();
+    
+    const parts: Part[] = [{ text: `User Idea: "${input.idea}"${input.style ? `\nDesired Style: "${input.style}"` : ''}` }];
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Create a detailed image prompt for this idea: "${input.idea}"${input.style ? ` in style: "${input.style}"` : ''}.
-        Write it as a single, rich descriptive paragraph suitable for image generation.
-        Do NOT return JSON. Do NOT use markdown. Just the prompt text.`,
+        contents: [{ role: 'user', parts }],
         config: {
+            systemInstruction: `You are an expert AI Prompt Engineer.
+            Task: Transform the user's idea into a single, high-quality, detailed image generation prompt (midjourney/stable diffusion style).
+            Output Rules:
+            1. Return ONLY the raw prompt text.
+            2. Do NOT use Markdown formatting (no bold, no italics, no code blocks).
+            3. Do NOT include JSON.
+            4. Do NOT include conversational filler ("Here is the prompt...").
+            5. Focus on visual descriptions, lighting, texture, and composition.
+            6. If the user input is partial or incomplete, reasonably infer the missing details to create a complete visual concept.`,
             safetySettings: [
                 { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
                 { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
@@ -267,28 +280,35 @@ export const generateStructuredPrompt = async (input: { idea: string; style?: st
         }
     });
     
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text;
+    
     if (!text) {
         if (response.candidates?.[0]?.finishReason === 'SAFETY') {
             throw new Error("La generación fue bloqueada por filtros de seguridad.");
         }
-        throw new Error("La IA no generó ningún texto.");
+        throw new Error("La IA no generó ningún texto. Intenta reformular tu idea.");
     }
-    return text;
+    return text.trim();
 };
 
 export const generateStructuredPromptFromImage = async (images: {imageBase64: string, mimeType: string}[], style: string) => {
     const ai = getAiClient();
     const parts: Part[] = [];
     images.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.imageBase64 } }));
-    parts.push({ text: `Analyze these images and generate a detailed image generation prompt based on them${style ? `, incorporating this style: ${style}` : ''}.
-    Write it as a single, rich descriptive paragraph.
-    Do NOT return JSON. Do NOT use markdown. Just the prompt text.` });
+    parts.push({ text: `Analyze these images and generate a detailed image generation prompt based on them${style ? `, incorporating this style: ${style}` : ''}.` });
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts },
+        contents: [{ role: 'user', parts }],
         config: {
+            systemInstruction: `You are an expert AI Prompt Engineer.
+            Task: Analyze the visual elements of the provided images and generate a single, high-quality image prompt that captures their essence.
+            Output Rules:
+            1. Return ONLY the raw prompt text.
+            2. Do NOT use Markdown formatting.
+            3. Do NOT include JSON.
+            4. Do NOT include conversational filler.
+            5. Focus on visual descriptions, lighting, texture, and composition.`,
             safetySettings: [
                 { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
                 { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
@@ -298,14 +318,14 @@ export const generateStructuredPromptFromImage = async (images: {imageBase64: st
         }
     });
     
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
         if (response.candidates?.[0]?.finishReason === 'SAFETY') {
             throw new Error("La generación fue bloqueada por filtros de seguridad.");
         }
-        throw new Error("La IA no generó ningún texto.");
+        throw new Error("La IA no generó ningún texto con las imágenes provistas.");
     }
-    return text;
+    return text.trim();
 };
 
 export const generateMasterPromptMetadata = async (prompt: string, images?: {imageBase64: string, mimeType: string}[]) => {
