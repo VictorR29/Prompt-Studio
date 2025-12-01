@@ -262,26 +262,102 @@ export const adaptFragmentToContext = async (targetMode: ExtractionMode, fragmen
 
 export const generateStructuredPrompt = async (params: {idea: string, style?: string}) => {
     const ai = getAiClient();
-    const prompt = `Create a detailed image prompt structure based on: Idea: "${params.idea}", Style: "${params.style || 'Any'}". Return a JSON with keys for subject, scene, style, lighting, etc.`;
-     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { responseMimeType: "application/json" } 
-    });
-    return response.text || "{}";
+    const systemInstruction = `Act as an Image Description Generator.
+    Task: Write a highly detailed, continuous text paragraph describing an image based on the user's idea.
+    
+    REQUIREMENTS:
+    1. Write a RAW TEXT DESCRIPTION.
+    2. Do NOT use JSON formatting.
+    3. Do NOT use headers, labels, or markdown (no "Subject:", no bold).
+    4. Include vivid details for Subject, Pose, Outfit, Scene, and Lighting.
+    5. Return ONLY the description text.`;
+
+    const userPrompt = `Idea: "${params.idea}". Style Preference: "${params.style || 'Photorealistic/Cinematic'}".`;
+
+     try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [{ text: userPrompt }] },
+            config: {
+                systemInstruction: systemInstruction,
+                safetySettings: [
+                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+                ]
+            }
+        });
+        
+        if (response.candidates && response.candidates.length > 0) {
+             const candidate = response.candidates[0];
+             if (candidate.finishReason === 'SAFETY') {
+                 throw new Error("La generación fue bloqueada por filtros de seguridad. Intenta reformular tu idea.");
+             }
+             if (!response.text && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                 return candidate.content.parts[0].text || "";
+             }
+        }
+
+        return response.text || "";
+     } catch (e: any) {
+         console.error("Structure generation failed", e);
+         if (e.response && e.response.candidates && e.response.candidates[0].finishReason === 'SAFETY') {
+             throw new Error("La generación fue bloqueada por filtros de seguridad. Intenta reformular tu idea.");
+         }
+         throw e;
+     }
 };
 
 export const generateStructuredPromptFromImage = async (images: {imageBase64: string, mimeType: string}[], style?: string) => {
     const ai = getAiClient();
-    const parts: any[] = images.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.imageBase64 } }));
-    parts.push({ text: `Analyze this image and generate a structured JSON prompt description. Style guidance: ${style || 'Match image style'}.` });
     
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts },
-        config: { responseMimeType: "application/json" }
-    });
-    return response.text || "{}";
+    const systemInstruction = `Act as an Image Description Generator.
+    Task: Analyze the reference image(s) and write a highly detailed text description to recreate it.
+    
+    REQUIREMENTS:
+    1. Write a RAW TEXT DESCRIPTION.
+    2. Do NOT use JSON formatting.
+    3. Do NOT use headers or labels.
+    4. Describe all visual elements (Subject, Pose, Outfit, Scene, Lighting) in one continuous block.
+    5. Return ONLY the description text.`;
+
+    const parts: any[] = images.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.imageBase64 } }));
+    parts.push({ text: `Style Guidance: "${style || 'Faithful to original'}". Describe the image in detail.` });
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts },
+            config: {
+                systemInstruction: systemInstruction,
+                safetySettings: [
+                    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+                    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+                    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+                    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+                ]
+            }
+        });
+
+        if (response.candidates && response.candidates.length > 0) {
+             const candidate = response.candidates[0];
+             if (candidate.finishReason === 'SAFETY') {
+                 throw new Error("La generación fue bloqueada por filtros de seguridad. Intenta con otra imagen.");
+             }
+             if (!response.text && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                 return candidate.content.parts[0].text || "";
+             }
+        }
+
+        return response.text || "";
+    } catch (e: any) {
+        console.error("Structure generation from image failed", e);
+        if (e.response && e.response.candidates && e.response.candidates[0].finishReason === 'SAFETY') {
+             throw new Error("La generación fue bloqueada por filtros de seguridad. Intenta con otra imagen.");
+        }
+        throw e;
+    }
 };
 
 export const generateImageFromPrompt = async (prompt: string) => {

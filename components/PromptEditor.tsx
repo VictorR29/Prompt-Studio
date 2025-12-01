@@ -280,19 +280,23 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setGlobalLoader({ active: true, message: 'Generando prompt estructurado...' });
 
         try {
-            let resultJson: string;
+            let resultText: string;
             if (structurerImages.length > 0) {
                  const imagePayloads = structurerImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
-                 resultJson = await generateStructuredPromptFromImage(imagePayloads, structurerStyle || structurerIdea);
+                 resultText = await generateStructuredPromptFromImage(imagePayloads, structurerStyle || structurerIdea);
             } else {
                 if (!structurerIdea.trim()) {
                     throw new Error('La idea principal es necesaria.');
                 }
-                resultJson = await generateStructuredPrompt({ idea: structurerIdea, style: structurerStyle });
+                resultText = await generateStructuredPrompt({ idea: structurerIdea, style: structurerStyle });
             }
             
+            if (!resultText) {
+                throw new Error("La IA no generó ningún texto.");
+            }
+
             setGlobalLoader({ active: true, message: 'Estructura creada. Modularizando...' });
-            await handleLoadPromptFromUI(resultJson);
+            await handleLoadPromptFromUI(resultText);
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
