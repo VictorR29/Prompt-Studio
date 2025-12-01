@@ -7,6 +7,33 @@ const getAiClient = () => {
     return new GoogleGenAI({ apiKey });
 };
 
+// Helper to translate and format safety errors
+const SAFETY_CATEGORY_MAP: Record<string, string> = {
+    'HARM_CATEGORY_HARASSMENT': 'Acoso',
+    'HARM_CATEGORY_HATE_SPEECH': 'Discurso de Odio',
+    'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'Contenido Sexualmente Explícito',
+    'HARM_CATEGORY_DANGEROUS_CONTENT': 'Contenido Peligroso/Dañino',
+    'HARM_CATEGORY_CIVIC_INTEGRITY': 'Integridad Cívica'
+};
+
+const formatSafetyError = (candidate: any): string => {
+    if (!candidate.safetyRatings) return "Contenido bloqueado por seguridad.";
+    
+    const blockedReasons = candidate.safetyRatings
+        .filter((r: any) => r.probability === 'HIGH' || r.probability === 'MEDIUM')
+        .map((r: any) => {
+            const cat = SAFETY_CATEGORY_MAP[r.category] || r.category;
+            const prob = r.probability === 'HIGH' ? 'Alta' : 'Media';
+            return `${cat} (${prob})`;
+        });
+
+    if (blockedReasons.length > 0) {
+        return `Generación bloqueada. Se detectó posible: ${blockedReasons.join(', ')}. Por favor reformula tu entrada.`;
+    }
+    
+    return "El contenido fue marcado como inseguro por los filtros de IA.";
+};
+
 export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: string, images?: {imageBase64: string, mimeType: string}[]) => {
     const ai = getAiClient();
     
@@ -22,7 +49,6 @@ export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: stri
     };
 
     const textPrompt = `Generate metadata for this ${mode} prompt: "${prompt}". 
-    Return JSON.
     REQUIREMENTS:
     1. Title: Concise and evocative (2-5 words) in English.
     2. Category: Broad style/theme (e.g., Sci-Fi, Portrait) in English.
@@ -81,6 +107,16 @@ export const analyzeImageFeature = async (mode: ExtractionMode, images: {imageBa
         contents: { parts }
     });
 
+    // Check for safety blocks even if text is returned (sometimes partial)
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        const warning = formatSafetyError(response.candidates[0]);
+        // If we have some text, return it with a warning. If no text, block.
+        if (!response.text) {
+            throw new Error(warning);
+        }
+        return { result: response.text, warning: `Advertencia: ${warning}` };
+    }
+
     return { result: response.text || "", warning: undefined };
 };
 
@@ -130,6 +166,11 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
             }
         }
     });
+    
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error(formatSafetyError(response.candidates[0]));
+    }
+
     return JSON.parse(response.text || "{}");
 };
 
@@ -152,6 +193,11 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
         4. FLOW: Merge into a single continuous paragraph.
         5. OUTPUT FORMAT: SINGLE CONTINUOUS BLOCK. No intro, no markdown, no newlines.`,
     });
+    
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error(formatSafetyError(response.candidates[0]));
+    }
+    
     return response.text || "";
 };
 
@@ -284,7 +330,7 @@ export const generateStructuredPrompt = async (input: { idea: string; style?: st
     
     if (!text) {
         if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-            throw new Error("La generación fue bloqueada por filtros de seguridad.");
+            throw new Error(formatSafetyError(response.candidates[0]));
         }
         throw new Error("La IA no generó ningún texto. Intenta reformular tu idea.");
     }
@@ -321,7 +367,7 @@ export const generateStructuredPromptFromImage = async (images: {imageBase64: st
     const text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
         if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-            throw new Error("La generación fue bloqueada por filtros de seguridad.");
+            throw new Error(formatSafetyError(response.candidates[0]));
         }
         throw new Error("La IA no generó ningún texto con las imágenes provistas.");
     }
@@ -413,6 +459,10 @@ export const getCreativeAssistantResponse = async (history: {role: string, parts
         }
     });
     
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error(formatSafetyError(response.candidates[0]));
+    }
+
     return response.text || "";
 };
 
@@ -457,7 +507,7 @@ export const generateHybridFragment = async (targetModule: ExtractionMode, paylo
     const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
          if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-            throw new Error("Contenido bloqueado por seguridad.");
+            throw new Error(formatSafetyError(response.candidates[0]));
         }
         // Fallback for weird API responses
         if (response.text) return response.text;
