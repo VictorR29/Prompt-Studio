@@ -8,6 +8,7 @@ import { CloseIcon } from './icons/CloseIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { JsonEditor } from './JsonEditor';
 import { BanIcon } from './icons/BanIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
 
 interface PromptModalProps {
   promptData: SavedPrompt;
@@ -106,10 +107,13 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
             </div>
           
             <div className="flex-grow overflow-y-auto pr-2 -mr-4 space-y-6 custom-scrollbar">
-                <div>
-                    <h4 className="font-bold text-teal-300 mb-1 text-sm uppercase tracking-wider">Notas</h4>
-                    <p className="text-gray-300 italic text-sm">"{promptData.notes}"</p>
+                <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+                    <h4 className="font-bold text-teal-300 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
+                        <SparklesIcon className="w-3 h-3" /> Descripción Visual
+                    </h4>
+                    <p className="text-gray-300 text-sm leading-relaxed">{promptData.notes}</p>
                 </div>
+
                 <div>
                     <h4 className="font-bold text-teal-300 mb-2 text-sm uppercase tracking-wider">Prompt Completo</h4>
                      <div className="bg-gray-800 rounded-lg p-3 ring-1 ring-gray-700">
