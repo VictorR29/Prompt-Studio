@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SavedPrompt } from '../types';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { CheckIcon } from './icons/CheckIcon';
@@ -9,6 +8,10 @@ import { PencilIcon } from './icons/PencilIcon';
 import { JsonEditor } from './JsonEditor';
 import { BanIcon } from './icons/BanIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { ShareIcon } from './icons/ShareIcon';
+import { ShareCard } from './ShareCard';
+import { toBlob } from 'html-to-image';
+import { Loader } from './Loader';
 
 interface PromptModalProps {
   promptData: SavedPrompt;
@@ -19,6 +22,8 @@ interface PromptModalProps {
 
 export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, onDelete, onEdit }) => {
   const [copied, setCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -29,16 +34,72 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // The window.confirm dialog was likely being blocked, preventing the action.
-    // Removing it to ensure functionality. A custom confirmation could be a future enhancement.
     onDelete(promptData.id);
-    onClose(); // Close the modal after deletion
+    onClose(); 
   };
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     onEdit(promptData);
     onClose();
+  };
+  
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSharing || !shareCardRef.current) return;
+
+    setIsSharing(true);
+
+    try {
+        // Wait a small tick to ensure font rendering consistency if needed
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const blob = await toBlob(shareCardRef.current, {
+            cacheBust: true,
+            pixelRatio: 1, // Standard ratio for the large canvas size we set
+            backgroundColor: '#0A0814'
+        });
+
+        if (!blob) throw new Error("Error generating image");
+
+        const file = new File([blob], `prompt-studio-${promptData.id}.png`, { type: 'image/png' });
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: promptData.title,
+                    text: `Mira este prompt creado en Prompt Studio: ${promptData.title}`,
+                });
+            } catch (shareError) {
+                if ((shareError as Error).name !== 'AbortError') {
+                    console.error("Share failed", shareError);
+                    // Fallback to download if share fails (but not if user cancelled)
+                    downloadImage(blob, promptData.title);
+                }
+            }
+        } else {
+            // Fallback for desktop or unsupported browsers
+            downloadImage(blob, promptData.title);
+        }
+
+    } catch (err) {
+        console.error("Failed to generate share card", err);
+        alert("No se pudo generar la imagen para compartir.");
+    } finally {
+        setIsSharing(false);
+    }
+  };
+
+  const downloadImage = (blob: Blob, title: string) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `prompt-studio-${title.replace(/\s+/g, '-').toLowerCase()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
   };
   
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
@@ -64,6 +125,11 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
         aria-modal="true"
         aria-labelledby="prompt-modal-title"
     >
+      {/* Hidden container for the ShareCard generation */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+          <ShareCard ref={shareCardRef} promptData={promptData} />
+      </div>
+
       <div 
         className="glass-pane rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
@@ -150,19 +216,31 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                     <PencilIcon className="w-5 h-5" />
                     <span>Cargar y Editar</span>
                 </button>
+                
                 <button
-                onClick={handleCopy}
-                className="p-2.5 rounded-lg bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-teal-500 transition-colors"
-                aria-label="Copiar prompt"
+                    onClick={handleShare}
+                    disabled={isSharing}
+                    className="p-2.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 transition-colors disabled:opacity-50"
+                    aria-label="Compartir Prompt"
+                    title="Compartir Ficha"
                 >
-                {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
+                    {isSharing ? <Loader /> : <ShareIcon className="w-5 h-5" />}
                 </button>
+
                 <button
-                onClick={handleDelete}
-                className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-500 transition-colors"
-                aria-label="Eliminar prompt"
+                    onClick={handleCopy}
+                    className="p-2.5 rounded-lg bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-teal-500 transition-colors"
+                    aria-label="Copiar prompt"
                 >
-                <TrashIcon className="w-5 h-5" />
+                    {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
+                </button>
+                
+                <button
+                    onClick={handleDelete}
+                    className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-500 transition-colors"
+                    aria-label="Eliminar prompt"
+                >
+                    <TrashIcon className="w-5 h-5" />
                 </button>
             </div>
         </div>
