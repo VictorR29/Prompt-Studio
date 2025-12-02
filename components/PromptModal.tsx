@@ -76,12 +76,12 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
     setIsSharing(true);
 
     try {
-        // Wait a small tick to ensure font rendering consistency if needed
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait a longer tick to ensure font rendering and layout stability
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         const blob = await toBlob(shareCardRef.current, {
             cacheBust: true,
-            pixelRatio: 2, // High resolution for sharper QR codes
+            pixelRatio: 3, // Ultra-High resolution for sharp QR dots
             backgroundColor: '#0A0814',
             // Disable automatic font embedding to prevent CORS errors with Google Fonts
             fontEmbedCSS: '', 

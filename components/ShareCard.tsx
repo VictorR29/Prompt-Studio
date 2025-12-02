@@ -84,15 +84,19 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                  </div>
 
                  {/* QR Container: Massive, High Contrast, No shadows near code */}
-                 <div className="bg-white p-4">
+                 {/* p-8 provides a large quiet zone. shape-rendering: crispEdges prevents anti-aliasing blur. */}
+                 <div className="bg-white p-8 rounded-xl">
                     {shareUrl && (
-                        <QRCode 
-                            value={shareUrl} 
-                            size={400}
-                            level="L" 
-                            fgColor="#000000"
-                            bgColor="#FFFFFF"
-                        />
+                        <div style={{ width: '480px', height: '480px' }}>
+                            <QRCode 
+                                value={shareUrl} 
+                                size={480}
+                                level="L" 
+                                fgColor="#000000"
+                                bgColor="#FFFFFF"
+                                style={{ height: "auto", maxWidth: "100%", width: "100%", shapeRendering: "crispEdges" }}
+                            />
+                        </div>
                     )}
                  </div>
 
