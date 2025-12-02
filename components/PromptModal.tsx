@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SavedPrompt } from '../types';
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -49,16 +50,18 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
   // Generate the share URL whenever promptData changes
   useEffect(() => {
       // Create a lightweight payload for the QR code (exclude heavy cover image)
-      const payload = {
+      // Only include fields if they have value to reduce QR density
+      const payload: any = {
           p: promptData.prompt,
-          n: promptData.negativePrompt,
           t: promptData.type,
           ti: promptData.title,
           c: promptData.category,
           at: promptData.artType,
-          no: promptData.notes,
-          h: promptData.isHybrid
       };
+      
+      if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
+      if (promptData.notes) payload.no = promptData.notes;
+      if (promptData.isHybrid) payload.h = 1;
       
       const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
       const url = `${window.location.origin}?data=${compressed}`;

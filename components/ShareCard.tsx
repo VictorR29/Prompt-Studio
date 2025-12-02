@@ -88,7 +88,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                         <QRCode 
                             value={shareUrl} 
                             size={320}
-                            level="M"
+                            level="L" 
                             fgColor="#111827"
                             bgColor="#FFFFFF"
                         />
