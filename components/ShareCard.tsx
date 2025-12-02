@@ -75,7 +75,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
              <div className="absolute left-0 top-0 bottom-0 border-l-[6px] border-dashed border-gray-300"></div>
              <div className="absolute left-[-12px] top-1/2 -translate-y-1/2 w-6 h-12 bg-[#0A0814] rounded-r-full"></div>
 
-             <div className="w-[70%] flex flex-col items-center text-center space-y-8">
+             <div className="w-[80%] flex flex-col items-center text-center space-y-8">
                  <div>
                      <p className="text-2xl font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Compartir Prompt</p>
                      <h2 className="text-5xl font-black text-gray-900 leading-tight">
@@ -83,13 +83,14 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                      </h2>
                  </div>
 
-                 <div className="bg-white p-6 rounded-[2.5rem] border-[6px] border-gray-900 shadow-2xl">
+                 {/* QR Container: Massive, High Contrast, No shadows near code */}
+                 <div className="bg-white p-4">
                     {shareUrl && (
                         <QRCode 
                             value={shareUrl} 
-                            size={320}
+                            size={400}
                             level="L" 
-                            fgColor="#111827"
+                            fgColor="#000000"
                             bgColor="#FFFFFF"
                         />
                     )}

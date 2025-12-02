@@ -54,13 +54,14 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
       const payload: any = {
           p: promptData.prompt,
           t: promptData.type,
-          ti: promptData.title,
+          // Truncate title slightly to save bytes in QR
+          ti: promptData.title.substring(0, 50),
           c: promptData.category,
           at: promptData.artType,
       };
       
       if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
-      if (promptData.notes) payload.no = promptData.notes;
+      if (promptData.notes) payload.no = promptData.notes.substring(0, 100); // Truncate notes
       if (promptData.isHybrid) payload.h = 1;
       
       const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
@@ -80,7 +81,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
 
         const blob = await toBlob(shareCardRef.current, {
             cacheBust: true,
-            pixelRatio: 1, // Standard ratio for the large canvas size we set
+            pixelRatio: 2, // High resolution for sharper QR codes
             backgroundColor: '#0A0814',
             // Disable automatic font embedding to prevent CORS errors with Google Fonts
             fontEmbedCSS: '', 
