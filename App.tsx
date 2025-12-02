@@ -62,12 +62,20 @@ const App: React.FC = () => {
   const [isApiKeySet, setIsApiKeySet] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [promptForPlayground, setPromptForPlayground] = useState<SavedPrompt | null>(null);
+  
+  // New state to hold a shared prompt if the user hasn't set up their key yet
+  const [pendingSharedPrompt, setPendingSharedPrompt] = useState<SavedPrompt | null>(null);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
     extractionMode === 'subject' ? 3 :
     1;
     
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    const id = Date.now();
+    setToasts(prevToasts => [...prevToasts, { id, message, type }]);
+  }, []);
+
   // Handle Loading Data from URL (Shared Prompts)
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -79,7 +87,6 @@ const App: React.FC = () => {
               if (json) {
                   const payload = JSON.parse(json);
                   // Reconstruct SavedPrompt object
-                  // Note: Images are excluded from share to save space, so we use placeholders or null
                   const loadedPrompt: SavedPrompt = {
                       id: `shared-${Date.now()}`,
                       prompt: payload.p,
@@ -93,15 +100,24 @@ const App: React.FC = () => {
                       coverImage: '' // No cover image in shared link
                   };
                   
-                  setPromptForEditor(loadedPrompt);
-                  setView('editor');
+                  // Check if we have a key ready
+                  const userKey = localStorage.getItem('userGeminiKey');
+                  const envKey = process.env.API_KEY;
+
+                  if (userKey || envKey) {
+                      // Normal flow for existing users
+                      setPromptForEditor(loadedPrompt);
+                      setView('editor');
+                      setTimeout(() => {
+                          addToast('¡Prompt compartido cargado con éxito!', 'success');
+                      }, 1000);
+                  } else {
+                      // Conversion flow for new users: Store pending prompt
+                      setPendingSharedPrompt(loadedPrompt);
+                  }
+                  
                   // Clear URL to prevent re-reading on refresh
                   window.history.replaceState({}, document.title, window.location.pathname);
-                  
-                  // Use timeout to allow toast system to initialize
-                  setTimeout(() => {
-                      addToast('¡Prompt compartido cargado con éxito!', 'success');
-                  }, 1000);
               }
           } catch (e) {
               console.error("Failed to load shared data", e);
@@ -110,7 +126,7 @@ const App: React.FC = () => {
               }, 1000);
           }
       }
-  }, []);
+  }, []); // Intentionally empty dependency array to run only once
 
   useEffect(() => {
     const hasCompleted = localStorage.getItem('hasCompletedWalkthrough');
@@ -141,6 +157,15 @@ const App: React.FC = () => {
 
   const handleKeySaved = () => {
     setIsApiKeySet(true);
+    // If there was a pending shared prompt, load it now that we have a key
+    if (pendingSharedPrompt) {
+        setPromptForEditor(pendingSharedPrompt);
+        setView('editor');
+        setTimeout(() => {
+            addToast(`¡Prompt "${pendingSharedPrompt.title}" desbloqueado y cargado!`, 'success');
+            setPendingSharedPrompt(null);
+        }, 500);
+    }
   };
 
 
@@ -157,11 +182,6 @@ const App: React.FC = () => {
   const removeToast = (id: number) => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
-
-  const addToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
-    const id = Date.now();
-    setToasts(prevToasts => [...prevToasts, { id, message, type }]);
-  }, []);
 
   useEffect(() => {
     try {
@@ -342,7 +362,13 @@ const App: React.FC = () => {
   };
   
   if (!isApiKeySet) {
-    return <ApiKeySetup onKeySaved={handleKeySaved} addToast={addToast} />;
+    return (
+        <ApiKeySetup 
+            onKeySaved={handleKeySaved} 
+            addToast={addToast} 
+            pendingSharedPrompt={pendingSharedPrompt}
+        />
+    );
   }
 
   return (
