@@ -2,14 +2,16 @@ import React, { forwardRef } from 'react';
 import { SavedPrompt } from '../types';
 import { PROMPT_TYPE_CONFIG } from '../config';
 import { DNAIcon } from './icons/DNAIcon';
+import QRCode from 'react-qr-code';
 
 interface ShareCardProps {
   promptData: SavedPrompt;
+  shareUrl: string;
 }
 
 // Fixed dimensions for a "Story" or high-res mobile format
 // 1080px wide is standard for high quality social sharing
-export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptData }, ref) => {
+export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptData, shareUrl }, ref) => {
   const { className: typeBadgeClass, text: typeText } = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
   const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
 
@@ -63,7 +65,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
 
             {/* Metadata Section */}
             <div className="flex flex-col gap-2 mb-8">
-                <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 leading-tight">
+                <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 leading-tight line-clamp-2">
                     {promptData.title}
                 </h1>
                 <div className="flex items-center gap-4 text-2xl text-teal-400 font-medium">
@@ -95,16 +97,30 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                 )}
             </div>
 
-            {/* Footer */}
-            <div className="mt-8 flex justify-between items-end text-gray-500 font-mono text-sm">
-                <div>
+            {/* Footer with QR Code */}
+            <div className="mt-8 flex justify-between items-end h-32">
+                <div className="text-gray-500 font-mono text-sm self-end pb-2">
                     <p>ID: {promptData.id.slice(-8)}</p>
                     <p>{new Date().toLocaleDateString()}</p>
                 </div>
-                <div className="text-right">
-                    <p>Created with</p>
-                    <p className="text-teal-500 font-bold text-lg">Prompt Studio</p>
-                </div>
+                
+                {shareUrl && (
+                    <div className="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+                        <div className="text-right">
+                            <p className="text-white font-bold text-lg leading-none mb-1">SCAN TO EDIT</p>
+                            <p className="text-teal-400 text-xs font-mono uppercase tracking-wider">Load in App</p>
+                        </div>
+                        <div className="p-2 bg-white rounded-lg">
+                            <QRCode 
+                                value={shareUrl} 
+                                size={80} 
+                                level="L"
+                                fgColor="#000000"
+                                bgColor="#FFFFFF"
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -19,6 +18,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { createImageCollage } from './utils/imageUtils';
 import { Playground } from './components/Playground';
 import { FusionLab } from './components/FusionLab';
+import LZString from 'lz-string';
 
 interface ToastMessage {
   id: number;
@@ -68,6 +68,50 @@ const App: React.FC = () => {
     extractionMode === 'subject' ? 3 :
     1;
     
+  // Handle Loading Data from URL (Shared Prompts)
+  useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const data = params.get('data');
+      
+      if (data) {
+          try {
+              const json = LZString.decompressFromEncodedURIComponent(data);
+              if (json) {
+                  const payload = JSON.parse(json);
+                  // Reconstruct SavedPrompt object
+                  // Note: Images are excluded from share to save space, so we use placeholders or null
+                  const loadedPrompt: SavedPrompt = {
+                      id: `shared-${Date.now()}`,
+                      prompt: payload.p,
+                      negativePrompt: payload.n,
+                      type: payload.t,
+                      title: payload.ti || 'Shared Prompt',
+                      category: payload.c || 'Imported',
+                      artType: payload.at || 'Prompt',
+                      notes: payload.no || 'Imported via QR/Link',
+                      isHybrid: payload.h,
+                      coverImage: '' // No cover image in shared link
+                  };
+                  
+                  setPromptForEditor(loadedPrompt);
+                  setView('editor');
+                  // Clear URL to prevent re-reading on refresh
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                  
+                  // Use timeout to allow toast system to initialize
+                  setTimeout(() => {
+                      addToast('¡Prompt compartido cargado con éxito!', 'success');
+                  }, 1000);
+              }
+          } catch (e) {
+              console.error("Failed to load shared data", e);
+              setTimeout(() => {
+                  addToast('Error al cargar el prompt compartido.', 'error');
+              }, 1000);
+          }
+      }
+  }, []);
+
   useEffect(() => {
     const hasCompleted = localStorage.getItem('hasCompletedWalkthrough');
     if (!hasCompleted) {

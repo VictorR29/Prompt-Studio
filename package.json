@@ -16,7 +16,9 @@
     "@vitejs/plugin-react": "^5.1.0",
     "path": "^0.12.7",
     "url": "^0.11.4",
-    "html-to-image": "^1.11.11"
+    "html-to-image": "^1.11.11",
+    "lz-string": "^1.5.0",
+    "react-qr-code": "^2.0.12"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

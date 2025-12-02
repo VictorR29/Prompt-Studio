@@ -12,6 +12,7 @@ import { ShareIcon } from './icons/ShareIcon';
 import { ShareCard } from './ShareCard';
 import { toBlob } from 'html-to-image';
 import { Loader } from './Loader';
+import LZString from 'lz-string';
 
 interface PromptModalProps {
   promptData: SavedPrompt;
@@ -23,6 +24,7 @@ interface PromptModalProps {
 export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, onDelete, onEdit }) => {
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
   const shareCardRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -44,6 +46,25 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
     onClose();
   };
   
+  // Generate the share URL whenever promptData changes
+  useEffect(() => {
+      // Create a lightweight payload for the QR code (exclude heavy cover image)
+      const payload = {
+          p: promptData.prompt,
+          n: promptData.negativePrompt,
+          t: promptData.type,
+          ti: promptData.title,
+          c: promptData.category,
+          at: promptData.artType,
+          no: promptData.notes,
+          h: promptData.isHybrid
+      };
+      
+      const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+      const url = `${window.location.origin}?data=${compressed}`;
+      setShareUrl(url);
+  }, [promptData]);
+
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isSharing || !shareCardRef.current) return;
@@ -57,7 +78,9 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
         const blob = await toBlob(shareCardRef.current, {
             cacheBust: true,
             pixelRatio: 1, // Standard ratio for the large canvas size we set
-            backgroundColor: '#0A0814'
+            backgroundColor: '#0A0814',
+            // Disable automatic font embedding to prevent CORS errors with Google Fonts
+            fontEmbedCSS: '', 
         });
 
         if (!blob) throw new Error("Error generating image");
@@ -127,7 +150,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
     >
       {/* Hidden container for the ShareCard generation */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-          <ShareCard ref={shareCardRef} promptData={promptData} />
+          {shareUrl && <ShareCard ref={shareCardRef} promptData={promptData} shareUrl={shareUrl} />}
       </div>
 
       <div 
