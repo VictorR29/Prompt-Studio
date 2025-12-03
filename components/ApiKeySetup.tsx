@@ -11,15 +11,24 @@ interface ApiKeySetupProps {
 
 export const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onKeySaved, addToast, pendingSharedPrompt }) => {
   const [apiKey, setApiKey] = useState('');
+  const [username, setUsername] = useState('');
 
   const handleSave = () => {
     if (!apiKey.trim()) {
       addToast('Por favor, ingresa una API Key válida.', 'error');
       return;
     }
+    
     localStorage.setItem('userGeminiKey', apiKey.trim());
+    
+    if (username.trim()) {
+        localStorage.setItem('promptStudioUsername', username.trim());
+    } else {
+        localStorage.setItem('promptStudioUsername', 'Anon');
+    }
+
     if (!pendingSharedPrompt) {
-        addToast('¡API Key guardada! Bienvenido a Prompt Studio.', 'success');
+        addToast(`¡Bienvenido, ${username || 'Anon'}! Todo listo.`, 'success');
     }
     onKeySaved();
   };
@@ -41,7 +50,14 @@ export const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onKeySaved, addToast, 
                            ¡Prompt Encontrado!
                         </h1>
                          <p className="text-gray-300">
-                           Tu amigo te ha compartido un prompt. <br/>Ingresa tu clave para desbloquearlo.
+                           {pendingSharedPrompt.creator ? (
+                               <>
+                                 <span className="font-bold text-teal-300">@{pendingSharedPrompt.creator}</span> te ha enviado un prompt.
+                               </>
+                           ) : (
+                               "Tu amigo te ha compartido un prompt."
+                           )}
+                           <br/>Configura tu cuenta para guardarlo en tu galería.
                         </p>
                      </div>
 
@@ -59,13 +75,26 @@ export const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onKeySaved, addToast, 
                      </div>
 
                      <div className="space-y-4">
-                        <input
-                            type="password"
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="Pega tu API Key de Gemini aquí"
-                            className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner text-center"
-                        />
+                        <div>
+                            <label className="block text-left text-xs font-semibold text-gray-400 mb-1 ml-1">Tu Nombre de Usuario (Firma)</label>
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="Ej: NeoArtist"
+                                className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-left text-xs font-semibold text-gray-400 mb-1 ml-1">Tu API Key de Gemini</label>
+                            <input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="Pega tu API Key aquí"
+                                className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner"
+                            />
+                        </div>
                     </div>
 
                     <button
@@ -87,25 +116,38 @@ export const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onKeySaved, addToast, 
                         Bienvenido a Prompt Studio
                     </h1>
                     <p className="text-gray-400 mb-6">
-                        Para comenzar, por favor ingresa tu API Key de Google AI Studio.
+                        Configura tu perfil para comenzar a crear.
                     </p>
 
                     <div className="space-y-4">
-                        <input
-                            type="password"
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="Pega tu API Key aquí"
-                            className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner text-center"
-                            aria-label="API Key de Gemini"
-                        />
+                        <div>
+                             <label className="block text-left text-xs font-semibold text-gray-400 mb-1 ml-1">Nombre de Usuario</label>
+                             <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder="¿Cómo quieres firmar tus prompts?"
+                                className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner"
+                            />
+                        </div>
+                        <div>
+                             <label className="block text-left text-xs font-semibold text-gray-400 mb-1 ml-1">API Key de Gemini</label>
+                            <input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="Pega tu API Key aquí"
+                                className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner"
+                                aria-label="API Key de Gemini"
+                            />
+                        </div>
                         <a 
                             href="https://ai.google.dev/gemini-api/docs/api-key" 
                             target="_blank" 
                             rel="noopener noreferrer" 
                             className="text-sm text-teal-400 hover:text-teal-300 hover:underline transition-colors inline-block"
                         >
-                            ¿Cómo obtener una API Key y configurar la facturación?
+                            ¿Cómo obtener una API Key?
                         </a>
                     </div>
 

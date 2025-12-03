@@ -50,18 +50,19 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
   // Generate the share URL whenever promptData changes
   useEffect(() => {
       // Create a lightweight payload for the QR code (exclude heavy cover image)
-      // Only include fields if they have value to reduce QR density
+      const currentUser = localStorage.getItem('promptStudioUsername');
+
       const payload: any = {
           p: promptData.prompt,
           t: promptData.type,
-          // Truncate title slightly to save bytes in QR
           ti: promptData.title.substring(0, 50),
           c: promptData.category,
           at: promptData.artType,
+          u: currentUser || undefined, // Include username of creator
       };
       
       if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
-      if (promptData.notes) payload.no = promptData.notes.substring(0, 100); // Truncate notes
+      if (promptData.notes) payload.no = promptData.notes.substring(0, 100); 
       if (promptData.isHybrid) payload.h = 1;
       
       const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
@@ -76,14 +77,12 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
     setIsSharing(true);
 
     try {
-        // Wait a longer tick to ensure font rendering and layout stability
         await new Promise(resolve => setTimeout(resolve, 250));
 
         const blob = await toBlob(shareCardRef.current, {
             cacheBust: true,
-            pixelRatio: 3, // Ultra-High resolution for sharp QR dots
+            pixelRatio: 3, 
             backgroundColor: '#0A0814',
-            // Disable automatic font embedding to prevent CORS errors with Google Fonts
             fontEmbedCSS: '', 
         });
 
@@ -101,12 +100,10 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
             } catch (shareError) {
                 if ((shareError as Error).name !== 'AbortError') {
                     console.error("Share failed", shareError);
-                    // Fallback to download if share fails (but not if user cancelled)
                     downloadImage(blob, promptData.title);
                 }
             }
         } else {
-            // Fallback for desktop or unsupported browsers
             downloadImage(blob, promptData.title);
         }
 
@@ -152,7 +149,6 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
         aria-modal="true"
         aria-labelledby="prompt-modal-title"
     >
-      {/* Hidden container for the ShareCard generation */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
           {shareUrl && <ShareCard ref={shareCardRef} promptData={promptData} shareUrl={shareUrl} />}
       </div>
@@ -176,6 +172,14 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                 >
                 <CloseIcon className="w-5 h-5" />
             </button>
+            
+            {/* Attribution Badge */}
+            {promptData.creator && (
+                 <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-white flex items-center gap-2 border border-white/10">
+                    <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+                    Creado por @{promptData.creator}
+                 </div>
+            )}
         </div>
         <div className="w-full md:w-1/2 p-6 flex flex-col overflow-y-auto">
             <div className="flex justify-between items-start mb-4">

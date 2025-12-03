@@ -4,7 +4,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { PromptDisplay } from './components/PromptDisplay';
 import { Gallery } from './components/Gallery';
 import { PromptEditor } from './components/PromptEditor';
-import { generateFeatureMetadata, analyzeImageFeature } from './services/geminiService';
+import { generateFeatureMetadata, analyzeImageFeature, generateImageFromPrompt } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
 import { SavedPrompt, ExtractionMode, AppView } from './types';
 import { ExtractorModeSelector } from './components/ExtractorModeSelector';
@@ -76,6 +76,29 @@ const App: React.FC = () => {
     setToasts(prevToasts => [...prevToasts, { id, message, type }]);
   }, []);
 
+  const addPromptToGallery = useCallback((newPrompt: SavedPrompt) => {
+    setSavedPrompts(prev => [newPrompt, ...prev]);
+  }, []);
+
+  const importSharedPrompt = useCallback(async (promptToImport: SavedPrompt) => {
+        // Add to gallery immediately with existing info
+        addPromptToGallery(promptToImport);
+        
+        // Generate cover image in background if none exists
+        if (!promptToImport.coverImage) {
+            try {
+                // We don't block the UI here, just update state when ready
+                const coverUrl = await generateImageFromPrompt(promptToImport.prompt);
+                setSavedPrompts(prev => prev.map(p => 
+                    p.id === promptToImport.id ? { ...p, coverImage: coverUrl } : p
+                ));
+            } catch (e) {
+                console.warn("Could not generate cover for imported prompt", e);
+            }
+        }
+  }, [addPromptToGallery]);
+
+
   // Handle Loading Data from URL (Shared Prompts)
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -93,10 +116,11 @@ const App: React.FC = () => {
                       negativePrompt: payload.n,
                       type: payload.t,
                       title: payload.ti || 'Shared Prompt',
-                      category: payload.c || 'Imported',
+                      category: 'Imported', // Force category to Imported
                       artType: payload.at || 'Prompt',
                       notes: payload.no || 'Imported via QR/Link',
                       isHybrid: payload.h,
+                      creator: payload.u, // Attribution
                       coverImage: '' // No cover image in shared link
                   };
                   
@@ -105,11 +129,11 @@ const App: React.FC = () => {
                   const envKey = process.env.API_KEY;
 
                   if (userKey || envKey) {
-                      // Normal flow for existing users
-                      setPromptForEditor(loadedPrompt);
-                      setView('editor');
+                      // Normal flow for existing users: Add to Gallery
+                      importSharedPrompt(loadedPrompt);
+                      setView('gallery');
                       setTimeout(() => {
-                          addToast('¡Prompt compartido cargado con éxito!', 'success');
+                          addToast(`¡Prompt "${loadedPrompt.title}" añadido a la Galería!`, 'success');
                       }, 1000);
                   } else {
                       // Conversion flow for new users: Store pending prompt
@@ -126,7 +150,7 @@ const App: React.FC = () => {
               }, 1000);
           }
       }
-  }, []); // Intentionally empty dependency array to run only once
+  }, [importSharedPrompt, addToast]); 
 
   useEffect(() => {
     const hasCompleted = localStorage.getItem('hasCompletedWalkthrough');
@@ -157,12 +181,12 @@ const App: React.FC = () => {
 
   const handleKeySaved = () => {
     setIsApiKeySet(true);
-    // If there was a pending shared prompt, load it now that we have a key
+    // If there was a pending shared prompt, load it into gallery now
     if (pendingSharedPrompt) {
-        setPromptForEditor(pendingSharedPrompt);
-        setView('editor');
+        importSharedPrompt(pendingSharedPrompt);
+        setView('gallery');
         setTimeout(() => {
-            addToast(`¡Prompt "${pendingSharedPrompt.title}" desbloqueado y cargado!`, 'success');
+            addToast(`¡Prompt "${pendingSharedPrompt.title}" desbloqueado y guardado en tu Galería!`, 'success');
             setPendingSharedPrompt(null);
         }, 500);
     }
@@ -212,9 +236,6 @@ const App: React.FC = () => {
     setError(null);
   }, [extractionMode]);
 
-  const addPromptToGallery = useCallback((newPrompt: SavedPrompt) => {
-    setSavedPrompts(prev => [newPrompt, ...prev]);
-  }, []);
 
   const handleUpdatePrompts = useCallback((newPrompts: SavedPrompt[]) => {
     setSavedPrompts(newPrompts);

@@ -25,24 +25,33 @@ const UploadIcon: React.FC<{className?: string}> = ({ className = "w-5 h-5" }) =
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySaved, addToast, savedPrompts = [], onPromptsUpdate }) => {
   const [apiKey, setApiKey] = useState('');
+  const [username, setUsername] = useState('');
   const [showKey, setShowKey] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const storedKey = localStorage.getItem('userGeminiKey');
-    if (storedKey) {
-      setApiKey(storedKey);
-    }
+    if (storedKey) setApiKey(storedKey);
+    
+    const storedUser = localStorage.getItem('promptStudioUsername');
+    if (storedUser) setUsername(storedUser);
   }, []);
 
   const handleSave = () => {
     if (apiKey.trim()) {
       localStorage.setItem('userGeminiKey', apiKey.trim());
-      addToast('Tu API Key ha sido guardada.', 'success');
+      addToast('Configuración guardada.', 'success');
     } else {
       localStorage.removeItem('userGeminiKey');
       addToast('Usando la clave de la aplicación por defecto.', 'success');
     }
+    
+    if (username.trim()) {
+        localStorage.setItem('promptStudioUsername', username.trim());
+    } else {
+        localStorage.setItem('promptStudioUsername', 'Anon');
+    }
+
     onKeySaved();
     onClose();
   };
@@ -105,19 +114,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
                   throw new Error('Formato de archivo inválido.');
               }
 
-              // Merge strategy: Use a Map to deduplicate by ID, preferring the imported version if there's a conflict?
-              // Actually, let's preserve existing if ID matches, or just add new ones.
-              // Usually, restore implies we want what's in the file. But let's be safe and merge.
-              // If we assume the file is a backup, it might contain older versions. 
-              // Let's do a simple merge: Add prompts that don't exist.
-              
-              // Better strategy for user: Combine lists, unique by ID.
               const currentMap = new Map(savedPrompts.map(p => [p.id, p]));
               let addedCount = 0;
               
               importedPrompts.forEach((p: any) => {
                   if (p.id && p.prompt && p.type) {
-                      // If it exists, we could overwrite or skip. Let's overwrite to allow restoring updates.
                       if (!currentMap.has(p.id)) {
                         addedCount++;
                       }
@@ -135,7 +136,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
               console.error('Import error:', error);
               addToast('Error al importar: El archivo no es válido.', 'error');
           }
-          // Reset input
           if (fileInputRef.current) fileInputRef.current.value = '';
       };
       reader.readAsText(file);
@@ -166,11 +166,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
         </div>
         
         <div className="space-y-6">
+            {/* User Profile Section */}
+             <section className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-200 border-b border-white/10 pb-2">Perfil de Creador</h3>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Nombre de Usuario
+                    </label>
+                     <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Ej: NeoArtist"
+                        className="w-full bg-gray-900/50 rounded-lg p-3 text-gray-200 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Este nombre aparecerá cuando compartas tus prompts.</p>
+                </div>
+            </section>
+
             {/* API Key Section */}
             <section className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-200 border-b border-white/10 pb-2">API Key</h3>
                 <p className="text-gray-400 text-sm">
-                    Puedes usar tu propia API Key de Google AI Studio. El uso se facturará a tu cuenta de Google Cloud.
+                    Puedes usar tu propia API Key de Google AI Studio.
                 </p>
                 <div>
                     <label htmlFor="api-key-input" className="block text-sm font-medium text-gray-300 mb-2">
@@ -249,7 +267,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
             onClick={handleSave}
             className="w-full text-center bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-teal-500/50 shadow-lg"
           >
-            Listo
+            Guardar Cambios
           </button>
         </div>
       </div>

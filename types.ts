@@ -12,6 +12,7 @@ export interface SavedPrompt {
   artType: string;
   notes: string;
   isHybrid?: boolean;
+  creator?: string; // Username of the creator
 }
 
 export interface PlaygroundOperation {
