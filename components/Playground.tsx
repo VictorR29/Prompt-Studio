@@ -357,7 +357,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-180px)] lg:h-[calc(100vh-140px)] animate-fade-in-subtle">
+        <div className="flex flex-col h-[calc(100dvh-180px)] lg:h-[calc(100vh-140px)] animate-fade-in-subtle">
             {/* Header: Responsive Layout */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 md:gap-0">
                  <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center gap-2">

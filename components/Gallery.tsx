@@ -166,7 +166,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
       )}
 
       {promptsToShow.length > 0 && (
-        <div className="columns-2 md:columns-3 lg:columns-4 gap-6">
+        <div className="columns-2 md:columns-3 lg:columns-4 gap-3 md:gap-6">
             {promptsToShow.map((prompt) => {
               const isSelected = multiSelect && selection ? selection.some(p => p.id === prompt.id) : false;
               return (

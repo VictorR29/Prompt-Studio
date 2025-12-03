@@ -19,7 +19,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
 
   return (
     <div
-      className="group cursor-pointer mb-6 break-inside-avoid relative"
+      className="group cursor-pointer mb-3 md:mb-6 break-inside-avoid relative"
       onClick={onClick}
     >
       <div className={`relative w-full rounded-xl shadow-lg overflow-hidden bg-gray-800 transition-all duration-300 group-hover:shadow-2xl group-hover:shadow-teal-500/10 group-hover:-translate-y-1 ${isSelected ? 'ring-2 ring-offset-2 ring-offset-gray-900 ring-teal-400' : ''}`}>
@@ -40,27 +40,27 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
-        <div className="absolute inset-0 flex flex-col justify-end p-4">
-            <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
-                 <div className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ring-1 flex items-center gap-1 shadow-md ${typeBadgeClass}`}>
-                    {isHybrid && <DNAIcon className="w-3 h-3" />}
+        <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-4">
+            <div className="absolute top-2 right-2 md:top-3 md:right-3 flex flex-col items-end gap-1">
+                 <div className={`text-[9px] md:text-[10px] font-bold uppercase px-1.5 py-0.5 md:px-2 md:py-1 rounded-full ring-1 flex items-center gap-1 shadow-md ${typeBadgeClass}`}>
+                    {isHybrid && <DNAIcon className="w-2.5 h-2.5 md:w-3 md:h-3" />}
                     {typeText}
                 </div>
                  {isImported && (
-                     <div className="bg-white/90 text-gray-900 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shadow-md">
+                     <div className="bg-white/90 text-gray-900 text-[9px] md:text-[10px] font-bold uppercase px-1.5 py-0.5 md:px-2 rounded-full shadow-md">
                         Importado
                      </div>
                 )}
             </div>
             
             <div>
-              <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md">{promptData.title}</h3>
+              <h3 className="text-white font-bold text-sm md:text-lg leading-tight drop-shadow-md line-clamp-2 md:line-clamp-none">{promptData.title}</h3>
               <div className="flex justify-between items-center mt-1">
-                  <p className="text-teal-300 text-xs font-medium drop-shadow-sm">
+                  <p className="text-teal-300 text-[10px] md:text-xs font-medium drop-shadow-sm truncate pr-2">
                     {promptData.category}
                   </p>
                   {promptData.creator && (
-                      <span className="text-gray-400 text-[10px] bg-black/50 px-1.5 py-0.5 rounded">
+                      <span className="text-gray-400 text-[9px] md:text-[10px] bg-black/50 px-1.5 py-0.5 rounded flex-shrink-0">
                           by @{promptData.creator}
                       </span>
                   )}
@@ -70,7 +70,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
         {isSelected && (
           <div className="absolute inset-0 bg-teal-500/30 rounded-xl flex items-center justify-center pointer-events-none">
             <div className="bg-teal-500 rounded-full p-2">
-              <CheckIcon className="w-8 h-8 text-white" />
+              <CheckIcon className="w-6 h-6 md:w-8 md:h-8 text-white" />
             </div>
           </div>
         )}

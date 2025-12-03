@@ -478,6 +478,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const result = String(await assembleMasterPrompt(fragmentsToAssemble));
             setFinalPrompt(result);
+            // On mobile, scroll to output
+            if (window.innerWidth < 1024) {
+                 setTimeout(() => {
+                    document.getElementById('editor-output-section')?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
         } catch (err) {
             setOutputType(null);
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -554,6 +560,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const result = await assembleOptimizedJson(activeFragments);
             setFinalPrompt(result);
+            // On mobile, scroll to output
+            if (window.innerWidth < 1024) {
+                 setTimeout(() => {
+                    document.getElementById('editor-output-section')?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
         } catch (err) {
             setOutputType(null);
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -811,7 +823,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const aestheticModules: ExtractionMode[] = ['style', 'scene', 'color', 'composition'];
 
     return (
-        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8 pb-24 md:pb-0">
             {/* Left Panel (Modules) */}
             <div className="lg:col-span-7 space-y-6">
                 <div className="flex justify-between items-center -mb-2">
@@ -897,7 +909,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             </div>
 
             {/* Right Panel (Output) */}
-            <div className="mt-6 lg:mt-0 lg:col-span-5">
+            <div className="mt-6 lg:mt-0 lg:col-span-5" id="editor-output-section">
                 <div className="lg:sticky lg:top-[90px]">
                     <div className="glass-pane p-6 rounded-2xl space-y-4" data-tour-id="editor-output-section">
                         <h2 className="text-xl font-bold text-white">Salida y Ensamblaje</h2>
@@ -991,6 +1003,29 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+            
+            {/* Mobile Floating Action Bar (Sticky Bottom) */}
+            <div className="lg:hidden fixed bottom-16 left-0 right-0 p-4 z-40 bg-gradient-to-t from-gray-900/95 via-gray-900/80 to-transparent pointer-events-none">
+                <div className="flex gap-2 pointer-events-auto max-w-lg mx-auto">
+                     {finalPrompt ? (
+                        <button
+                            onClick={() => setShowPreview(true)}
+                            className="flex-1 bg-indigo-600/90 backdrop-blur hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            <EyeIcon className="w-5 h-5" />
+                            Preview
+                        </button>
+                    ) : null}
+                    <button
+                        onClick={handleGenerateText}
+                        disabled={isLoading}
+                        className="flex-1 bg-teal-600/90 backdrop-blur hover:bg-teal-500 disabled:bg-teal-500/50 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                         {isLoading ? <Loader /> : <SparklesIcon className="w-5 h-5" />}
+                        Generar Texto
+                    </button>
                 </div>
             </div>
 
