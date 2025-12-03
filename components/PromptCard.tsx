@@ -1,8 +1,23 @@
+
 import React from 'react';
 import { SavedPrompt } from '../types';
 import { PROMPT_TYPE_CONFIG } from '../config';
 import { CheckIcon } from './icons/CheckIcon';
 import { DNAIcon } from './icons/DNAIcon';
+import { BanIcon } from './icons/BanIcon';
+import { 
+    PaletteIcon, 
+    UserIcon, 
+    BodyIcon, 
+    FaceIcon, 
+    ShirtIcon, 
+    MountainIcon, 
+    CubeIcon, 
+    FrameIcon, 
+    DropIcon,
+    CodeBracketIcon,
+    CloudDownloadIcon
+} from './icons/CategoryIcons';
 
 interface PromptCardProps {
   promptData: SavedPrompt;
@@ -14,7 +29,35 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
   const { className: typeBadgeClass, text: typeText } = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
 
   const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
-  const isImported = promptData.category === 'Imported' || promptData.creator;
+  const isImported = promptData.category === 'Imported' || (promptData.creator && promptData.creator !== 'Anon');
+
+  // Helper to determine the correct icon component based on type
+  const getIconForType = () => {
+      // 1. Hybrid / Fusion gets priority
+      if (isHybrid) return <DNAIcon className="w-16 h-16 text-indigo-500 opacity-80" />;
+
+      // 2. Specific Fragments
+      switch (promptData.type) {
+          case 'style': return <PaletteIcon className="w-16 h-16 text-green-500 opacity-80" />;
+          case 'subject': return <UserIcon className="w-16 h-16 text-red-500 opacity-80" />;
+          case 'pose': return <BodyIcon className="w-16 h-16 text-blue-500 opacity-80" />;
+          case 'expression': return <FaceIcon className="w-16 h-16 text-amber-500 opacity-80" />;
+          case 'outfit': return <ShirtIcon className="w-16 h-16 text-pink-500 opacity-80" />;
+          case 'scene': return <MountainIcon className="w-16 h-16 text-teal-500 opacity-80" />;
+          case 'object': return <CubeIcon className="w-16 h-16 text-indigo-500 opacity-80" />;
+          case 'composition': return <FrameIcon className="w-16 h-16 text-cyan-500 opacity-80" />;
+          case 'color': return <DropIcon className="w-16 h-16 text-orange-500 opacity-80" />;
+          case 'negative': return <BanIcon className="w-16 h-16 text-red-600 opacity-80" />;
+          case 'structured': return <CodeBracketIcon className="w-16 h-16 text-purple-500 opacity-80" />;
+          
+          // 3. Master / Default
+          case 'master': 
+          default:
+              if (isImported) return <CloudDownloadIcon className="w-16 h-16 text-gray-500 opacity-80" />;
+              // The classic generic icon for Master prompts
+              return <svg className="w-16 h-16 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
+      }
+  };
 
   return (
     <div
@@ -32,11 +75,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
           />
         ) : (
           <div className="w-full aspect-square bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
-            {isHybrid ? (
-                <DNAIcon className="w-16 h-16 text-indigo-500 opacity-80" />
-            ) : (
-                <svg className="w-16 h-16 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-            )}
+            {getIconForType()}
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
