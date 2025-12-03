@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { SavedPrompt } from '../types';
 import { PROMPT_TYPE_CONFIG } from '../config';

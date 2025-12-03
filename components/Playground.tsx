@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -114,12 +113,28 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     const handleLoadPrompt = async (text: string) => {
         setGlobalLoader({ active: true, message: 'Analizando prompt con IA...' });
         setCurrentPromptText(text); // Initialize with the raw text
+        
         try {
-            const modularized = await modularizePrompt(text) as Record<ExtractionMode, string>;
+            let modularized = await modularizePrompt(text);
+            
+            // Validation: Check if we have at least one non-empty value to avoid empty state
+            const hasContent = Object.values(modularized).some(val => val && val.trim().length > 0);
+            
+            if (!hasContent) {
+                // Fallback: If AI returns empty, put everything in Subject to ensure user sees something.
+                modularized = { ...initialFragments, subject: text };
+                addToast("La IA no pudo estructurar el prompt, se cargó como texto plano.", 'warning');
+            }
+            
             setFragments(modularized);
             setViewState('chat');
         } catch (error) {
-            addToast("Error al analizar el prompt.", 'error');
+            console.error("Analysis failed", error);
+            // Fallback on error too
+             const fallbackFragments = { ...initialFragments, subject: text };
+             setFragments(fallbackFragments);
+             setViewState('chat');
+             addToast("Error de análisis. Se cargó el texto original.", 'warning');
         } finally {
             setGlobalLoader({ active: false, message: '' });
         }
@@ -242,9 +257,6 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     };
     
     const handleCopy = () => {
-        // Copy the currentPromptText directly. 
-        // Since we update it on every AI turn, it's always ready.
-        // This avoids async operations inside the click handler.
         const textToCopy = currentPromptText || "Prompt vacío";
         
         navigator.clipboard.writeText(textToCopy).then(() => {
@@ -258,9 +270,6 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
     };
 
     const handleSaveToGallery = async () => {
-        // Here we can use currentPromptText as the prompt to save, or re-assemble to be safe.
-        // Re-assembling ensures consistency if manual edits were possible (they aren't here yet),
-        // but currentPromptText comes from the AI expert assembler, so it's high quality.
         if (!currentPromptText) {
              addToast('No hay prompt para guardar.', 'error');
              return;

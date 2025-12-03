@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { SavedPrompt } from '../types';
@@ -45,9 +44,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     };
   }, [handleKeyDown]);
 
-  // Use useMemo to ensure the array reference stays stable unless data actually changes.
   const filteredPrompts = useMemo(() => {
-    // Check if filter is provided and has length
     if (filter && filter.length > 0) {
         return prompts.filter(p => {
           if (filter.includes(p.type)) return true;
@@ -55,7 +52,6 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
           return false;
         });
     }
-    // If no filter or empty filter array, return all prompts
     return prompts;
   }, [prompts, filter]);
 
@@ -84,27 +80,27 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-4 animate-fade-in"
-      style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 animate-fade-in"
+      style={{ backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)' }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="glass-pane rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-scale-in"
+        className="glass-pane rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-scale-in border border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-4 border-b border-white/10 flex-shrink-0 bg-gray-900/50">
+        <div className="flex justify-between items-center p-4 border-b border-white/10 flex-shrink-0 bg-gray-900/90">
             <h2 className="text-xl font-bold text-white">{multiSelect ? `Seleccionar hasta ${maxSelection} Sujetos` : (title || 'Seleccionar de la Galería')}</h2>
             <button
                 onClick={onClose}
-                className="bg-transparent text-gray-500 hover:text-white rounded-full p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white rounded-full p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500"
                 aria-label="Cerrar modal"
             >
-                <CloseIcon className="w-6 h-6" />
+                <CloseIcon className="w-5 h-5" />
             </button>
         </div>
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-grow bg-black/20">
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-grow bg-[#0A0814]/80">
             <Gallery 
               prompts={filteredPrompts} 
               onSelect={handleCardSelect} 
@@ -113,11 +109,11 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
             />
         </div>
         {multiSelect && (
-          <div className="p-4 border-t border-white/10 flex-shrink-0 bg-gray-900/80">
+          <div className="p-4 border-t border-white/10 flex-shrink-0 bg-gray-900">
             <button
               onClick={handleConfirm}
               disabled={selected.length === 0}
-              className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-colors disabled:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-colors disabled:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Confirmar Selección ({selected.length}/{maxSelection})
             </button>
