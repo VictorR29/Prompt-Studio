@@ -64,26 +64,35 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
   
   // Generate the share URL whenever promptData changes
   useEffect(() => {
-      // Create a lightweight payload for the QR code (exclude heavy cover image)
-      const currentUser = localStorage.getItem('promptStudioUsername');
+      try {
+          // Create a lightweight payload for the QR code (exclude heavy cover image)
+          const currentUser = localStorage.getItem('promptStudioUsername');
+          const safeTitle = promptData.title ? promptData.title.substring(0, 50) : 'Untitled';
 
-      const payload: any = {
-          p: promptData.prompt,
-          t: promptData.type,
-          ti: promptData.title.substring(0, 50),
-          c: promptData.category,
-          at: promptData.artType,
-          u: currentUser || undefined, // Include username of creator
-      };
-      
-      if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
-      // Increased limit from 100 to 600 thanks to better QR resolution
-      if (promptData.notes) payload.no = promptData.notes.substring(0, 600); 
-      if (promptData.isHybrid) payload.h = 1;
-      
-      const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
-      const url = `${window.location.origin}?data=${compressed}`;
-      setShareUrl(url);
+          const payload: any = {
+              p: promptData.prompt,
+              t: promptData.type,
+              ti: safeTitle,
+              c: promptData.category,
+              at: promptData.artType,
+              u: currentUser || undefined, // Include username of creator
+          };
+          
+          if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
+          
+          // Defensive check for notes: Ensure it's a string before substring
+          const safeNotes = promptData.notes || ''; 
+          if (safeNotes) payload.no = safeNotes.substring(0, 600);
+          
+          if (promptData.isHybrid) payload.h = 1;
+          
+          const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+          const url = `${window.location.origin}?data=${compressed}`;
+          setShareUrl(url);
+      } catch (error) {
+          console.warn("Could not generate share URL for this prompt:", error);
+          setShareUrl('');
+      }
   }, [promptData]);
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -104,7 +113,8 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
 
         if (!blob) throw new Error("Error generating image");
 
-        const file = new File([blob], `prompt-studio-${promptData.id}.png`, { type: 'image/png' });
+        const safeTitle = (promptData.title || 'prompt').replace(/\s+/g, '-').toLowerCase();
+        const file = new File([blob], `prompt-studio-${safeTitle}.png`, { type: 'image/png' });
 
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
@@ -116,11 +126,11 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
             } catch (shareError) {
                 if ((shareError as Error).name !== 'AbortError') {
                     console.error("Share failed", shareError);
-                    downloadImage(blob, promptData.title);
+                    downloadImage(blob, safeTitle);
                 }
             }
         } else {
-            downloadImage(blob, promptData.title);
+            downloadImage(blob, safeTitle);
         }
 
     } catch (err) {
@@ -135,7 +145,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `prompt-studio-${title.replace(/\s+/g, '-').toLowerCase()}.png`;
+      link.download = `prompt-studio-${title}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -259,7 +269,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                     <h4 className="font-bold text-teal-300 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
                         <SparklesIcon className="w-3 h-3" /> Descripción Visual
                     </h4>
-                    <p className="text-gray-300 text-sm leading-relaxed">{promptData.notes}</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{promptData.notes || 'Sin descripción disponible.'}</p>
                 </div>
 
                 <div>

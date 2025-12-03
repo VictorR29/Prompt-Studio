@@ -12,8 +12,13 @@ interface ShareCardProps {
 
 // 16:9 Aspect Ratio (1600x900) - Horizontal Layout
 export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptData, shareUrl }, ref) => {
-  const { className: typeBadgeClass, text: typeText } = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
+  // Defensive check: Ensure we have fallback if promptData.type is invalid/missing
+  const config = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
+  const { className: typeBadgeClass, text: typeText } = config;
   const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
+  
+  // Defensive check: Ensure ID exists before slicing
+  const safeId = promptData.id ? String(promptData.id) : 'UNKNOWN';
 
   return (
     <div 
@@ -51,14 +56,14 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
             <div className="flex flex-col gap-8 flex-grow justify-center mt-8">
                  <div className="space-y-4">
                      <div className="flex items-center gap-4">
-                        <span className="text-teal-400 font-bold uppercase tracking-widest text-lg">{promptData.category}</span>
+                        <span className="text-teal-400 font-bold uppercase tracking-widest text-lg">{promptData.category || 'General'}</span>
                         <div className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide flex items-center gap-2 border border-white/10 ${typeBadgeClass}`}>
                              {isHybrid && <DNAIcon className="w-4 h-4" />}
                              {typeText}
                         </div>
                      </div>
                      <h1 className="text-7xl font-black text-white leading-[1.05] tracking-tight line-clamp-3 drop-shadow-lg">
-                        {promptData.title}
+                        {promptData.title || 'Untitled Prompt'}
                      </h1>
                  </div>
 
@@ -78,7 +83,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                     <span className="text-teal-500 font-bold">Prompt Studio AI</span>
                 </div>
                 <div className="text-gray-600 text-sm font-mono">
-                    ID: {promptData.id.slice(-8).toUpperCase()}
+                    ID: {safeId.slice(-8).toUpperCase()}
                 </div>
             </div>
         </div>
