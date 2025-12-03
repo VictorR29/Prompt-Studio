@@ -14,6 +14,21 @@ import { ShareCard } from './ShareCard';
 import { toBlob } from 'html-to-image';
 import { Loader } from './Loader';
 import LZString from 'lz-string';
+import { createPortal } from 'react-dom';
+import { DNAIcon } from './icons/DNAIcon';
+import { 
+    PaletteIcon, 
+    UserIcon, 
+    BodyIcon, 
+    FaceIcon, 
+    ShirtIcon, 
+    MountainIcon, 
+    CubeIcon, 
+    FrameIcon, 
+    DropIcon,
+    CodeBracketIcon,
+    CloudDownloadIcon
+} from './icons/CategoryIcons';
 
 interface PromptModalProps {
   promptData: SavedPrompt;
@@ -140,10 +155,45 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
     };
   }, [handleKeyDown]);
 
+  const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
+  const isImported = promptData.category === 'Imported' || (promptData.creator && promptData.creator !== 'Anon');
 
-  return (
+  const getIconForType = () => {
+      const iconClass = "w-32 h-32 opacity-80"; // Larger size for modal
+
+      // 1. Hybrid / Fusion gets priority
+      if (isHybrid) return <DNAIcon className={`${iconClass} text-indigo-500`} />;
+
+      // 2. Specific Fragments
+      switch (promptData.type) {
+          case 'style': return <PaletteIcon className={`${iconClass} text-green-500`} />;
+          case 'subject': return <UserIcon className={`${iconClass} text-red-500`} />;
+          case 'pose': return <BodyIcon className={`${iconClass} text-blue-500`} />;
+          case 'expression': return <FaceIcon className={`${iconClass} text-amber-500`} />;
+          case 'outfit': return <ShirtIcon className={`${iconClass} text-pink-500`} />;
+          case 'scene': return <MountainIcon className={`${iconClass} text-teal-500`} />;
+          case 'object': return <CubeIcon className={`${iconClass} text-indigo-500`} />;
+          case 'composition': return <FrameIcon className={`${iconClass} text-cyan-500`} />;
+          case 'color': return <DropIcon className={`${iconClass} text-orange-500`} />;
+          case 'negative': return <BanIcon className={`${iconClass} text-red-600`} />;
+          case 'structured': return <CodeBracketIcon className={`${iconClass} text-purple-500`} />;
+          
+          // 3. Master / Default
+          case 'master': 
+          default:
+              if (isImported) return <CloudDownloadIcon className={`${iconClass} text-gray-500`} />;
+              // The classic generic icon for Master prompts
+              return <svg className={`${iconClass} text-gray-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
+      }
+  };
+
+
+  // Use React Portal to render at body level to avoid Z-index clipping issues from parent views
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div 
-        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
+        className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 animate-fade-in"
         style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
         onClick={onClose}
         role="dialog"
@@ -163,7 +213,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                 <img src={promptData.coverImage} alt={promptData.title} className="w-full h-64 md:h-full object-cover" />
             ) : (
                 <div className="w-full h-64 md:h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
-                    <svg className="w-24 h-24 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                    {getIconForType()}
                 </div>
             )}
              <button
@@ -289,6 +339,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
         .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
         .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
