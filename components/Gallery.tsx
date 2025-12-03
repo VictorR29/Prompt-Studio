@@ -23,7 +23,7 @@ const INITIAL_LOAD_COUNT = 20;
 const SUBSEQUENT_LOAD_COUNT = 10;
 
 
-export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, multiSelect = false }) => {
+export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, selection, multiSelect = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   // Set of strings to allow for custom filters like 'imported'
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
@@ -43,6 +43,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
   }, []);
   
   const filteredPrompts = useMemo(() => {
+    if (!prompts) return [];
     return prompts.filter(prompt => {
       // Filter by type or custom status
       if (activeFilters.size > 0) {

@@ -29,6 +29,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
             alt={promptData.title} 
             className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105 bg-gray-800"
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="w-full aspect-square bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">

@@ -25,6 +25,12 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     maxSelection = 1 
 }) => {
   const [selected, setSelected] = useState<SavedPrompt[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (event.key === 'Escape') {
@@ -40,15 +46,17 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
   }, [handleKeyDown]);
 
   // Use useMemo to ensure the array reference stays stable unless data actually changes.
-  // This prevents the Gallery component from resetting its view state unnecessarily.
   const filteredPrompts = useMemo(() => {
-    return filter 
-      ? prompts.filter(p => {
+    // Check if filter is provided and has length
+    if (filter && filter.length > 0) {
+        return prompts.filter(p => {
           if (filter.includes(p.type)) return true;
           if (filter.includes('hybrid') && p.isHybrid) return true;
           return false;
-        }) 
-      : prompts;
+        });
+    }
+    // If no filter or empty filter array, return all prompts
+    return prompts;
   }, [prompts, filter]);
 
   const handleCardSelect = (prompt: SavedPrompt) => {
@@ -72,31 +80,31 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     onSelect(selected);
   };
 
-  if (typeof document === 'undefined') return null;
+  if (!mounted || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in-subtle"
+      className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-4 animate-fade-in"
       style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="glass-pane rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-scale-in-center"
+        className="glass-pane rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-4 border-b border-white/10 flex-shrink-0">
+        <div className="flex justify-between items-center p-4 border-b border-white/10 flex-shrink-0 bg-gray-900/50">
             <h2 className="text-xl font-bold text-white">{multiSelect ? `Seleccionar hasta ${maxSelection} Sujetos` : (title || 'Seleccionar de la Galería')}</h2>
             <button
                 onClick={onClose}
-                className="bg-transparent text-gray-500 hover:text-white rounded-full p-1 transition-colors"
+                className="bg-transparent text-gray-500 hover:text-white rounded-full p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500"
                 aria-label="Cerrar modal"
             >
                 <CloseIcon className="w-6 h-6" />
             </button>
         </div>
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-grow bg-black/20">
             <Gallery 
               prompts={filteredPrompts} 
               onSelect={handleCardSelect} 
@@ -105,17 +113,29 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
             />
         </div>
         {multiSelect && (
-          <div className="p-4 border-t border-white/10 flex-shrink-0 bg-gray-900/30">
+          <div className="p-4 border-t border-white/10 flex-shrink-0 bg-gray-900/80">
             <button
               onClick={handleConfirm}
               disabled={selected.length === 0}
-              className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-colors disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-colors disabled:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Confirmar Selección ({selected.length}/{maxSelection})
             </button>
           </div>
         )}
       </div>
+       <style>{`
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes scale-in {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+        .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
+      `}</style>
     </div>,
     document.body
   );
