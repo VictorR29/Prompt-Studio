@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CloseIcon } from './icons/CloseIcon';
 import { generateImageFromPrompt } from '../services/geminiService';
 import { Loader } from './Loader';
@@ -31,8 +33,10 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ prompt, on
 
   const isQuotaError = error && (error.includes('cuota') || error.includes('límite') || error.includes('gratuito'));
 
-  return (
-    <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 animate-fade-in-subtle" onClick={onClose}>
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4 animate-fade-in-subtle" onClick={onClose}>
       <div className="glass-pane rounded-2xl p-4 max-w-2xl w-full flex flex-col items-center relative" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 p-2 rounded-full text-white transition-colors z-10">
           <CloseIcon className="w-5 h-5" />
@@ -82,6 +86,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ prompt, on
            </a>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -67,10 +67,11 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
     });
   }, [prompts, searchQuery, activeFilters]);
 
-  // Reset visible count when filters or search query change
+  // Reset visible count when filters or search query change.
+  // We use prompts.length as a dependency instead of prompts to avoid resetting on unstable array references.
   useEffect(() => {
     setVisibleCount(INITIAL_LOAD_COUNT);
-  }, [searchQuery, activeFilters]);
+  }, [searchQuery, activeFilters, prompts.length]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {

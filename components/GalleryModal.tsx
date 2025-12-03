@@ -1,5 +1,6 @@
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { SavedPrompt } from '../types';
 import { Gallery } from './Gallery';
 import { CloseIcon } from './icons/CloseIcon';
@@ -38,14 +39,17 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     };
   }, [handleKeyDown]);
 
-  const filteredPrompts = filter 
-    ? prompts.filter(p => {
-        if (filter.includes(p.type)) return true;
-        // If filter includes 'hybrid', also show items marked as isHybrid
-        if (filter.includes('hybrid') && p.isHybrid) return true;
-        return false;
-      }) 
-    : prompts;
+  // Use useMemo to ensure the array reference stays stable unless data actually changes.
+  // This prevents the Gallery component from resetting its view state unnecessarily.
+  const filteredPrompts = useMemo(() => {
+    return filter 
+      ? prompts.filter(p => {
+          if (filter.includes(p.type)) return true;
+          if (filter.includes('hybrid') && p.isHybrid) return true;
+          return false;
+        }) 
+      : prompts;
+  }, [prompts, filter]);
 
   const handleCardSelect = (prompt: SavedPrompt) => {
     if (multiSelect) {
@@ -57,7 +61,6 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
             if (prev.length < maxSelection) {
                 return [...prev, prompt];
             }
-            // Optional: add a toast or feedback that max selection is reached
             return prev;
         });
     } else {
@@ -69,9 +72,11 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     onSelect(selected);
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-subtle"
+      className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in-subtle"
       style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
       onClick={onClose}
       role="dialog"
@@ -111,6 +116,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
