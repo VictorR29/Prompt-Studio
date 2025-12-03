@@ -34,6 +34,26 @@ const formatSafetyError = (candidate: any): string => {
     return "El contenido fue marcado como inseguro por los filtros de IA.";
 };
 
+const cleanAndParseJson = (text: string): any => {
+    // Remove markdown code blocks if present
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    try {
+        return JSON.parse(cleanText);
+    } catch (e) {
+        // If simple parse fails, try to find the first '{' and last '}'
+        const firstBrace = cleanText.indexOf('{');
+        const lastBrace = cleanText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+             try {
+                return JSON.parse(cleanText.substring(firstBrace, lastBrace + 1));
+            } catch (e2) {
+                // Ignore
+            }
+        }
+        return {}; // Return empty object on failure to avoid app crash
+    }
+};
+
 export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: string, images?: {imageBase64: string, mimeType: string}[]) => {
     const ai = getAiClient();
     
@@ -78,7 +98,7 @@ export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: stri
         }
     });
 
-    return JSON.parse(response.text || "{}");
+    return cleanAndParseJson(response.text || "{}");
 };
 
 export const analyzeImageFeature = async (mode: ExtractionMode, images: {imageBase64: string, mimeType: string}[]) => {
@@ -135,7 +155,7 @@ export const generateIdeasForStyle = async (prompt: string): Promise<string[]> =
             }
         }
     });
-    return JSON.parse(response.text || "[]");
+    return cleanAndParseJson(response.text || "[]");
 };
 
 export const modularizePrompt = async (prompt: string): Promise<Partial<Record<ExtractionMode, string>>> => {
@@ -171,7 +191,7 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
         throw new Error(formatSafetyError(response.candidates[0]));
     }
 
-    return JSON.parse(response.text || "{}");
+    return cleanAndParseJson(response.text || "{}");
 };
 
 export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
@@ -220,7 +240,7 @@ export const optimizePromptFragment = async (mode: ExtractionMode, fragments: Pa
             }
         }
     });
-    return JSON.parse(response.text || "[]");
+    return cleanAndParseJson(response.text || "[]");
 };
 
 export const mergeModulesIntoJsonTemplate = async (fragments: Partial<Record<ExtractionMode, string>>, template: string): Promise<string> => {
@@ -282,21 +302,38 @@ export const generateStructuredPromptMetadata = async (prompt: string, image?: {
             }
         }
     });
-    return JSON.parse(response.text || "{}");
+    return cleanAndParseJson(response.text || "{}");
 };
 
 export const adaptFragmentToContext = async (targetModule: ExtractionMode, sourcePrompt: string, currentFragments: Partial<Record<ExtractionMode, string>>) => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Extract the '${targetModule}' aspect from this prompt: "${sourcePrompt}".
-        Then adapt it to fit seamlessly with this existing context: ${JSON.stringify(currentFragments)}.
-        CRITICAL RULES:
-        1. PRESERVE DETAILS: Do not summarize. Keep specific adjectives, textures, and technical terms from the source.
-        2. INTEGRATE: Only adjust grammar to fit.
-        3. OUTPUT FORMAT: SINGLE CONTINUOUS BLOCK. No fillers.`,
+        contents: `You are an expert Prompt Engineer.
+        Task: Extract strictly the content for the '${targetModule}' module from the Source Prompt.
+        
+        Source Prompt: "${sourcePrompt}"
+        Context (Current Editor State): ${JSON.stringify(currentFragments)}
+        
+        Instructions:
+        1. Ignore the Current Editor State content, it is provided only for context adaptation (grammar).
+        2. Focus ONLY on the Source Prompt.
+        3. Extract the specific detail relevant to '${targetModule}'.
+        4. If the Source Prompt is already a fragment (e.g. just "red jacket"), use it as is.
+        5. Return a JSON object with a single key 'extracted_text'.
+        
+        Output Schema:
+        {
+            "extracted_text": "The extracted string here"
+        }
+        `,
+        config: {
+            responseMimeType: "application/json"
+        }
     });
-    return response.text || "";
+
+    const json = cleanAndParseJson(response.text || "{}");
+    return json.extracted_text || sourcePrompt; // Fallback to source if extraction fails
 };
 
 export const generateStructuredPrompt = async (input: { idea: string; style?: string }) => {
