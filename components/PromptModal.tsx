@@ -62,7 +62,8 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
       };
       
       if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
-      if (promptData.notes) payload.no = promptData.notes.substring(0, 100); 
+      // Increased limit from 100 to 600 thanks to better QR resolution
+      if (promptData.notes) payload.no = promptData.notes.substring(0, 600); 
       if (promptData.isHybrid) payload.h = 1;
       
       const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
