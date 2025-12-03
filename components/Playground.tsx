@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -115,26 +116,27 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         setCurrentPromptText(text); // Initialize with the raw text
         
         try {
+            // Attempt modularization with a timeout assumption (the API doesn't support explicit timeout easily, but we catch errors)
             let modularized = await modularizePrompt(text);
             
             // Validation: Check if we have at least one non-empty value to avoid empty state
             const hasContent = Object.values(modularized).some(val => val && val.trim().length > 0);
             
             if (!hasContent) {
-                // Fallback: If AI returns empty, put everything in Subject to ensure user sees something.
-                modularized = { ...initialFragments, subject: text };
-                addToast("La IA no pudo estructurar el prompt, se cargó como texto plano.", 'warning');
+                 // Fallback: If AI returns empty modules, treat whole text as subject
+                 modularized = { ...initialFragments, subject: text };
+                 addToast("Estructura simple detectada.", 'warning');
             }
             
             setFragments(modularized);
             setViewState('chat');
         } catch (error) {
             console.error("Analysis failed", error);
-            // Fallback on error too
+             // Robust Fallback: load text as subject so user is never left with empty screen
              const fallbackFragments = { ...initialFragments, subject: text };
              setFragments(fallbackFragments);
              setViewState('chat');
-             addToast("Error de análisis. Se cargó el texto original.", 'warning');
+             addToast("Error de conexión con IA. Se cargó el texto original.", 'warning');
         } finally {
             setGlobalLoader({ active: false, message: '' });
         }

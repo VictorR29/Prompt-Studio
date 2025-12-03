@@ -1018,14 +1018,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                             Preview
                         </button>
                     ) : null}
-                    <button
-                        onClick={handleGenerateText}
-                        disabled={isLoading}
-                        className="flex-1 bg-teal-600/90 backdrop-blur hover:bg-teal-500 disabled:bg-teal-500/50 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                    >
-                         {isLoading ? <Loader /> : <SparklesIcon className="w-5 h-5" />}
-                        Generar Texto
-                    </button>
+                    {/* 'Generar Texto' button removed as requested */}
                 </div>
             </div>
 
