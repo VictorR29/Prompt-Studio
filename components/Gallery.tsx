@@ -25,11 +25,12 @@ const SUBSEQUENT_LOAD_COUNT = 10;
 
 export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, multiSelect = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilters, setActiveFilters] = useState<Set<SavedPrompt['type']>>(new Set());
+  // Set of strings to allow for custom filters like 'imported'
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  const handleFilterToggle = useCallback((type: SavedPrompt['type']) => {
+  const handleFilterToggle = useCallback((type: string) => {
     setActiveFilters(prevFilters => {
       const newFilters = new Set(prevFilters);
       if (newFilters.has(type)) {
@@ -43,13 +44,16 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
   
   const filteredPrompts = useMemo(() => {
     return prompts.filter(prompt => {
-      // Filter by type
+      // Filter by type or custom status
       if (activeFilters.size > 0) {
-          const matchesDirectType = activeFilters.has(prompt.type);
-          // If the 'hybrid' filter is active, include any prompt marked as isHybrid
-          const matchesHybridFilter = activeFilters.has('hybrid') && !!prompt.isHybrid;
+          const isImported = prompt.category === 'Imported' || !!prompt.creator;
           
-          if (!matchesDirectType && !matchesHybridFilter) return false;
+          let matches = false;
+          if (activeFilters.has(prompt.type)) matches = true;
+          if (activeFilters.has('hybrid') && prompt.isHybrid) matches = true;
+          if (activeFilters.has('imported') && isImported) matches = true;
+          
+          if (!matches) return false;
       }
 
       // Filter by search query
@@ -110,6 +114,19 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
 
         <div className="flex flex-wrap gap-2 items-center">
             <span className="text-sm font-semibold text-gray-400 mr-2">Filtrar por:</span>
+            
+            <button
+              onClick={() => handleFilterToggle('imported')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-full ring-1 transition-all duration-200 flex items-center gap-1 ${
+                activeFilters.has('imported')
+                  ? 'ring-offset-2 ring-offset-gray-900 ring-white bg-white text-gray-900 scale-105 shadow-md'
+                  : 'opacity-70 hover:opacity-100 bg-white/10 text-white border border-white/20'
+              }`}
+            >
+              📥 Importados
+            </button>
+            <div className="h-4 w-px bg-gray-700 mx-1"></div>
+
           {filterOptions.map(option => (
             <button
               key={option.id}
@@ -126,7 +143,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts, onSelect, selection, 
           {activeFilters.size > 0 && (
              <button
               onClick={() => setActiveFilters(new Set())}
-              className="px-3 py-1.5 text-xs font-semibold rounded-full ring-1 transition-all duration-200 text-gray-300 ring-gray-500/30 hover:bg-gray-500/30"
+              className="px-3 py-1.5 text-xs font-semibold rounded-full ring-1 transition-all duration-200 text-gray-300 ring-gray-500/30 hover:bg-gray-500/30 ml-auto"
             >
               Limpiar filtros
             </button>

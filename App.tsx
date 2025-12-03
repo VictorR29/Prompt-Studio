@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -52,7 +53,26 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>('editor');
-  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  
+  // Lazy initialization for savedPrompts to prevent race conditions
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>(() => {
+    try {
+      const storedPrompts = localStorage.getItem('savedPrompts');
+      if (storedPrompts) {
+        const parsedPrompts = JSON.parse(storedPrompts);
+        // Migration logic for older prompts without a 'type'
+        return parsedPrompts.map((p: any) => ({
+          ...p,
+          type: p.type || 'style',
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error("Error al cargar los prompts desde localStorage:", error);
+      return [];
+    }
+  });
+
   const [promptForEditor, setPromptForEditor] = useState<SavedPrompt | null>(null);
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>('style');
   const [selectedPromptForModal, setSelectedPromptForModal] = useState<SavedPrompt | null>(null);
@@ -206,23 +226,6 @@ const App: React.FC = () => {
   const removeToast = (id: number) => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
-
-  useEffect(() => {
-    try {
-      const storedPrompts = localStorage.getItem('savedPrompts');
-      if (storedPrompts) {
-        const parsedPrompts = JSON.parse(storedPrompts);
-        // Migration logic for older prompts without a 'type'
-        const migratedPrompts = parsedPrompts.map((p: any) => ({
-          ...p,
-          type: p.type || 'style',
-        }));
-        setSavedPrompts(migratedPrompts);
-      }
-    } catch (error) {
-      console.error("Error al cargar los prompts desde localStorage:", error);
-    }
-  }, []);
 
   useEffect(() => {
     // Sincronizar con localStorage cada vez que savedPrompts cambie
