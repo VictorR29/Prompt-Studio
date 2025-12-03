@@ -17,7 +17,7 @@ export const UserIcon: React.FC<IconProps> = (props) => (
 
 export const BodyIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zM12 7.5a6 6 0 00-6 6v3.75a.75.75 0 001.5 0v-3.75a4.5 4.5 0 119 0v3.75a.75.75 0 001.5 0v-3.75a6 6 0 00-6-6z" />
   </svg>
 );
 
@@ -35,7 +35,7 @@ export const MountainIcon: React.FC<IconProps> = (props) => (
 
 export const ShirtIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3zM6 6h.008v.008H6V6z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M20.914 9.477l-3.323-5.574A2.25 2.25 0 0015.662 2.5H8.338a2.25 2.25 0 00-1.93 1.403L3.086 9.477a1.5 1.5 0 002.058 1.944l.856-.428V19.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25V10.993l.856.428a1.5 1.5 0 002.058-1.944z" />
   </svg>
 );
 
@@ -53,7 +53,7 @@ export const FrameIcon: React.FC<IconProps> = (props) => (
 
 export const DropIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125S3.75 19.903 3.75 17.625V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125S3.75 12.527 3.75 10.125" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.25c-5.385 5.965-8.25 9.675-8.25 13.125a8.25 8.25 0 0016.5 0c0-3.45-2.865-7.16-8.25-13.125z" />
   </svg>
 );
 
