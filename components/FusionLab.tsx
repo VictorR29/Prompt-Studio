@@ -95,23 +95,23 @@ const Slot: React.FC<{
                                     <img src={slot.url} alt="Cover" className="w-full h-full object-cover" />
                                 </div>
                             ) : null}
-                            <div className="relative z-10">
+                            <div className="relative z-10 pointer-events-none">
                                 <span className="text-2xl mb-2 block">📝</span>
                                 <p className="text-xs font-bold text-indigo-300 line-clamp-3">{slot.label}</p>
                             </div>
                         </div>
                     )}
                     
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
                         <button
                             onClick={() => onClear(slot.id)}
-                            className="bg-red-500/80 p-2 rounded-full text-white hover:bg-red-600 transition-colors shadow-lg"
+                            className="bg-red-500/80 p-2 rounded-full text-white hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110"
                             title="Limpiar slot"
                         >
                             <CloseIcon className="w-5 h-5" />
                         </button>
                     </div>
-                    <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1">
+                    <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1 z-10 pointer-events-none">
                         <span>{label}</span>
                         <span className="text-[10px] text-gray-400 uppercase ml-1">({slot.type === 'image' ? 'IMG' : 'TXT'})</span>
                     </div>
