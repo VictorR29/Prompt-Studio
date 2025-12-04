@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CloseIcon } from './icons/CloseIcon';
 import { SavedPrompt } from '../types';
 import { SaveIcon } from './icons/SaveIcon';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -27,6 +29,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
   const [apiKey, setApiKey] = useState('');
   const [username, setUsername] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,6 +64,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
     setApiKey('');
     addToast('Se ha limpiado tu API Key. Usando la clave por defecto.', 'success');
     onKeySaved();
+  };
+  
+  const handleClearGallery = () => {
+    localStorage.removeItem('savedPrompts');
+    if (onPromptsUpdate) {
+        onPromptsUpdate([]);
+    }
+    setConfirmClear(false);
+    addToast('Galería eliminada por completo. Ahora tienes espacio libre.', 'success');
   };
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
@@ -234,7 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
             <section className="space-y-4">
                  <h3 className="text-lg font-semibold text-gray-200 border-b border-white/10 pb-2">Gestión de Datos</h3>
                  <p className="text-gray-400 text-sm">
-                    Tus prompts se guardan en el almacenamiento local de tu navegador. Haz una copia de seguridad para no perderlos.
+                    Tus prompts se guardan en el almacenamiento local. Exporta una copia de seguridad antes de borrar.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                     <button
@@ -259,6 +271,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
                         />
                     </button>
                 </div>
+                
+                {/* Nuclear Option: Clear Gallery */}
+                {!confirmClear ? (
+                    <button 
+                        onClick={() => setConfirmClear(true)}
+                        className="w-full mt-3 flex items-center justify-center gap-2 py-2 text-xs font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                    >
+                        <TrashIcon className="w-4 h-4" />
+                        Borrar toda la Galería (Reiniciar)
+                    </button>
+                ) : (
+                    <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg animate-fade-in-subtle">
+                        <p className="text-xs text-red-200 mb-2 text-center">
+                            ¿Estás seguro? Esta acción borrará TODOS los prompts y no se puede deshacer.
+                            <br/><span className="font-bold">Asegúrate de haber exportado antes.</span>
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setConfirmClear(false)}
+                                className="flex-1 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded-md transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleClearGallery}
+                                className="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-md transition-colors"
+                            >
+                                Sí, Borrar Todo
+                            </button>
+                        </div>
+                    </div>
+                )}
             </section>
         </div>
         
