@@ -15,7 +15,8 @@ import {
     generateMasterPromptMetadata,
     generateImageFromPrompt,
     generateNegativePrompt,
-    assembleOptimizedJson
+    assembleOptimizedJson,
+    generateStructuredPromptFromImage
 } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
@@ -272,29 +273,60 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleGenerateStructure = async () => {
         setLoadingAction('structure');
         setError(null);
-        setGlobalLoader({ active: true, message: 'Analizando y estructurando prompt...' });
+        setGlobalLoader({ active: true, message: 'Analizando imagen y estructura...' });
 
         try {
             // Optimized logic for image input: single call to modularize directly
             if (structurerImages.length > 0) {
                  const imagePayloads = structurerImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
                  
-                 // Use the new efficient service function
-                 const modularized = await modularizeImageAnalysis(imagePayloads, structurerIdea, structurerStyle) as Record<ExtractionMode, string>;
+                 // Try structured analysis first
+                 let modularized: Record<ExtractionMode, string> | null = null;
                  
-                 setFragments(modularized);
-                 if (modularized.negative) {
-                     setNegativePrompt(modularized.negative);
+                 try {
+                     modularized = await modularizeImageAnalysis(imagePayloads, structurerIdea, structurerStyle) as Record<ExtractionMode, string>;
+                 } catch (e) {
+                     console.warn("Structured analysis failed, trying fallback...", e);
+                 }
+
+                 // Check if we got valid content (at least one non-empty field)
+                 const hasContent = modularized && Object.values(modularized).some(v => v && v.trim().length > 0);
+
+                 if (!hasContent) {
+                     console.log("Structured analysis returned empty. Switching to fallback method.");
+                     setGlobalLoader({ active: true, message: 'Análisis profundo en curso...' });
+                     
+                     // Fallback: Generate raw description then modularize
+                     const context = structurerIdea ? `Context: ${structurerIdea}. ` : '';
+                     const styleCtx = structurerStyle ? `Style: ${structurerStyle}` : '';
+                     const rawPrompt = await generateStructuredPromptFromImage(imagePayloads, `${context}${styleCtx}`);
+                     
+                     const fallbackModularized = await modularizePrompt(rawPrompt) as Record<ExtractionMode, string>;
+                     
+                     setFragments(fallbackModularized);
+                     setFinalPrompt(rawPrompt); 
+                     
+                     if (fallbackModularized.negative) {
+                         setNegativePrompt(fallbackModularized.negative);
+                         setShowNegativeSection(true);
+                     }
+                     setViewMode('editor');
+                     return;
+                 }
+
+                 setFragments(modularized!);
+                 if (modularized!.negative) {
+                     setNegativePrompt(modularized!.negative);
                      setShowNegativeSection(true);
                  }
                  
-                 // Generate a text prompt for the output box (optional but good UX)
-                 const assembled = await assembleMasterPrompt(modularized);
+                 setGlobalLoader({ active: true, message: 'Ensamblando prompt final...' });
+                 const assembled = await assembleMasterPrompt(modularized!);
                  setFinalPrompt(assembled);
 
                  setViewMode('editor');
             } else {
-                // Text-only path
+                // Text only path
                 if (!structurerIdea.trim()) {
                     throw new Error('La idea principal es necesaria si no hay imagen.');
                 }
@@ -312,13 +344,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al generar estructura: ${errorMessage}`);
             addToast(`Error al generar estructura: ${errorMessage}`, 'error');
-            setGlobalLoader({ active: false, message: '' });
         } finally {
             setLoadingAction(null);
-             // Global loader turned off if not handled by handleLoadPromptFromUI
-            if (structurerImages.length > 0) {
-                 setGlobalLoader({ active: false, message: '' });
-            }
+            setGlobalLoader({ active: false, message: '' });
         }
     };
 
