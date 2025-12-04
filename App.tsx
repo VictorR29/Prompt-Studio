@@ -227,10 +227,20 @@ const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
 
+  // Robust LocalStorage saving with Quota Limit detection
   useEffect(() => {
-    // Sincronizar con localStorage cada vez que savedPrompts cambie
-    localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
-  }, [savedPrompts]);
+    try {
+        localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+    } catch (e: any) {
+        console.error("LocalStorage error:", e);
+        if (e.name === 'QuotaExceededError' || e.message?.includes('quota')) {
+            addToast("⚠️ Almacenamiento lleno. Exporta y borra prompts antiguos para seguir guardando.", "error");
+        } else {
+            // Only show generic toast if it's not a known quota issue to avoid spamming
+           // addToast("Error al guardar en almacenamiento local.", "warning");
+        }
+    }
+  }, [savedPrompts, addToast]);
   
   useEffect(() => {
     // Cuando cambia el modo, limpia el estado para evitar confusiones.

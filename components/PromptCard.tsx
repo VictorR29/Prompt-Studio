@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { SavedPrompt } from '../types';
 import { PROMPT_TYPE_CONFIG } from '../config';
 import { CheckIcon } from './icons/CheckIcon';
@@ -27,6 +27,7 @@ interface PromptCardProps {
 
 export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isSelected = false }) => {
   const { className: typeBadgeClass, text: typeText } = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
+  const [imgError, setImgError] = useState(false);
 
   const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
   const isImported = promptData.category === 'Imported' || (promptData.creator && promptData.creator !== 'Anon');
@@ -65,13 +66,14 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
       onClick={onClick}
     >
       <div className={`relative w-full rounded-xl shadow-lg overflow-hidden bg-gray-800 transition-all duration-300 group-hover:shadow-2xl group-hover:shadow-teal-500/10 group-hover:-translate-y-1 ${isSelected ? 'ring-2 ring-offset-2 ring-offset-gray-900 ring-teal-400' : ''}`}>
-        {promptData.coverImage ? (
+        {promptData.coverImage && !imgError ? (
           <img 
             src={promptData.coverImage} 
             alt={promptData.title} 
             className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105 bg-gray-800"
             loading="lazy"
             decoding="async"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full aspect-square bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
