@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ExtractionMode, SavedPrompt, AssistantResponse } from '../types';
 import { getCreativeAssistantResponse, modularizePrompt, assembleMasterPrompt, generateMasterPromptMetadata, generateImageFromPrompt } from '../services/geminiService';
@@ -149,6 +150,42 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         }
     };
 
+    // Helper to extract JSON from AI response even if it includes Markdown or extra text
+    const cleanAndParseResponse = (text: string): AssistantResponse => {
+        try {
+            // 1. Try simple parse first
+            return JSON.parse(text);
+        } catch (e) {
+            // 2. Try extracting from markdown code blocks
+            const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (codeBlockMatch) {
+                try {
+                    return JSON.parse(codeBlockMatch[1]);
+                } catch (e2) {
+                    // continue
+                }
+            }
+            
+            // 3. Try finding the outer braces
+            const firstBrace = text.indexOf('{');
+            const lastBrace = text.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                try {
+                    return JSON.parse(text.substring(firstBrace, lastBrace + 1));
+                } catch (e3) {
+                    // continue
+                }
+            }
+
+            // 4. Failed to parse JSON, assume plain text error or message
+            console.warn("Could not parse JSON from AI response:", text);
+            return {
+                message: text,
+                updates: []
+            };
+        }
+    };
+
     const handleSendMessage = async () => {
         if (!userInput.trim() || isLoading) return;
 
@@ -173,9 +210,11 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         geminiHistory.push({ role: 'user', parts: [{ text: userInput + `\n\n${contextText}` }] });
 
         try {
-            // The service now handles cleaning and parsing, returning a typed object
-            const parsedResponse = await getCreativeAssistantResponse(geminiHistory, fragments);
+            const responseText = await getCreativeAssistantResponse(geminiHistory, fragments);
             
+            // Robust parsing
+            const parsedResponse = cleanAndParseResponse(responseText);
+
             // Apply updates immediately
             if (parsedResponse.updates && parsedResponse.updates.length > 0) {
                 const newFragments = { ...fragments };
@@ -250,7 +289,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
             }
 
             setGlobalLoader({ active: true, message: 'Generando metadatos...' });
-            const metadata = await generateMasterPromptMetadata('style', currentPromptText, []);
+            const metadata = await generateMasterPromptMetadata(currentPromptText, []);
              const newPrompt: SavedPrompt = {
                 id: Date.now().toString(),
                 type: 'master',
