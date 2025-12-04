@@ -17,8 +17,12 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
   const { className: typeBadgeClass, text: typeText } = config;
   const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
   
-  // Defensive check: Ensure ID exists before slicing
+  // Defensive check: Ensure ID exists before slicing, and cast all potentially unsafe fields to string
   const safeId = promptData.id ? String(promptData.id) : 'UNKNOWN';
+  const safeTitle = String(promptData.title || 'Untitled Prompt');
+  const safeCategory = String(promptData.category || 'General');
+  // Handle prompt being potentially an object (if legacy/corrupted)
+  const safePrompt = typeof promptData.prompt === 'string' ? promptData.prompt : JSON.stringify(promptData.prompt || '');
 
   return (
     <div 
@@ -56,14 +60,14 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
             <div className="flex flex-col gap-8 flex-grow justify-center mt-8">
                  <div className="space-y-4">
                      <div className="flex items-center gap-4">
-                        <span className="text-teal-400 font-bold uppercase tracking-widest text-lg">{promptData.category || 'General'}</span>
+                        <span className="text-teal-400 font-bold uppercase tracking-widest text-lg">{safeCategory}</span>
                         <div className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide flex items-center gap-2 border border-white/10 ${typeBadgeClass}`}>
                              {isHybrid && <DNAIcon className="w-4 h-4" />}
                              {typeText}
                         </div>
                      </div>
                      <h1 className="text-7xl font-black text-white leading-[1.05] tracking-tight line-clamp-3 drop-shadow-lg">
-                        {promptData.title || 'Untitled Prompt'}
+                        {safeTitle}
                      </h1>
                  </div>
 
@@ -71,7 +75,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                  <div className="bg-white/5 rounded-3xl p-10 border border-white/10 backdrop-blur-md relative overflow-hidden shadow-2xl">
                     <div className="absolute top-0 left-0 w-3 h-full bg-gradient-to-b from-teal-400 to-indigo-500"></div>
                      <p className="text-3xl leading-relaxed font-mono text-gray-200 line-clamp-[5] whitespace-pre-wrap">
-                        {promptData.prompt}
+                        {safePrompt}
                     </p>
                  </div>
             </div>

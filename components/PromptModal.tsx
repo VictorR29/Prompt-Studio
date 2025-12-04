@@ -43,9 +43,18 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
   const [shareUrl, setShareUrl] = useState('');
   const shareCardRef = useRef<HTMLDivElement>(null);
 
+  // Data Sanitization: Ensure all display fields are strings to prevent React render crashes
+  // if localStorage contains corrupted data (e.g., objects where strings should be).
+  const safeTitle = String(promptData.title || 'Sin Título');
+  const safeCategory = String(promptData.category || 'General');
+  const safeArtType = String(promptData.artType || 'Estándar');
+  const safeNotes = promptData.notes ? String(promptData.notes) : '';
+  const safePromptText = typeof promptData.prompt === 'string' ? promptData.prompt : JSON.stringify(promptData.prompt || '');
+  const safeNegativePrompt = promptData.negativePrompt ? String(promptData.negativePrompt) : '';
+
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(promptData.prompt);
+    navigator.clipboard.writeText(safePromptText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -67,21 +76,17 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
       try {
           // Create a lightweight payload for the QR code (exclude heavy cover image)
           const currentUser = localStorage.getItem('promptStudioUsername');
-          const safeTitle = promptData.title ? promptData.title.substring(0, 50) : 'Untitled';
-
+          
           const payload: any = {
-              p: promptData.prompt,
+              p: safePromptText,
               t: promptData.type,
-              ti: safeTitle,
-              c: promptData.category,
-              at: promptData.artType,
+              ti: safeTitle.substring(0, 50),
+              c: safeCategory,
+              at: safeArtType,
               u: currentUser || undefined, // Include username of creator
           };
           
-          if (promptData.negativePrompt) payload.n = promptData.negativePrompt;
-          
-          // Defensive check for notes: Ensure it's a string before substring
-          const safeNotes = promptData.notes || ''; 
+          if (safeNegativePrompt) payload.n = safeNegativePrompt;
           if (safeNotes) payload.no = safeNotes.substring(0, 600);
           
           if (promptData.isHybrid) payload.h = 1;
@@ -93,7 +98,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
           console.warn("Could not generate share URL for this prompt:", error);
           setShareUrl('');
       }
-  }, [promptData]);
+  }, [promptData, safePromptText, safeTitle, safeCategory, safeArtType, safeNegativePrompt, safeNotes]);
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -113,24 +118,24 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
 
         if (!blob) throw new Error("Error generating image");
 
-        const safeTitle = (promptData.title || 'prompt').replace(/\s+/g, '-').toLowerCase();
-        const file = new File([blob], `prompt-studio-${safeTitle}.png`, { type: 'image/png' });
+        const cleanTitle = safeTitle.replace(/\s+/g, '-').toLowerCase();
+        const file = new File([blob], `prompt-studio-${cleanTitle}.png`, { type: 'image/png' });
 
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
                 await navigator.share({
                     files: [file],
-                    title: promptData.title,
-                    text: `Mira este prompt creado en Prompt Studio: ${promptData.title}`,
+                    title: safeTitle,
+                    text: `Mira este prompt creado en Prompt Studio: ${safeTitle}`,
                 });
             } catch (shareError) {
                 if ((shareError as Error).name !== 'AbortError') {
                     console.error("Share failed", shareError);
-                    downloadImage(blob, safeTitle);
+                    downloadImage(blob, cleanTitle);
                 }
             }
         } else {
-            downloadImage(blob, safeTitle);
+            downloadImage(blob, cleanTitle);
         }
 
     } catch (err) {
@@ -220,7 +225,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
       >
         <div className="w-full md:w-1/2 relative bg-gray-900">
             {promptData.coverImage ? (
-                <img src={promptData.coverImage} alt={promptData.title} className="w-full h-64 md:h-full object-cover" />
+                <img src={promptData.coverImage} alt={safeTitle} className="w-full h-64 md:h-full object-cover" />
             ) : (
                 <div className="w-full h-64 md:h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
                     {getIconForType()}
@@ -245,13 +250,13 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
         <div className="w-full md:w-1/2 p-6 flex flex-col overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
                 <div className="flex-grow">
-                    <h2 id="prompt-modal-title" className="text-2xl font-bold text-white leading-tight">{promptData.title}</h2>
+                    <h2 id="prompt-modal-title" className="text-2xl font-bold text-white leading-tight">{safeTitle}</h2>
                     <div className="flex flex-wrap gap-2 mt-2">
                          <span className="text-teal-300 text-xs font-semibold bg-white/10 px-2.5 py-1 rounded-full">
-                            {promptData.category}
+                            {safeCategory}
                         </span>
                          <span className="text-amber-300 text-xs font-semibold bg-white/10 px-2.5 py-1 rounded-full">
-                            {promptData.artType}
+                            {safeArtType}
                         </span>
                     </div>
                 </div>
@@ -269,30 +274,30 @@ export const PromptModal: React.FC<PromptModalProps> = ({ promptData, onClose, o
                     <h4 className="font-bold text-teal-300 mb-2 text-xs uppercase tracking-wider flex items-center gap-2">
                         <SparklesIcon className="w-3 h-3" /> Descripción Visual
                     </h4>
-                    <p className="text-gray-300 text-sm leading-relaxed">{promptData.notes || 'Sin descripción disponible.'}</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{safeNotes || 'Sin descripción disponible.'}</p>
                 </div>
 
                 <div>
                     <h4 className="font-bold text-teal-300 mb-2 text-sm uppercase tracking-wider">Prompt Completo</h4>
                      <div className="bg-gray-800 rounded-lg p-3 ring-1 ring-gray-700">
                         {promptData.type === 'structured' ? (
-                            <JsonEditor jsonString={promptData.prompt} />
+                            <JsonEditor jsonString={safePromptText} />
                         ) : (
                             <pre className="font-mono text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                {promptData.prompt}
+                                {safePromptText}
                             </pre>
                         )}
                     </div>
                 </div>
 
-                {promptData.negativePrompt && (
+                {safeNegativePrompt && (
                     <div>
                         <h4 className="font-bold text-red-400 mb-2 text-sm uppercase tracking-wider flex items-center gap-2">
                             <BanIcon className="w-4 h-4" /> Prompt Negativo
                         </h4>
                         <div className="bg-red-900/10 rounded-lg p-3 ring-1 ring-red-500/30">
                             <pre className="font-mono text-xs text-red-200 leading-relaxed whitespace-pre-wrap">
-                                {promptData.negativePrompt}
+                                {safeNegativePrompt}
                             </pre>
                         </div>
                     </div>
