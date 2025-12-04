@@ -77,7 +77,7 @@ const Slot: React.FC<{
 
     return (
         <div 
-            className={`relative group w-full aspect-square bg-gray-900/50 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden ${isDragging ? 'border-teal-400 bg-teal-500/10' : 'border-gray-700 hover:border-indigo-500 hover:bg-gray-900/80'}`}
+            className={`relative group w-full h-48 sm:h-auto sm:aspect-square bg-gray-900/50 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden ${isDragging ? 'border-teal-400 bg-teal-500/10' : 'border-gray-700 hover:border-indigo-500 hover:bg-gray-900/80'}`}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
@@ -102,26 +102,29 @@ const Slot: React.FC<{
                         </div>
                     )}
                     
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
-                        <button
-                            onClick={() => onClear(slot.id)}
-                            className="bg-red-500/80 p-2 rounded-full text-white hover:bg-red-600 transition-colors shadow-lg transform hover:scale-110"
-                            title="Limpiar slot"
-                        >
-                            <CloseIcon className="w-5 h-5" />
-                        </button>
-                    </div>
+                    {/* Always visible delete button on top-right, safer for mobile */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClear(slot.id);
+                        }}
+                        className="absolute top-2 right-2 z-20 bg-black/60 hover:bg-red-600 text-white p-2 rounded-full transition-all shadow-md backdrop-blur-sm"
+                        title="Limpiar slot"
+                    >
+                        <CloseIcon className="w-5 h-5" />
+                    </button>
+
                     <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-white flex items-center gap-1 z-10 pointer-events-none">
                         <span>{label}</span>
                         <span className="text-[10px] text-gray-400 uppercase ml-1">({slot.type === 'image' ? 'IMG' : 'TXT'})</span>
                     </div>
                 </>
             ) : (
-                <div className="flex flex-col items-center justify-center gap-2 p-2 w-full h-full">
-                    <span className="text-xs font-semibold text-gray-500 mb-1">{label}</span>
-                    <div className="flex gap-2">
-                        <label htmlFor={inputId} className="cursor-pointer bg-gray-800 hover:bg-gray-700 p-2 rounded-lg transition-colors group/btn" title="Subir Imagen">
-                            <ImageIcon className="w-5 h-5 text-gray-400 group-hover/btn:text-white" />
+                <div className="flex flex-col items-center justify-center gap-3 p-4 w-full h-full">
+                    <span className="text-sm font-semibold text-gray-500 mb-1">{label}</span>
+                    <div className="flex gap-4">
+                        <label htmlFor={inputId} className="cursor-pointer bg-gray-800 hover:bg-gray-700 p-3 rounded-xl transition-colors group/btn shadow-md ring-1 ring-white/5" title="Subir Imagen">
+                            <ImageIcon className="w-6 h-6 text-gray-400 group-hover/btn:text-white" />
                             <input
                                 id={inputId}
                                 type="file"
@@ -132,13 +135,13 @@ const Slot: React.FC<{
                         </label>
                         <button 
                             onClick={() => onOpenGallery(slot.id)} 
-                            className="bg-gray-800 hover:bg-gray-700 p-2 rounded-lg transition-colors group/btn" 
+                            className="bg-gray-800 hover:bg-gray-700 p-3 rounded-xl transition-colors group/btn shadow-md ring-1 ring-white/5" 
                             title="Seleccionar de Galería"
                         >
-                            <GalleryIcon className="w-5 h-5 text-gray-400 group-hover/btn:text-white" />
+                            <GalleryIcon className="w-6 h-6 text-gray-400 group-hover/btn:text-white" />
                         </button>
                     </div>
-                    <span className="text-[10px] text-gray-600 mt-1">Arrastra o selecciona</span>
+                    <span className="text-xs text-gray-600 mt-1">Arrastra o selecciona</span>
                 </div>
             )}
             {isDragging && (
@@ -320,7 +323,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
                     {/* Slots */}
                     <div className="bg-gray-900/50 p-4 rounded-xl border border-white/5">
                         <label className="block text-sm font-bold text-gray-300 mb-3 uppercase tracking-wide">2. Referencias (ADN)</label>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                             {slots.map((slot, idx) => (
                                 <Slot 
                                     key={slot.id} 
