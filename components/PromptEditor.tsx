@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { SavedPrompt, ExtractionMode, AppView } from '../types';
 import { 
@@ -197,12 +196,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             }
             
             setGlobalLoader({ active: true, message: 'Generando metadatos para la plantilla...' });
-            const imagePayload = coverImageDataUrl ? {
+            const imagePayload = coverImageDataUrl ? [{
                 imageBase64: coverImageDataUrl.split(',')[1],
                 mimeType: 'image/jpeg'
-            } : undefined;
+            }] : undefined;
 
-            const metadata = await generateStructuredPromptMetadata(templateJson, imagePayload) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
+            const metadata = await generateStructuredPromptMetadata('style', templateJson, imagePayload) as Omit<SavedPrompt, 'id' | 'prompt' | 'coverImage' | 'type'>;
 
             const newTemplatePrompt: SavedPrompt = {
                 id: Date.now().toString(),
@@ -247,7 +246,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
             setGlobalLoader({ active: true, message: 'Generando metadatos...' });
             // Generate metadata based on the text prompt
-            const metadata = await generateMasterPromptMetadata(pastedExternalPrompt, []);
+            const metadata = await generateMasterPromptMetadata('style', pastedExternalPrompt, []);
 
             const newPrompt: SavedPrompt = {
                 id: Date.now().toString(),
@@ -654,7 +653,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             if (outputType === 'text') {
                 const allImages: ImageState[] = Object.values(imagesByModule).reduce<ImageState[]>((acc, val) => (Array.isArray(val) ? acc.concat(val) : acc), []);
                 const imagePayload = allImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
-                const metadata = await generateMasterPromptMetadata(finalPrompt, imagePayload);
+                const metadata = await generateMasterPromptMetadata('style', finalPrompt, imagePayload);
     
                 const newPrompt: SavedPrompt = {
                     id: Date.now().toString(),
@@ -666,12 +665,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 };
                 onSavePrompt(newPrompt);
             } else if (outputType === 'json') {
-                const imagePayload = coverImageDataUrl ? {
+                const imagePayload = coverImageDataUrl ? [{
                     imageBase64: coverImageDataUrl.split(',')[1],
                     mimeType: 'image/jpeg'
-                } : undefined;
+                }] : undefined;
 
-                const metadata = await generateStructuredPromptMetadata(finalPrompt, imagePayload);
+                const metadata = await generateStructuredPromptMetadata('style', finalPrompt, imagePayload);
                 const newPrompt: SavedPrompt = {
                     id: Date.now().toString(),
                     type: 'structured',
