@@ -11,7 +11,7 @@ import {
     adaptFragmentToContext, 
     analyzeImageFeature,
     generateStructuredPrompt,
-    generateStructuredPromptFromImage,
+    modularizeImageAnalysis,
     generateMasterPromptMetadata,
     generateImageFromPrompt,
     generateNegativePrompt,
@@ -29,7 +29,7 @@ import { UndoIcon } from './icons/UndoIcon';
 import { GalleryModal } from './GalleryModal';
 import { CloseIcon } from './icons/CloseIcon';
 import { fileToBase64 } from '../utils/fileUtils';
-import { createImageCollage } from '../utils/imageUtils';
+import { createImageCollage, resizeImageFile } from '../utils/imageUtils';
 import { ImageUploader } from './ImageUploader';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -38,7 +38,6 @@ import { ImagePreviewModal } from './ImagePreviewModal';
 import { BookmarkIcon } from './icons/BookmarkIcon';
 import { BanIcon } from './icons/BanIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
-
 
 type ImageState = { url: string; base64: string; mimeType: string; };
 
@@ -132,8 +131,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     }, [setGlobalLoader, addToast]);
     
     useEffect(() => {
-        // This effect specifically handles loading an `initialPrompt` prop,
-        // including cleanup for when the component unmounts mid-load.
         let isMounted = true;
 
         const loadInitialPrompt = async (promptData: SavedPrompt) => {
@@ -141,7 +138,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setError(null);
             setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
             
-            // Populate negative prompt if present
             if (promptData.negativePrompt) {
                 setNegativePrompt(promptData.negativePrompt);
                 setShowNegativeSection(true);
@@ -151,7 +147,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 const modularized = await modularizePrompt(promptData.prompt);
                 if (isMounted) {
                     setFragments(modularized as Record<ExtractionMode, string>);
-                    setFinalPrompt(promptData.prompt); // Pre-fill final prompt
+                    setFinalPrompt(promptData.prompt);
                     setViewMode('editor');
                 }
             } catch (err) {
@@ -193,7 +189,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             } catch (imgErr) {
                 console.error("Error generating cover image for template:", imgErr);
                 addToast('No se pudo generar la portada para la plantilla. Guardando sin ella.', 'error');
-                coverImageDataUrl = ''; // Fallback to no cover
+                coverImageDataUrl = '';
             }
             
             setGlobalLoader({ active: true, message: 'Generando metadatos para la plantilla...' });
@@ -246,12 +242,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             }
 
             setGlobalLoader({ active: true, message: 'Generando metadatos...' });
-            // Generate metadata based on the text prompt
             const metadata = await generateMasterPromptMetadata(pastedExternalPrompt, []);
 
             const newPrompt: SavedPrompt = {
                 id: Date.now().toString(),
-                type: 'master', // Treat as a master prompt so it can be modularized later
+                type: 'master',
                 prompt: pastedExternalPrompt,
                 coverImage: coverImageDataUrl,
                 title: metadata.title,
@@ -277,26 +272,41 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleGenerateStructure = async () => {
         setLoadingAction('structure');
         setError(null);
-        setGlobalLoader({ active: true, message: 'Generando prompt estructurado...' });
+        setGlobalLoader({ active: true, message: 'Analizando y estructurando prompt...' });
 
         try {
-            let resultText: string;
+            // Optimized logic for image input: single call to modularize directly
             if (structurerImages.length > 0) {
                  const imagePayloads = structurerImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
-                 resultText = await generateStructuredPromptFromImage(imagePayloads, structurerStyle || structurerIdea);
-            } else {
-                if (!structurerIdea.trim()) {
-                    throw new Error('La idea principal es necesaria.');
-                }
-                resultText = await generateStructuredPrompt({ idea: structurerIdea, style: structurerStyle });
-            }
-            
-            if (!resultText) {
-                throw new Error("La IA no generó ningún texto.");
-            }
+                 
+                 // Use the new efficient service function
+                 const modularized = await modularizeImageAnalysis(imagePayloads, structurerIdea, structurerStyle) as Record<ExtractionMode, string>;
+                 
+                 setFragments(modularized);
+                 if (modularized.negative) {
+                     setNegativePrompt(modularized.negative);
+                     setShowNegativeSection(true);
+                 }
+                 
+                 // Generate a text prompt for the output box (optional but good UX)
+                 const assembled = await assembleMasterPrompt(modularized);
+                 setFinalPrompt(assembled);
 
-            setGlobalLoader({ active: true, message: 'Estructura creada. Modularizando...' });
-            await handleLoadPromptFromUI(resultText);
+                 setViewMode('editor');
+            } else {
+                // Text-only path
+                if (!structurerIdea.trim()) {
+                    throw new Error('La idea principal es necesaria si no hay imagen.');
+                }
+                const resultText = await generateStructuredPrompt({ idea: structurerIdea, style: structurerStyle });
+                
+                if (!resultText) {
+                    throw new Error("La IA no generó ningún texto.");
+                }
+
+                setGlobalLoader({ active: true, message: 'Estructura creada. Modularizando...' });
+                await handleLoadPromptFromUI(resultText);
+            }
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
@@ -305,7 +315,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             setGlobalLoader({ active: false, message: '' });
         } finally {
             setLoadingAction(null);
-            // setGlobalLoader is handled by handleLoadPrompt on success
+             // Global loader turned off if not handled by handleLoadPromptFromUI
+            if (structurerImages.length > 0) {
+                 setGlobalLoader({ active: false, message: '' });
+            }
         }
     };
 
@@ -369,7 +382,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
         try {
             const newImagesData = await Promise.all(
-                Array.from(files).map(file => fileToBase64(file).then(data => ({ ...data, url: URL.createObjectURL(file) })))
+                Array.from(files).map(async file => {
+                    const resized = await resizeImageFile(file);
+                    return { ...resized, url: URL.createObjectURL(file) };
+                })
             );
             
             const allImages = [...currentImages, ...newImagesData];
@@ -422,7 +438,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 handleFragmentChange('subject', finalSubjectString);
                 addToast(`${promptsToProcess.length} sujeto(s) añadido(s).`, 'success');
             } else {
-                // Handle single select for other modules
                 const selectedPrompt = Array.isArray(selectedPrompts) ? selectedPrompts[0] : selectedPrompts as SavedPrompt;
                  if (!selectedPrompt) return;
 
@@ -435,7 +450,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 } catch (err) {
                     const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
                     addToast(`Error al adaptar: ${errorMessage}`, 'error');
-                    // Fallback to direct insertion on error
                     handleFragmentChange(targetModule, selectedPrompt.prompt);
                 } finally {
                     setOptimizingModule(null);
@@ -478,7 +492,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const result = String(await assembleMasterPrompt(fragmentsToAssemble));
             setFinalPrompt(result);
-            // On mobile, scroll to output
             if (window.innerWidth < 1024) {
                  setTimeout(() => {
                     document.getElementById('editor-output-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -523,7 +536,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     };
     
     const handleGenerateJson = () => {
-        // Check active fragments properly
         const activeFragments = Object.values(fragments).some(v => {
             if (typeof v === 'string') {
                 return v.trim() !== '';
@@ -560,7 +572,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const result = await assembleOptimizedJson(activeFragments);
             setFinalPrompt(result);
-            // On mobile, scroll to output
             if (window.innerWidth < 1024) {
                  setTimeout(() => {
                     document.getElementById('editor-output-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -623,7 +634,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             let coverImageDataUrl = '';
             let coverGenerationFailed = false;
     
-            // --- Cover Image Generation Logic ---
             if (outputType === 'text') {
                 const allImages: ImageState[] = Object.values(imagesByModule).reduce<ImageState[]>((acc, val) => (Array.isArray(val) ? acc.concat(val) : acc), []);
                 if (allImages.length > 0) {
@@ -648,7 +658,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 }
             }
     
-            // --- Metadata and Saving Logic ---
             setGlobalLoader({ active: true, message: 'Generando metadatos con IA...' });
     
             if (outputType === 'text') {
@@ -762,8 +771,16 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                 />
                            </div>
                            <div className="h-full">
-                             <ImageUploader onImagesUpload={(files) => {
-                                fileToBase64(files[0]).then(imgData => setStructurerImages([{...imgData, url: URL.createObjectURL(files[0])}]));
+                             <ImageUploader onImagesUpload={async (files) => {
+                                if (files && files.length > 0) {
+                                    try {
+                                        // Optimize: Resize image to speed up upload/AI processing
+                                        const imgData = await resizeImageFile(files[0]);
+                                        setStructurerImages([{...imgData, url: URL.createObjectURL(files[0])}]);
+                                    } catch (e) {
+                                        addToast('Error al procesar la imagen.', 'error');
+                                    }
+                                }
                              }} onImageRemove={() => setStructurerImages([])} images={structurerImages} maxImages={1} />
                            </div>
                         </div>
@@ -957,7 +974,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                                     </div>
                                 </div>
 
-                                {/* Optional Negative Prompt Section */}
                                 <div className="border-t border-white/10 pt-4">
                                     <button 
                                         onClick={() => setShowNegativeSection(!showNegativeSection)}
@@ -1006,7 +1022,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 </div>
             </div>
             
-            {/* Mobile Floating Action Bar (Sticky Bottom) */}
             <div className="lg:hidden fixed bottom-16 left-0 right-0 p-4 z-40 bg-gradient-to-t from-gray-900/95 via-gray-900/80 to-transparent pointer-events-none">
                 <div className="flex gap-2 pointer-events-auto max-w-lg mx-auto">
                      {finalPrompt ? (
@@ -1018,11 +1033,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                             Preview
                         </button>
                     ) : null}
-                    {/* 'Generar Texto' button removed as requested */}
                 </div>
             </div>
 
-            {/* Modals are kept at the end to ensure they are on top of the layout */}
             {galleryModalFor && (
                 <GalleryModal 
                     prompts={savedPrompts}

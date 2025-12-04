@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { ExtractionMode, AssistantResponse } from "../types";
 
@@ -193,6 +194,51 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
 
     return cleanAndParseJson(response.text || "{}");
 };
+
+export const modularizeImageAnalysis = async (images: {imageBase64: string, mimeType: string}[], idea?: string, style?: string): Promise<Partial<Record<ExtractionMode, string>>> => {
+    const ai = getAiClient();
+    const parts: Part[] = [];
+    images.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.imageBase64 } }));
+    
+    let prompt = `Analyze these images and decompose them into a structured image generation prompt.`;
+    if (idea) prompt += `\nIncorporating this user idea: "${idea}".`;
+    if (style) prompt += `\nTarget Style: "${style}".`;
+    
+    prompt += `\n\nReturn a JSON object with the following keys (values must be detailed English descriptions):
+    subject, pose, expression, outfit, object, scene, color, composition, style.
+    extract any negative aspects to 'negative'.`;
+
+    parts.push({ text: prompt });
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts }],
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    subject: { type: Type.STRING },
+                    pose: { type: Type.STRING },
+                    expression: { type: Type.STRING },
+                    outfit: { type: Type.STRING },
+                    object: { type: Type.STRING },
+                    scene: { type: Type.STRING },
+                    color: { type: Type.STRING },
+                    composition: { type: Type.STRING },
+                    style: { type: Type.STRING },
+                    negative: { type: Type.STRING }
+                }
+            }
+        }
+    });
+
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error(formatSafetyError(response.candidates[0]));
+    }
+    
+    return cleanAndParseJson(response.text || "{}");
+}
 
 export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     const ai = getAiClient();

@@ -1,3 +1,4 @@
+
 const loadImage = (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -68,4 +69,50 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
     }
 
     return canvas.toDataURL('image/jpeg', 0.8);
+};
+
+export const resizeImageFile = (file: File, maxWidth = 1024): Promise<{ base64: string; mimeType: string; url: string }> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            
+            // Calculate new dimensions
+            if (width > maxWidth || height > maxWidth) {
+                const ratio = width / height;
+                if (width > height) {
+                    width = maxWidth;
+                    height = maxWidth / ratio;
+                } else {
+                    height = maxWidth;
+                    width = maxWidth * ratio;
+                }
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                 reject(new Error("Canvas context not available"));
+                 return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to base64
+            const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+            const base64Url = canvas.toDataURL(mimeType, 0.85); // 0.85 quality for jpeg
+            const base64 = base64Url.split(',')[1];
+            
+            resolve({
+                base64,
+                mimeType,
+                url // Keep original URL reference
+            });
+        };
+        img.onerror = reject;
+        img.src = url;
+    });
 };
