@@ -28,14 +28,25 @@ interface PromptCardProps {
   isSelected?: boolean;
   onDelete?: (id: string) => void;
   onEdit?: (prompt: SavedPrompt) => void;
+  activeContextMenuId?: string | null;
+  onSetActiveContextMenu?: (id: string | null) => void;
 }
 
-export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isSelected = false, onDelete, onEdit }) => {
+export const PromptCard: React.FC<PromptCardProps> = ({ 
+    promptData, 
+    onClick, 
+    isSelected = false, 
+    onDelete, 
+    onEdit,
+    activeContextMenuId,
+    onSetActiveContextMenu
+}) => {
   const { className: typeBadgeClass, text: typeText } = PROMPT_TYPE_CONFIG[promptData.type] || PROMPT_TYPE_CONFIG['style'];
   const [imgError, setImgError] = useState(false);
   
-  // Context Menu State
-  const [showContextMenu, setShowContextMenu] = useState(false);
+  // Determine if this specific card's menu is open based on parent state
+  const isContextMenuOpen = activeContextMenuId === promptData.id;
+  
   const [isCopied, setIsCopied] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,11 +60,13 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
       isLongPress.current = false;
       timerRef.current = setTimeout(() => {
           isLongPress.current = true;
-          setShowContextMenu(true);
+          if (onSetActiveContextMenu) {
+              onSetActiveContextMenu(promptData.id);
+          }
           // Haptic Feedback
           if (navigator.vibrate) navigator.vibrate(50);
       }, 500); // 500ms for long press
-  }, []);
+  }, [onSetActiveContextMenu, promptData.id]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent | React.MouseEvent) => {
       if (timerRef.current) {
@@ -67,22 +80,36 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
   }, []);
 
   const handleTouchMove = useCallback(() => {
+      // If user scrolls/moves finger, cancel the long press timer
       if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
       }
   }, []);
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+      // CRITICAL: Prevent default browser context menu (save image, open in new tab)
+      // This allows our custom long-press menu to be the only interaction.
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+  };
+
+  const closeMenu = (e?: React.MouseEvent) => {
+      if (e) e.stopPropagation();
+      if (onSetActiveContextMenu) onSetActiveContextMenu(null);
+  };
+
   // Quick Action Handlers
   const handleQuickEdit = (e: React.MouseEvent) => {
       e.stopPropagation();
-      setShowContextMenu(false);
+      closeMenu();
       if (onEdit) onEdit(promptData);
   };
 
   const handleQuickDelete = (e: React.MouseEvent) => {
       e.stopPropagation();
-      setShowContextMenu(false);
+      closeMenu();
       if (onDelete) onDelete(promptData.id);
   };
 
@@ -94,7 +121,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
       if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
       setTimeout(() => {
           setIsCopied(false);
-          setShowContextMenu(false);
+          closeMenu();
       }, 800);
   };
 
@@ -139,19 +166,21 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
       onMouseLeave={() => {
         if (timerRef.current) clearTimeout(timerRef.current);
       }}
+      onContextMenu={handleContextMenu}
+      style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}
     >
       <div className={`relative w-full rounded-xl shadow-lg overflow-hidden bg-gray-800 transition-all duration-300 group-hover:shadow-2xl group-hover:shadow-teal-500/10 group-hover:-translate-y-1 ${isSelected ? 'ring-2 ring-offset-2 ring-offset-gray-900 ring-teal-400' : ''}`}>
         {promptData.coverImage && !imgError ? (
           <img 
             src={promptData.coverImage} 
             alt={promptData.title} 
-            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105 bg-gray-800"
+            className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105 bg-gray-800 pointer-events-none" // pointer-events-none ensures long press goes to parent div
             loading="lazy"
             decoding="async"
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className="w-full aspect-square bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
+          <div className="w-full aspect-square bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center pointer-events-none">
             {getIconForType()}
           </div>
         )}
@@ -196,10 +225,10 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
         )}
 
         {/* Pinterest-Style Context Menu Overlay */}
-        {showContextMenu && (
+        {isContextMenuOpen && (
             <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-[2px] animate-fade-in flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                 {/* Close area (click outside buttons) */}
-                <div className="absolute inset-0" onClick={() => setShowContextMenu(false)}></div>
+                <div className="absolute inset-0" onClick={(e) => closeMenu(e)}></div>
                 
                 {/* Radial Buttons Container */}
                 <div className="relative w-full h-full flex items-center justify-center pointer-events-none">

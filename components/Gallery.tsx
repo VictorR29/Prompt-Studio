@@ -28,6 +28,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
+  const [activeContextMenuId, setActiveContextMenuId] = useState<string | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const handleFilterToggle = useCallback((type: string) => {
@@ -86,6 +87,15 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
     observer.observe(element);
     return () => observer.disconnect();
   }, [visibleCount, filteredPrompts.length]);
+
+  // Close context menu when scrolling
+  useEffect(() => {
+    const handleScroll = () => {
+        if (activeContextMenuId) setActiveContextMenuId(null);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeContextMenuId]);
 
   const promptsToShow = filteredPrompts.slice(0, visibleCount);
 
@@ -170,6 +180,8 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
                 isSelected={isSelected} 
                 onDelete={onDelete}
                 onEdit={onEdit}
+                activeContextMenuId={activeContextMenuId}
+                onSetActiveContextMenu={setActiveContextMenuId}
             />
             );
         })}
