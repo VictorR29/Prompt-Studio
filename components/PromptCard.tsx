@@ -201,34 +201,40 @@ export const PromptCard: React.FC<PromptCardProps> = ({ promptData, onClick, isS
                 {/* Close area (click outside buttons) */}
                 <div className="absolute inset-0" onClick={() => setShowContextMenu(false)}></div>
                 
-                {/* Radial Buttons */}
+                {/* Radial Buttons Container */}
                 <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
-                     {/* Edit - Top Left */}
-                     <button 
-                        onClick={handleQuickEdit}
-                        className="absolute -translate-y-12 -translate-x-12 w-14 h-14 bg-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-900/50 pointer-events-auto transform transition-transform hover:scale-110 active:scale-95 animate-scale-up"
-                        style={{ animationDelay: '0ms' }}
-                     >
-                        <PencilIcon className="w-6 h-6 text-white" />
-                     </button>
+                     {/* Edit - Top Left (Position Wrapper) */}
+                     <div className="absolute -translate-x-16 -translate-y-12">
+                         <button 
+                            onClick={handleQuickEdit}
+                            className="w-14 h-14 bg-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
+                            style={{ animationDelay: '0ms' }}
+                         >
+                            <PencilIcon className="w-6 h-6 text-white" />
+                         </button>
+                     </div>
                      
-                     {/* Copy - Top Right */}
-                     <button 
-                        onClick={handleQuickCopy}
-                        className="absolute -translate-y-12 translate-x-12 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/50 pointer-events-auto transform transition-transform hover:scale-110 active:scale-95 animate-scale-up"
-                        style={{ animationDelay: '50ms' }}
-                     >
-                        {isCopied ? <CheckIcon className="w-6 h-6 text-green-300" /> : <ClipboardIcon className="w-6 h-6 text-white" />}
-                     </button>
+                     {/* Copy - Top Right (Position Wrapper) */}
+                     <div className="absolute translate-x-16 -translate-y-12">
+                         <button 
+                            onClick={handleQuickCopy}
+                            className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
+                            style={{ animationDelay: '50ms' }}
+                         >
+                            {isCopied ? <CheckIcon className="w-6 h-6 text-green-300" /> : <ClipboardIcon className="w-6 h-6 text-white" />}
+                         </button>
+                     </div>
                      
-                     {/* Delete - Bottom Center */}
-                     <button 
-                        onClick={handleQuickDelete}
-                        className="absolute translate-y-10 w-14 h-14 bg-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-900/50 pointer-events-auto transform transition-transform hover:scale-110 active:scale-95 animate-scale-up"
-                        style={{ animationDelay: '100ms' }}
-                     >
-                        <TrashIcon className="w-6 h-6 text-white" />
-                     </button>
+                     {/* Delete - Bottom Center (Position Wrapper) */}
+                     <div className="absolute translate-y-16">
+                         <button 
+                            onClick={handleQuickDelete}
+                            className="w-14 h-14 bg-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
+                            style={{ animationDelay: '100ms' }}
+                         >
+                            <TrashIcon className="w-6 h-6 text-white" />
+                         </button>
+                     </div>
                 </div>
             </div>
         )}
