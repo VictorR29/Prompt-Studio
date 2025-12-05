@@ -1049,20 +1049,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     </div>
                 </div>
             </div>
-            
-            <div className="lg:hidden fixed bottom-16 left-0 right-0 p-4 z-40 bg-gradient-to-t from-gray-900/95 via-gray-900/80 to-transparent pointer-events-none">
-                <div className="flex gap-2 pointer-events-auto max-w-lg mx-auto">
-                     {finalPrompt ? (
-                        <button
-                            onClick={() => setShowPreview(true)}
-                            className="flex-1 bg-indigo-600/90 backdrop-blur hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                        >
-                            <EyeIcon className="w-5 h-5" />
-                            Preview
-                        </button>
-                    ) : null}
-                </div>
-            </div>
 
             {galleryModalFor && (
                 <GalleryModal 

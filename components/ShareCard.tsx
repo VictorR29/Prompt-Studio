@@ -24,6 +24,11 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
   // Handle prompt being potentially an object (if legacy/corrupted)
   const safePrompt = typeof promptData.prompt === 'string' ? promptData.prompt : JSON.stringify(promptData.prompt || '');
 
+  // Calculate if URL exceeds QR code capacity (V40-L max bits 23648).
+  // 26892 bits > 23648 bits caused the crash. 
+  // 2500 chars is a safe conservative limit for alphanumeric/binary mixed content.
+  const isUrlTooLong = shareUrl && shareUrl.length > 2500;
+
   return (
     <div 
         ref={ref} 
@@ -117,8 +122,8 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                     <div className="absolute -bottom-4 -right-4 w-12 h-12 border-b-[6px] border-r-[6px] border-slate-900 rounded-br-xl z-10"></div>
 
                     {/* The Code */}
-                    <div className="bg-white p-6 rounded-3xl shadow-2xl relative overflow-hidden">
-                        {shareUrl && (
+                    <div className="bg-white p-6 rounded-3xl shadow-2xl relative overflow-hidden flex items-center justify-center">
+                        {shareUrl && !isUrlTooLong ? (
                             <div style={{ width: '480px', height: '480px' }}>
                                 <QRCode 
                                     value={shareUrl} 
@@ -128,6 +133,15 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ promptDat
                                     bgColor="#FFFFFF"
                                     style={{ height: "auto", maxWidth: "100%", width: "100%", shapeRendering: "crispEdges" }}
                                 />
+                            </div>
+                        ) : (
+                             <div className="w-[480px] h-[480px] flex flex-col items-center justify-center text-center p-4 bg-slate-100 rounded-xl border-4 border-slate-200 border-dashed">
+                                <span className="text-6xl mb-4 grayscale opacity-50">📦</span>
+                                <h3 className="text-2xl font-bold text-slate-700 mb-2 uppercase">Data Overflow</h3>
+                                <p className="text-slate-500 text-lg font-medium leading-relaxed">
+                                    The prompt content is too large to encode in a QR code.
+                                    <br/>Please share via file export instead.
+                                </p>
                             </div>
                         )}
                     </div>
