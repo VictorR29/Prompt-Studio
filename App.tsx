@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { PromptDisplay } from './components/PromptDisplay';
@@ -20,6 +20,8 @@ import { createImageCollage } from './utils/imageUtils';
 import { Playground } from './components/Playground';
 import { FusionLab } from './components/FusionLab';
 import LZString from 'lz-string';
+import { ShareCard } from './components/ShareCard';
+import { toBlob } from 'html-to-image';
 
 interface ToastMessage {
   id: number;
@@ -85,6 +87,11 @@ const App: React.FC = () => {
   
   // New state to hold a shared prompt if the user hasn't set up their key yet
   const [pendingSharedPrompt, setPendingSharedPrompt] = useState<SavedPrompt | null>(null);
+
+  // Global Share State
+  const [promptToShare, setPromptToShare] = useState<SavedPrompt | null>(null);
+  const [shareUrl, setShareUrl] = useState('');
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   const maxImages =
     extractionMode === 'style' ? 5 :
@@ -171,6 +178,44 @@ const App: React.FC = () => {
           }
       }
   }, [importSharedPrompt, addToast]); 
+
+  // Generate Share URL when promptToShare updates
+  useEffect(() => {
+      if (!promptToShare) {
+          setShareUrl('');
+          return;
+      }
+      try {
+          const safeTitle = String(promptToShare.title || 'Sin Título');
+          const safeCategory = String(promptToShare.category || 'General');
+          const safeArtType = String(promptToShare.artType || 'Estándar');
+          const safeNotes = promptToShare.notes ? String(promptToShare.notes) : '';
+          const safePromptText = typeof promptToShare.prompt === 'string' ? promptToShare.prompt : JSON.stringify(promptToShare.prompt || '');
+          const safeNegativePrompt = promptToShare.negativePrompt ? String(promptToShare.negativePrompt) : '';
+          const currentUser = localStorage.getItem('promptStudioUsername');
+
+          const payload: any = {
+              p: safePromptText,
+              t: promptToShare.type,
+              ti: safeTitle.substring(0, 50),
+              c: safeCategory,
+              at: safeArtType,
+              u: currentUser || undefined,
+          };
+          
+          if (safeNegativePrompt) payload.n = safeNegativePrompt;
+          if (safeNotes) payload.no = safeNotes.substring(0, 600);
+          if (promptToShare.isHybrid) payload.h = 1;
+          
+          const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+          const url = `${window.location.origin}?data=${compressed}`;
+          setShareUrl(url);
+      } catch (error) {
+          console.warn("Could not generate share URL for this prompt:", error);
+          setShareUrl('');
+      }
+  }, [promptToShare]);
+
 
   useEffect(() => {
     const hasCompleted = localStorage.getItem('hasCompletedWalkthrough');
@@ -389,6 +434,53 @@ const App: React.FC = () => {
   const handleClosePromptModal = useCallback(() => {
       setSelectedPromptForModal(null);
   }, []);
+  
+  // Global Share Function
+  const handleSharePrompt = useCallback(async (prompt: SavedPrompt) => {
+      setPromptToShare(prompt);
+      setGlobalLoaderState({ active: true, message: 'Creando ficha visual...' });
+      
+      // Delay to ensure DOM is updated with the new prompt in ShareCard
+      setTimeout(async () => {
+          if (!shareCardRef.current) {
+              setGlobalLoaderState({ active: false, message: '' });
+              return;
+          }
+          
+          try {
+              const blob = await toBlob(shareCardRef.current, {
+                  cacheBust: true,
+                  pixelRatio: 3, 
+                  backgroundColor: '#0A0814',
+                  fontEmbedCSS: '', // Fix for Google Fonts CORS error
+              });
+              
+               const cleanTitle = (prompt.title || 'prompt').replace(/\s+/g, '-').toLowerCase();
+               const file = new File([blob], `prompt-studio-${cleanTitle}.png`, { type: 'image/png' });
+
+               if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: prompt.title,
+                        text: `Mira este prompt: ${prompt.title}`,
+                    });
+               } else {
+                   const link = document.createElement('a');
+                   link.href = URL.createObjectURL(blob);
+                   link.download = `prompt-studio-${cleanTitle}.png`;
+                   link.click();
+                   URL.revokeObjectURL(link.href);
+                   addToast('Imagen descargada (Compartir no soportado en este dispositivo)', 'success');
+               }
+          } catch (e) {
+              console.error("Share error", e);
+              addToast('Error al generar la imagen para compartir', 'error');
+          } finally {
+              setGlobalLoaderState({ active: false, message: '' });
+              setPromptToShare(null); // Cleanup
+          }
+      }, 500);
+  }, [addToast]);
 
   const finishWalkthrough = () => {
     localStorage.setItem('hasCompletedWalkthrough', 'true');
@@ -409,6 +501,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-transparent text-gray-200 font-sans flex flex-col">
       <Header view={view} setView={handleSetView} onOpenSettings={() => setIsSettingsModalOpen(true)} />
+      
+      {/* Hidden Share Card for generating images */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+          {promptToShare && shareUrl && <ShareCard ref={shareCardRef} promptData={promptToShare} shareUrl={shareUrl} />}
+      </div>
       
       <main className="flex-grow container mx-auto p-4 md:p-8 w-full pb-24 md:pb-8">
         {view === 'extractor' && (
@@ -453,6 +550,7 @@ const App: React.FC = () => {
               onSelect={handleSelectPromptForModal}
               onDelete={handleDeletePrompt}
               onEdit={handleEditPrompt}
+              onShare={handleSharePrompt}
             />
           </div>
         )}

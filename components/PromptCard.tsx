@@ -7,7 +7,7 @@ import { DNAIcon } from './icons/DNAIcon';
 import { BanIcon } from './icons/BanIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
-import { ClipboardIcon } from './icons/ClipboardIcon';
+import { ShareIcon } from './icons/ShareIcon';
 import { 
     PaletteIcon, 
     UserIcon, 
@@ -28,6 +28,7 @@ interface PromptCardProps {
   isSelected?: boolean;
   onDelete?: (id: string) => void;
   onEdit?: (prompt: SavedPrompt) => void;
+  onShare?: (prompt: SavedPrompt) => void;
   activeContextMenuId?: string | null;
   onSetActiveContextMenu?: (id: string | null) => void;
 }
@@ -38,6 +39,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
     isSelected = false, 
     onDelete, 
     onEdit,
+    onShare,
     activeContextMenuId,
     onSetActiveContextMenu
 }) => {
@@ -113,12 +115,20 @@ export const PromptCard: React.FC<PromptCardProps> = ({
       if (onDelete) onDelete(promptData.id);
   };
 
-  const handleQuickCopy = (e: React.MouseEvent) => {
+  const handleQuickShare = (e: React.MouseEvent) => {
       e.stopPropagation();
+      
+      // 1. Immediate Action: Copy Text
       const textToCopy = typeof promptData.prompt === 'string' ? promptData.prompt : JSON.stringify(promptData.prompt);
       navigator.clipboard.writeText(textToCopy);
       setIsCopied(true);
       if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+
+      // 2. Main Action: Trigger Global Share
+      if (onShare) {
+          onShare(promptData);
+      }
+
       setTimeout(() => {
           setIsCopied(false);
           closeMenu();
@@ -243,14 +253,14 @@ export const PromptCard: React.FC<PromptCardProps> = ({
                          </button>
                      </div>
                      
-                     {/* Copy - Top Right (Position Wrapper) */}
+                     {/* Share/Copy - Top Right (Position Wrapper) */}
                      <div className="absolute translate-x-16 -translate-y-12">
                          <button 
-                            onClick={handleQuickCopy}
+                            onClick={handleQuickShare}
                             className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
                             style={{ animationDelay: '50ms' }}
                          >
-                            {isCopied ? <CheckIcon className="w-6 h-6 text-green-300" /> : <ClipboardIcon className="w-6 h-6 text-white" />}
+                            {isCopied ? <CheckIcon className="w-6 h-6 text-green-300" /> : <ShareIcon className="w-6 h-6 text-white" />}
                          </button>
                      </div>
                      

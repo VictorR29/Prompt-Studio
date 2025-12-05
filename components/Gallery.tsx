@@ -12,6 +12,7 @@ interface GalleryProps {
   multiSelect?: boolean;
   onDelete?: (id: string) => void;
   onEdit?: (prompt: SavedPrompt) => void;
+  onShare?: (prompt: SavedPrompt) => void;
 }
 
 const filterOptions: { id: SavedPrompt['type']; label: string; className: string }[] = Object.entries(PROMPT_TYPE_CONFIG)
@@ -24,7 +25,7 @@ const filterOptions: { id: SavedPrompt['type']; label: string; className: string
 const INITIAL_LOAD_COUNT = 24;
 const SUBSEQUENT_LOAD_COUNT = 12;
 
-export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, selection, multiSelect = false, onDelete, onEdit }) => {
+export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, selection, multiSelect = false, onDelete, onEdit, onShare }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
@@ -180,6 +181,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
                 isSelected={isSelected} 
                 onDelete={onDelete}
                 onEdit={onEdit}
+                onShare={onShare}
                 activeContextMenuId={activeContextMenuId}
                 onSetActiveContextMenu={setActiveContextMenuId}
             />
