@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { SavedPrompt } from '../types';
 import { PromptCard } from './PromptCard';
@@ -9,6 +10,8 @@ interface GalleryProps {
   onSelect: (prompt: SavedPrompt) => void;
   selection?: SavedPrompt[];
   multiSelect?: boolean;
+  onDelete?: (id: string) => void;
+  onEdit?: (prompt: SavedPrompt) => void;
 }
 
 const filterOptions: { id: SavedPrompt['type']; label: string; className: string }[] = Object.entries(PROMPT_TYPE_CONFIG)
@@ -21,7 +24,7 @@ const filterOptions: { id: SavedPrompt['type']; label: string; className: string
 const INITIAL_LOAD_COUNT = 24;
 const SUBSEQUENT_LOAD_COUNT = 12;
 
-export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, selection, multiSelect = false }) => {
+export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, selection, multiSelect = false, onDelete, onEdit }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
@@ -165,6 +168,8 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
                 promptData={prompt} 
                 onClick={() => onSelect(prompt)}
                 isSelected={isSelected} 
+                onDelete={onDelete}
+                onEdit={onEdit}
             />
             );
         })}

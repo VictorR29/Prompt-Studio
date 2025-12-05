@@ -150,42 +150,6 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         }
     };
 
-    // Helper to extract JSON from AI response even if it includes Markdown or extra text
-    const cleanAndParseResponse = (text: string): AssistantResponse => {
-        try {
-            // 1. Try simple parse first
-            return JSON.parse(text);
-        } catch (e) {
-            // 2. Try extracting from markdown code blocks
-            const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (codeBlockMatch) {
-                try {
-                    return JSON.parse(codeBlockMatch[1]);
-                } catch (e2) {
-                    // continue
-                }
-            }
-            
-            // 3. Try finding the outer braces
-            const firstBrace = text.indexOf('{');
-            const lastBrace = text.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1) {
-                try {
-                    return JSON.parse(text.substring(firstBrace, lastBrace + 1));
-                } catch (e3) {
-                    // continue
-                }
-            }
-
-            // 4. Failed to parse JSON, assume plain text error or message
-            console.warn("Could not parse JSON from AI response:", text);
-            return {
-                message: text,
-                updates: []
-            };
-        }
-    };
-
     const handleSendMessage = async () => {
         if (!userInput.trim() || isLoading) return;
 
@@ -210,10 +174,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         geminiHistory.push({ role: 'user', parts: [{ text: userInput + `\n\n${contextText}` }] });
 
         try {
-            const responseText = await getCreativeAssistantResponse(geminiHistory, fragments);
-            
-            // Robust parsing
-            const parsedResponse = cleanAndParseResponse(responseText);
+            const parsedResponse = await getCreativeAssistantResponse(geminiHistory, fragments);
 
             // Apply updates immediately
             if (parsedResponse.updates && parsedResponse.updates.length > 0) {
@@ -245,7 +206,10 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                 setCurrentPromptText(parsedResponse.assembled_prompt);
             }
 
-            const newAssistantMessage: ConversationMessage = { role: 'assistant', content: parsedResponse.message };
+            const newAssistantMessage: ConversationMessage = { 
+                role: 'assistant', 
+                content: parsedResponse.message || "Entendido, he actualizado el prompt." 
+            };
             setMessages(prev => [...prev, newAssistantMessage]);
 
         } catch (error) {

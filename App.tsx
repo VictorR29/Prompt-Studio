@@ -359,6 +359,7 @@ const App: React.FC = () => {
 
   const handleDeletePrompt = (id: string) => {
       setSavedPrompts(prev => prev.filter(p => p.id !== id));
+      addToast('Prompt eliminado.', 'success');
   };
 
   const handleUseFeatureInEditor = useCallback((featurePrompt: string) => {
@@ -450,6 +451,8 @@ const App: React.FC = () => {
             <Gallery 
               prompts={savedPrompts} 
               onSelect={handleSelectPromptForModal}
+              onDelete={handleDeletePrompt}
+              onEdit={handleEditPrompt}
             />
           </div>
         )}
