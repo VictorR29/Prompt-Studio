@@ -110,21 +110,36 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     }, [openSections]);
     
     const handleLoadPromptFromUI = useCallback(async (promptText: string) => {
+        if (!promptText.trim()) return;
+
         setLoadingAction('analyze');
         setError(null);
         setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
         try {
             const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
-            setFragments(modularized);
-            if (modularized.negative) {
-                setNegativePrompt(modularized.negative);
-                setShowNegativeSection(true);
+            
+            // Fallback Detection: Check if the AI actually returned meaningful content.
+            // If the JSON is empty or all fields are empty string, we use fallback.
+            const hasContent = Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
+
+            if (!hasContent) {
+                 // Fallback: Place the original text into 'Subject' so user doesn't lose input
+                 setFragments({ ...initialFragments, subject: promptText });
+                 addToast("La estructuración automática no devolvió resultados precisos. Se cargó el texto completo en 'Sujeto'.", 'warning');
+            } else {
+                 setFragments(prev => ({ ...initialFragments, ...modularized }));
+                 if (modularized.negative) {
+                    setNegativePrompt(modularized.negative);
+                    setShowNegativeSection(true);
+                }
             }
             setViewMode('editor');
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-            setError(`Error al modularizar: ${errorMessage}`);
-            addToast(`Error al modularizar: ${errorMessage}`, 'error');
+            // Error Fallback: Even if API errors (500, Safety), don't show empty screen.
+            console.error(err);
+            setFragments({ ...initialFragments, subject: promptText });
+            setViewMode('editor');
+            addToast("Hubo un error en el análisis, pero hemos cargado tu texto para que puedas editarlo.", 'warning');
         } finally {
             setLoadingAction(null);
             setGlobalLoader({ active: false, message: '' });
@@ -147,15 +162,22 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             try {
                 const modularized = await modularizePrompt(promptData.prompt);
                 if (isMounted) {
-                    setFragments(modularized as Record<ExtractionMode, string>);
+                    const hasContent = Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
+                     if (!hasContent) {
+                        setFragments({ ...initialFragments, subject: promptData.prompt });
+                     } else {
+                        setFragments(modularized as Record<ExtractionMode, string>);
+                     }
                     setFinalPrompt(promptData.prompt);
                     setViewMode('editor');
                 }
             } catch (err) {
                 if (isMounted) {
-                    const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-                    setError(`Error al modularizar: ${errorMessage}`);
-                    addToast(`Error al modularizar: ${errorMessage}`, 'error');
+                    // Fallback on error
+                    setFragments({ ...initialFragments, subject: promptData.prompt });
+                    setFinalPrompt(promptData.prompt);
+                    setViewMode('editor');
+                    addToast("No se pudo modularizar el prompt guardado. Se cargó como texto plano.", 'warning');
                 }
             } finally {
                 if (isMounted) {
@@ -295,16 +317,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                  
                  // 2. Text -> Modular JSON
                  setGlobalLoader({ active: true, message: 'Modularizando descripción...' });
-                 const modularized = await modularizePrompt(rawPrompt) as Record<ExtractionMode, string>;
-                 
-                 setFragments(modularized);
-                 setFinalPrompt(rawPrompt); 
-                 
-                 if (modularized.negative) {
-                     setNegativePrompt(modularized.negative);
-                     setShowNegativeSection(true);
-                 }
-                 setViewMode('editor');
+                 await handleLoadPromptFromUI(rawPrompt); // Reuse fallback logic
 
             } else {
                 // Text only path
@@ -325,9 +338,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
             setError(`Error al generar estructura: ${errorMessage}`);
             addToast(`Error al generar estructura: ${errorMessage}`, 'error');
-        } finally {
+            setGlobalLoader({ active: false, message: '' }); // Ensure loader off on error
             setLoadingAction(null);
-            setGlobalLoader({ active: false, message: '' });
         }
     };
 
