@@ -273,58 +273,39 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleGenerateStructure = async () => {
         setLoadingAction('structure');
         setError(null);
+        // Step 1: Image Analysis (if present)
         setGlobalLoader({ active: true, message: 'Analizando imagen y estructura...' });
 
         try {
-            // Optimized logic for image input: single call to modularize directly
             if (structurerImages.length > 0) {
                  const imagePayloads = structurerImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
                  
-                 // Try structured analysis first
-                 let modularized: Record<ExtractionMode, string> | null = null;
+                 // STRATEGY CHANGE: 
+                 // Instead of asking for strict JSON directly (which can timeout or fail), 
+                 // we ask for a rich text description first, then modularize that text.
+                 // This is much more robust for the model.
+
+                 const context = structurerIdea ? `Context/Idea: ${structurerIdea}. ` : '';
+                 const styleCtx = structurerStyle ? `Target Style: ${structurerStyle}` : '';
+                 const fullInstruction = `${context}${styleCtx}`;
                  
-                 try {
-                     modularized = await modularizeImageAnalysis(imagePayloads, structurerIdea, structurerStyle) as Record<ExtractionMode, string>;
-                 } catch (e) {
-                     console.warn("Structured analysis failed, trying fallback...", e);
-                 }
-
-                 // Check if we got valid content (at least one non-empty field)
-                 const hasContent = modularized && Object.values(modularized).some(v => v && v.trim().length > 0);
-
-                 if (!hasContent) {
-                     console.log("Structured analysis returned empty. Switching to fallback method.");
-                     setGlobalLoader({ active: true, message: 'Análisis profundo en curso...' });
-                     
-                     // Fallback: Generate raw description then modularize
-                     const context = structurerIdea ? `Context: ${structurerIdea}. ` : '';
-                     const styleCtx = structurerStyle ? `Style: ${structurerStyle}` : '';
-                     const rawPrompt = await generateStructuredPromptFromImage(imagePayloads, `${context}${styleCtx}`);
-                     
-                     const fallbackModularized = await modularizePrompt(rawPrompt) as Record<ExtractionMode, string>;
-                     
-                     setFragments(fallbackModularized);
-                     setFinalPrompt(rawPrompt); 
-                     
-                     if (fallbackModularized.negative) {
-                         setNegativePrompt(fallbackModularized.negative);
-                         setShowNegativeSection(true);
-                     }
-                     setViewMode('editor');
-                     return;
-                 }
-
-                 setFragments(modularized!);
-                 if (modularized!.negative) {
-                     setNegativePrompt(modularized!.negative);
+                 // 1. Image -> Text Prompt
+                 setGlobalLoader({ active: true, message: 'Interpretando imagen...' });
+                 const rawPrompt = await generateStructuredPromptFromImage(imagePayloads, fullInstruction);
+                 
+                 // 2. Text -> Modular JSON
+                 setGlobalLoader({ active: true, message: 'Modularizando descripción...' });
+                 const modularized = await modularizePrompt(rawPrompt) as Record<ExtractionMode, string>;
+                 
+                 setFragments(modularized);
+                 setFinalPrompt(rawPrompt); 
+                 
+                 if (modularized.negative) {
+                     setNegativePrompt(modularized.negative);
                      setShowNegativeSection(true);
                  }
-                 
-                 setGlobalLoader({ active: true, message: 'Ensamblando prompt final...' });
-                 const assembled = await assembleMasterPrompt(modularized!);
-                 setFinalPrompt(assembled);
-
                  setViewMode('editor');
+
             } else {
                 // Text only path
                 if (!structurerIdea.trim()) {
