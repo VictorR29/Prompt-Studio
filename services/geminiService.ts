@@ -202,6 +202,80 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
     return cleanAndParseJson(response.text || "{}");
 };
 
+export const generateAndModularizePrompt = async (
+    input: { idea?: string; style?: string; images?: {imageBase64: string, mimeType: string}[] }
+): Promise<Partial<Record<ExtractionMode, string>>> => {
+    const ai = getAiClient();
+    const parts: Part[] = [];
+
+    if (input.images) {
+        input.images.forEach(img => parts.push({
+            inlineData: { mimeType: img.mimeType, data: img.imageBase64 }
+        }));
+    }
+
+    let promptText = `
+    ACT AS: Professional AI Art Director (Midjourney/Flux Expert).
+    
+    TASK: 
+    1. ANALYZE the user's input (Idea + Style + Images).
+    2. CREATIVELY EXPAND: You MUST turn simple inputs into a highly detailed, professional prompt. 
+       - If input is "a cat", you must invent the breed, the lighting, the scene, the mood. 
+       - DO NOT simply repeat "a cat". Invent a masterpiece.
+    3. DISTRIBUTE: Break your *newly created* rich description into the specific JSON fields below.
+
+    USER INPUT:
+    - Idea: "${input.idea || ''}"
+    - Style: "${input.style || ''}"
+    ${input.images ? '- (See attached images for visual reference)' : ''}
+    
+    JSON OUTPUT REQUIREMENTS:
+    - 'subject': Detailed description of the character/subject.
+    - 'pose': The specific action or stance.
+    - 'style': Art mediums, influences, engine settings (e.g. Unreal Engine 5).
+    - 'lighting': (Include in 'scene' or 'composition')
+    - ALL VALUES MUST BE IN ENGLISH AND HIGHLY DETAILED.
+    `;
+
+    parts.push({ text: promptText });
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    subject: { type: Type.STRING },
+                    pose: { type: Type.STRING },
+                    expression: { type: Type.STRING },
+                    outfit: { type: Type.STRING },
+                    object: { type: Type.STRING },
+                    scene: { type: Type.STRING },
+                    color: { type: Type.STRING },
+                    composition: { type: Type.STRING },
+                    style: { type: Type.STRING },
+                    negative: { type: Type.STRING }
+                }
+            },
+            safetySettings: [
+                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+            ]
+        }
+    });
+    
+    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+        throw new Error(formatSafetyError(response.candidates[0]));
+    }
+
+    return cleanAndParseJson(response.text || "{}");
+}
+
+
 export const modularizeImageAnalysis = async (images: {imageBase64: string, mimeType: string}[], idea?: string, style?: string): Promise<Partial<Record<ExtractionMode, string>>> => {
     const ai = getAiClient();
     const parts: Part[] = [];

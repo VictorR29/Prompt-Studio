@@ -10,7 +10,7 @@ import {
     generateStructuredPromptMetadata, 
     adaptFragmentToContext, 
     analyzeImageFeature,
-    generateStructuredPrompt,
+    generateAndModularizePrompt,
     modularizeImageAnalysis,
     generateMasterPromptMetadata,
     generateImageFromPrompt,
@@ -295,51 +295,46 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
     const handleGenerateStructure = async () => {
         setLoadingAction('structure');
         setError(null);
-        // Step 1: Image Analysis (if present)
-        setGlobalLoader({ active: true, message: 'Analizando imagen y estructura...' });
+        setGlobalLoader({ active: true, message: 'La IA está creando tu prompt...' });
 
         try {
-            if (structurerImages.length > 0) {
-                 const imagePayloads = structurerImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType }));
-                 
-                 // STRATEGY CHANGE: 
-                 // Instead of asking for strict JSON directly (which can timeout or fail), 
-                 // we ask for a rich text description first, then modularize that text.
-                 // This is much more robust for the model.
+            const imagePayload = structurerImages.length > 0 ? structurerImages.map(img => ({
+                imageBase64: img.base64,
+                mimeType: img.mimeType
+            })) : undefined;
 
-                 const context = structurerIdea ? `Context/Idea: ${structurerIdea}. ` : '';
-                 const styleCtx = structurerStyle ? `Target Style: ${structurerStyle}` : '';
-                 const fullInstruction = `${context}${styleCtx}`;
-                 
-                 // 1. Image -> Text Prompt
-                 setGlobalLoader({ active: true, message: 'Interpretando imagen...' });
-                 const rawPrompt = await generateStructuredPromptFromImage(imagePayloads, fullInstruction);
-                 
-                 // 2. Text -> Modular JSON
-                 setGlobalLoader({ active: true, message: 'Modularizando descripción...' });
-                 await handleLoadPromptFromUI(rawPrompt); // Reuse fallback logic
+            const modularized = await generateAndModularizePrompt({
+                idea: structurerIdea,
+                style: structurerStyle,
+                images: imagePayload
+            });
 
+            // Fallback logic similar to handleLoadPromptFromUI
+            const hasContent = Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
+
+            if (!hasContent) {
+                // If AI fails to return structured data but returns something (unlikely with JSON schema, but possible)
+                // Just put the idea in subject
+                const fallbackText = structurerIdea || "Prompt generado desde imagen";
+                setFragments({ ...initialFragments, subject: fallbackText });
+                addToast("La IA no devolvió resultados detallados, se usó el texto base.", 'warning');
             } else {
-                // Text only path
-                if (!structurerIdea.trim()) {
-                    throw new Error('La idea principal es necesaria si no hay imagen.');
+                 setFragments(prev => ({ ...initialFragments, ...modularized }));
+                 if (modularized.negative) {
+                    setNegativePrompt(modularized.negative);
+                    setShowNegativeSection(true);
                 }
-                const resultText = await generateStructuredPrompt({ idea: structurerIdea, style: structurerStyle });
-                
-                if (!resultText) {
-                    throw new Error("La IA no generó ningún texto.");
-                }
-
-                setGlobalLoader({ active: true, message: 'Estructura creada. Modularizando...' });
-                await handleLoadPromptFromUI(resultText);
             }
+            setViewMode('editor');
+            addToast('Prompt generado y estructurado.', 'success');
 
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-            setError(`Error al generar estructura: ${errorMessage}`);
-            addToast(`Error al generar estructura: ${errorMessage}`, 'error');
-            setGlobalLoader({ active: false, message: '' }); // Ensure loader off on error
-            setLoadingAction(null);
+             const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
+             setError(`Error: ${errorMessage}`);
+             addToast(errorMessage, 'error');
+        } finally {
+             setLoadingAction(null);
+             setGlobalLoader({ active: false, message: '' });
         }
     };
 
