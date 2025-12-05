@@ -234,6 +234,7 @@ export const generateAndModularizePrompt = async (
     - 'pose': The specific action or stance.
     - 'style': Art mediums, influences, engine settings (e.g. Unreal Engine 5).
     - 'lighting': (Include in 'scene' or 'composition')
+    - 'negative': LEAVE EMPTY. Do NOT generate a negative prompt unless the User Input explicitly includes negative constraints (e.g. "no blurry", "avoid red"). DO NOT hallucinate negative prompts.
     - ALL VALUES MUST BE IN ENGLISH AND HIGHLY DETAILED.
     `;
 

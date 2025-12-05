@@ -115,6 +115,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setLoadingAction('analyze');
         setError(null);
         setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
+        // Clear any existing negative prompt to ensure fresh start
+        setNegativePrompt(''); 
+        setShowNegativeSection(false);
+
         try {
             const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
             
@@ -157,6 +161,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             if (promptData.negativePrompt) {
                 setNegativePrompt(promptData.negativePrompt);
                 setShowNegativeSection(true);
+            } else {
+                setNegativePrompt('');
+                setShowNegativeSection(false);
             }
 
             try {
@@ -297,6 +304,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setError(null);
         setGlobalLoader({ active: true, message: 'La IA está creando tu prompt...' });
 
+        // IMPORTANT: Clear negative prompt to respect "No auto-generate" rule.
+        setNegativePrompt('');
+        setShowNegativeSection(false);
+
         try {
             const imagePayload = structurerImages.length > 0 ? structurerImages.map(img => ({
                 imageBase64: img.base64,
@@ -343,6 +354,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setImagesByModule({});
         setFinalPrompt('');
         setNegativePrompt('');
+        setShowNegativeSection(false);
         setError(null);
         setViewMode('editor');
     };
@@ -354,6 +366,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setError(null);
         setFinalPrompt('');
         setNegativePrompt('');
+        setShowNegativeSection(false);
         setOutputType(null);
         setCopied(false);
         setIsLoading(false);
