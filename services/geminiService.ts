@@ -197,6 +197,63 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
     return cleanAndParseJson(response.text || "{}");
 };
 
+// NEW: Local function to map JSON structure to modules instantly (0 latency)
+export const attemptLocalModularization = (text: string): Partial<Record<ExtractionMode, string>> | null => {
+    try {
+        const json = JSON.parse(text);
+        
+        // If it's not an object (e.g. just a string), return null to use AI
+        if (typeof json !== 'object' || json === null) return null;
+
+        // Map common JSON keys to our internal ExtractionModes
+        const map: Record<string, ExtractionMode> = {
+            'subject': 'subject', 'character': 'subject', 'main_subject': 'subject',
+            'pose': 'pose', 'action': 'pose',
+            'expression': 'expression', 'emotion': 'expression',
+            'outfit': 'outfit', 'clothing': 'outfit', 'attire': 'outfit',
+            'object': 'object', 'props': 'object',
+            'scene': 'scene', 'environment': 'scene', 'background': 'scene', 'location': 'scene',
+            'color': 'color', 'palette': 'color', 'lighting': 'color', // Lighting often fits with color/atmos
+            'composition': 'composition', 'camera': 'composition', 'framing': 'composition',
+            'style': 'style', 'visual_style': 'style', 'aesthetic': 'style', 'art_style': 'style',
+            'negative': 'negative', 'negative_prompt': 'negative'
+        };
+
+        const result: Partial<Record<ExtractionMode, string>> = {};
+
+        Object.keys(json).forEach(key => {
+            const normalizedKey = key.toLowerCase();
+            const targetModule = map[normalizedKey];
+            
+            if (targetModule) {
+                const value = json[key];
+                if (typeof value === 'string') {
+                    result[targetModule] = value;
+                } else if (typeof value === 'object' && value !== null) {
+                    // Keep nested structure as formatted JSON string for editing
+                    result[targetModule] = JSON.stringify(value, null, 2);
+                }
+            } else if (typeof json[key] === 'object' && json[key] !== null) {
+                // If we have a key we don't recognize but it's an object (like "technical_settings"),
+                // try to see if its children map to anything, otherwise dump to Style or Composition
+                if (normalizedKey.includes('tech') || normalizedKey.includes('camera')) {
+                     const existing = result['composition'] ? result['composition'] + '\n' : '';
+                     result['composition'] = existing + `${key}: ${JSON.stringify(json[key])}`;
+                }
+            }
+        });
+
+        // If we found at least one valid module, return the result
+        if (Object.keys(result).length > 0) {
+            return result;
+        }
+
+        return null; // Fallback to AI if no known keys found
+    } catch (e) {
+        return null; // Not JSON, use AI
+    }
+};
+
 export const generateAndModularizePrompt = async (
     input: { idea?: string; style?: string; images?: {imageBase64: string, mimeType: string}[] }
 ): Promise<Partial<Record<ExtractionMode, string>>> => {

@@ -16,7 +16,8 @@ import {
     generateImageFromPrompt,
     generateNegativePrompt,
     assembleOptimizedJson,
-    generateStructuredPromptFromImage
+    generateStructuredPromptFromImage,
+    attemptLocalModularization
 } from '../services/geminiService';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
@@ -120,30 +121,36 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setShowNegativeSection(false);
 
         try {
-            const modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
+            // First, try local modularization (fast path for JSON)
+            let modularized = attemptLocalModularization(promptText);
+
+            if (!modularized) {
+                 // Fallback to AI for plain text
+                 modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
+            } else {
+                 addToast("Estructura JSON detectada. Cargada al instante.", 'success');
+            }
             
-            // Fallback Detection: Check if the AI actually returned meaningful content.
-            // If the JSON is empty or all fields are empty string, we use fallback.
-            const hasContent = Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
+            // Check content
+            const hasContent = modularized && Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
 
             if (!hasContent) {
-                 // Fallback: Place the original text into 'Subject' so user doesn't lose input
+                 // Fallback: Place text in Subject
                  setFragments({ ...initialFragments, subject: promptText });
-                 addToast("La estructuración automática no devolvió resultados precisos. Se cargó el texto completo en 'Sujeto'.", 'warning');
+                 addToast("No se detectaron módulos claros. Se cargó como texto base.", 'warning');
             } else {
                  setFragments(prev => ({ ...initialFragments, ...modularized }));
-                 if (modularized.negative) {
+                 if (modularized?.negative) {
                     setNegativePrompt(modularized.negative);
                     setShowNegativeSection(true);
                 }
             }
             setViewMode('editor');
         } catch (err) {
-            // Error Fallback: Even if API errors (500, Safety), don't show empty screen.
             console.error(err);
             setFragments({ ...initialFragments, subject: promptText });
             setViewMode('editor');
-            addToast("Hubo un error en el análisis, pero hemos cargado tu texto para que puedas editarlo.", 'warning');
+            addToast("Hubo un error en el análisis, pero hemos cargado tu texto.", 'warning');
         } finally {
             setLoadingAction(null);
             setGlobalLoader({ active: false, message: '' });
@@ -156,7 +163,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         const loadInitialPrompt = async (promptData: SavedPrompt) => {
             setLoadingAction('analyze');
             setError(null);
-            setGlobalLoader({ active: true, message: 'Analizando y modularizando prompt...' });
+            setGlobalLoader({ active: true, message: 'Cargando prompt...' });
             
             if (promptData.negativePrompt) {
                 setNegativePrompt(promptData.negativePrompt);
@@ -167,13 +174,25 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             }
 
             try {
-                const modularized = await modularizePrompt(promptData.prompt);
+                // OPTIMIZATION: Try to parse locally first to avoid AI latency for JSON prompts
+                let modularized = attemptLocalModularization(promptData.prompt);
+
+                if (!modularized) {
+                    // Only call AI if it's plain text and not a structured JSON
+                    modularized = await modularizePrompt(promptData.prompt) as Record<ExtractionMode, string>;
+                }
+
                 if (isMounted) {
-                    const hasContent = Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
+                    const hasContent = modularized && Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
                      if (!hasContent) {
                         setFragments({ ...initialFragments, subject: promptData.prompt });
                      } else {
+                        // Ensure we strictly typecast or handle the partial record safely
                         setFragments(modularized as Record<ExtractionMode, string>);
+                        if (modularized?.negative) {
+                            setNegativePrompt(modularized.negative);
+                            setShowNegativeSection(true);
+                        }
                      }
                     setFinalPrompt(promptData.prompt);
                     setViewMode('editor');
@@ -184,7 +203,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     setFragments({ ...initialFragments, subject: promptData.prompt });
                     setFinalPrompt(promptData.prompt);
                     setViewMode('editor');
-                    addToast("No se pudo modularizar el prompt guardado. Se cargó como texto plano.", 'warning');
+                    addToast("No se pudo modularizar. Se cargó como texto plano.", 'warning');
                 }
             } finally {
                 if (isMounted) {
