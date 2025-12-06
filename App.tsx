@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -367,12 +368,10 @@ const App: React.FC = () => {
     try {
         let coverImageDataUrl = '';
 
-        if ((extractionMode === 'style' || extractionMode === 'subject') && images.length > 1) {
-            setGlobalLoaderState({ active: true, message: 'Creando collage para la portada...' });
+        if (images.length > 0) {
+            setGlobalLoaderState({ active: true, message: 'Procesando portada...' });
+            // ALWAYS use collage to force resize/compression of images to avoid LocalStorage Quota exceeded
             coverImageDataUrl = await createImageCollage(images.map(img => ({ base64: img.base64, mimeType: img.mimeType })));
-        } else {
-            const coverImage = images[0];
-            coverImageDataUrl = `data:${coverImage.mimeType};base64,${coverImage.base64}`;
         }
         
         setGlobalLoaderState({ active: true, message: 'Generando metadatos con IA...' });

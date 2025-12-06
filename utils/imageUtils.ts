@@ -1,4 +1,5 @@
 
+
 const loadImage = (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -36,7 +37,8 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    const canvasSize = 512;
+    // Reduced from 512 to 360 to save LocalStorage space
+    const canvasSize = 360; 
     canvas.width = canvasSize;
     canvas.height = canvasSize;
     ctx.fillStyle = '#111827'; // a dark background similar to the app
@@ -68,10 +70,11 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
             break;
     }
 
-    return canvas.toDataURL('image/jpeg', 0.8);
+    // High compression (0.6) to prevent quota exceeded errors
+    return canvas.toDataURL('image/jpeg', 0.6);
 };
 
-export const resizeImageFile = (file: File, maxWidth = 1024): Promise<{ base64: string; mimeType: string; url: string }> => {
+export const resizeImageFile = (file: File, maxWidth = 800): Promise<{ base64: string; mimeType: string; url: string }> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
@@ -101,9 +104,9 @@ export const resizeImageFile = (file: File, maxWidth = 1024): Promise<{ base64: 
             }
             ctx.drawImage(img, 0, 0, width, height);
             
-            // Convert to base64
+            // Convert to base64 with moderate compression
             const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-            const base64Url = canvas.toDataURL(mimeType, 0.85); // 0.85 quality for jpeg
+            const base64Url = canvas.toDataURL(mimeType, 0.7); 
             const base64 = base64Url.split(',')[1];
             
             resolve({

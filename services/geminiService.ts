@@ -200,7 +200,9 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
 // NEW: Local function to map JSON structure to modules instantly (0 latency)
 export const attemptLocalModularization = (text: string): Partial<Record<ExtractionMode, string>> | null => {
     try {
-        const json = JSON.parse(text);
+        // Clean markdown code blocks often present in AI outputs
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const json = JSON.parse(cleanText);
         
         // If it's not an object (e.g. just a string), return null to use AI
         if (typeof json !== 'object' || json === null) return null;
@@ -458,21 +460,13 @@ export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMo
         INPUT MODULES: ${jsonModules}
 
         RULES FOR JSON GENERATION:
-        1. OPTIMIZATION: Do not just copy/paste strings. Refine the vocabulary (e.g., change "dark room" to "dimly lit, ambient occlusion, low-key lighting").
-        2. INTELLIGENT FRAGMENTATION:
+        1. VOCABULARY OPTIMIZATION: Do not just copy/paste. Upgrade simple terms to professional art/photography terminology (e.g. "bright" -> "volumetric high-key lighting").
+        2. SMART FRAGMENTATION:
            - Detect extensive or complex sections (specifically in 'style', 'composition', 'scene', 'outfit').
-           - BREAK THEM DOWN into nested sub-objects.
-           - Example: Instead of "style": "Oil painting by Van Gogh with thick brushstrokes", generate:
-             "style": {
-                "medium": "Oil Painting",
-                "technique": "Impasto, thick brushstrokes",
-                "artist_reference": "Vincent Van Gogh",
-                "aesthetic": "Post-Impressionism"
-             }
+           - BREAK THEM DOWN into nested sub-objects (e.g. "style": { "medium": "...", "technique": "..." }).
         3. ORGANIZATION: 
            - Group related concepts.
            - Ensure keys are snake_case, descriptive, and clean.
-           - Main keys should include (but not limited to): 'subject', 'environment', 'visual_style', 'camera', 'technical_settings'.
         4. FUNCTIONALITY: The output must be valid JSON, ready to be used or parsed by a sophisticated generation pipeline.
 
         RETURN ONLY THE JSON OBJECT.`,
