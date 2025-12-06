@@ -33,41 +33,53 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
         return '';
     }
 
+    const imageSources = images.slice(0, 4).map(img => `data:${img.mimeType};base64,${img.base64}`);
+    const loadedImages = await Promise.all(imageSources.map(loadImage));
+    
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    // Reduced from 512 to 360 to save LocalStorage space
-    const canvasSize = 360; 
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
-    ctx.fillStyle = '#111827'; // a dark background similar to the app
-    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    const targetWidth = 360; // Max width for storage optimization
 
+    if (loadedImages.length === 1) {
+        // SINGLE IMAGE: Pinterest Style (Dynamic Height)
+        // We preserve the original aspect ratio to create masonry effect
+        const img = loadedImages[0];
+        const aspectRatio = img.height / img.width;
+        
+        canvas.width = targetWidth;
+        canvas.height = Math.round(targetWidth * aspectRatio);
+        
+        // Draw full image without cropping
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } else {
+        // MULTIPLE IMAGES: Square Collage
+        // For multiple images, a square layout is cleaner
+        const canvasSize = targetWidth;
+        canvas.width = canvasSize;
+        canvas.height = canvasSize;
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-    const imageSources = images.slice(0, 4).map(img => `data:${img.mimeType};base64,${img.base64}`);
-    const loadedImages = await Promise.all(imageSources.map(loadImage));
-
-    switch (loadedImages.length) {
-        case 1:
-            drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize, canvasSize);
-            break;
-        case 2:
-            drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize / 2, canvasSize);
-            drawImageCover(ctx, loadedImages[1], canvasSize / 2, 0, canvasSize / 2, canvasSize);
-            break;
-        case 3:
-            drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize / 2, canvasSize);
-            drawImageCover(ctx, loadedImages[1], canvasSize / 2, 0, canvasSize / 2, canvasSize / 2);
-            drawImageCover(ctx, loadedImages[2], canvasSize / 2, canvasSize / 2, canvasSize / 2, canvasSize / 2);
-            break;
-        case 4:
-        default:
-            drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize / 2, canvasSize / 2);
-            drawImageCover(ctx, loadedImages[1], canvasSize / 2, 0, canvasSize / 2, canvasSize / 2);
-            drawImageCover(ctx, loadedImages[2], 0, canvasSize / 2, canvasSize / 2, canvasSize / 2);
-            drawImageCover(ctx, loadedImages[3], canvasSize / 2, canvasSize / 2, canvasSize / 2, canvasSize / 2);
-            break;
+        switch (loadedImages.length) {
+            case 2:
+                drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize / 2, canvasSize);
+                drawImageCover(ctx, loadedImages[1], canvasSize / 2, 0, canvasSize / 2, canvasSize);
+                break;
+            case 3:
+                drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize / 2, canvasSize);
+                drawImageCover(ctx, loadedImages[1], canvasSize / 2, 0, canvasSize / 2, canvasSize / 2);
+                drawImageCover(ctx, loadedImages[2], canvasSize / 2, canvasSize / 2, canvasSize / 2, canvasSize / 2);
+                break;
+            case 4:
+            default:
+                drawImageCover(ctx, loadedImages[0], 0, 0, canvasSize / 2, canvasSize / 2);
+                drawImageCover(ctx, loadedImages[1], canvasSize / 2, 0, canvasSize / 2, canvasSize / 2);
+                drawImageCover(ctx, loadedImages[2], 0, canvasSize / 2, canvasSize / 2, canvasSize / 2);
+                drawImageCover(ctx, loadedImages[3], canvasSize / 2, canvasSize / 2, canvasSize / 2, canvasSize / 2);
+                break;
+        }
     }
 
     // High compression (0.6) to prevent quota exceeded errors
