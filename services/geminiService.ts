@@ -268,8 +268,6 @@ export const generateAndModularizePrompt = async (
     return cleanAndParseJson(response.text || "{}");
 };
 
-// --- Missing Functions Implementation ---
-
 export const assembleMasterPrompt = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     const ai = getAiClient();
     const jsonModules = JSON.stringify(modules);
@@ -317,8 +315,6 @@ export const optimizePromptFragment = async (mode: ExtractionMode, context: Part
 };
 
 export const createJsonTemplate = async (input: string): Promise<string> => {
-    // This function seems to just validate or re-format JSON, or convert text to JSON template
-    // For now, we assume it ensures a structured JSON string
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -332,7 +328,6 @@ export const createJsonTemplate = async (input: string): Promise<string> => {
 };
 
 export const generateStructuredPromptMetadata = async (prompt: string, images?: any) => {
-    // Re-use logic from generateFeatureMetadata but adapted for full prompts
     return generateFeatureMetadata('style', prompt, images ? [images] : undefined);
 };
 
@@ -361,13 +356,10 @@ export const adaptFragmentToContext = async (mode: ExtractionMode, fragment: str
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
     const ai = getAiClient();
-    // According to instructions: "General Image Generation and Editing Tasks: 'gemini-2.5-flash-image'"
-    // And "output response may contain both image and text parts"
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-             // Instructions say: DO NOT set responseMimeType for nano banana (gemini-2.5-flash-image)
         });
         
         if (response.candidates?.[0]?.content?.parts) {
@@ -380,7 +372,6 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
         throw new Error("No image data returned from API");
     } catch (e) {
         console.error("Image gen failed", e);
-        // Fallback or re-throw
         throw e;
     }
 };
@@ -397,25 +388,68 @@ export const generateNegativePrompt = async (positivePrompt: string): Promise<st
     return response.text || "";
 };
 
+// IMPROVED: Direct JSON Generation with Intelligent Fragmentation
 export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
-    // Similar to assembleMasterPrompt but returns a JSON string structure
-    return JSON.stringify(modules, null, 2);
+    const ai = getAiClient();
+    const jsonModules = JSON.stringify(modules);
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `ACT AS: Senior AI Prompt Architect.
+        TASK: Transform the provided flat prompt modules into a highly structured, optimized, and functional JSON prompt for generative AI (Midjourney/Flux/SD).
+
+        INPUT MODULES: ${jsonModules}
+
+        RULES FOR JSON GENERATION:
+        1. OPTIMIZATION: Do not just copy/paste strings. Refine the vocabulary (e.g., change "dark room" to "dimly lit, ambient occlusion, low-key lighting").
+        2. INTELLIGENT FRAGMENTATION:
+           - Detect extensive or complex sections (specifically in 'style', 'composition', 'scene', 'outfit').
+           - BREAK THEM DOWN into nested sub-objects.
+           - Example: Instead of "style": "Oil painting by Van Gogh with thick brushstrokes", generate:
+             "style": {
+                "medium": "Oil Painting",
+                "technique": "Impasto, thick brushstrokes",
+                "artist_reference": "Vincent Van Gogh",
+                "aesthetic": "Post-Impressionism"
+             }
+        3. ORGANIZATION: 
+           - Group related concepts.
+           - Ensure keys are snake_case, descriptive, and clean.
+           - Main keys should include (but not limited to): 'subject', 'environment', 'visual_style', 'camera', 'technical_settings'.
+        4. FUNCTIONALITY: The output must be valid JSON, ready to be used or parsed by a sophisticated generation pipeline.
+
+        RETURN ONLY THE JSON OBJECT.`,
+        config: {
+            responseMimeType: "application/json"
+        }
+    });
+
+    return response.text || "{}";
 };
 
 export const generateStructuredPromptFromImage = async (image: {imageBase64: string, mimeType: string}): Promise<string> => {
-     // Re-use analyze logic
      const result = await analyzeImageFeature('style', [image]);
      return result.result || "";
 };
 
+// IMPROVED: Template Merging with Optimization
 export const mergeModulesIntoJsonTemplate = async (modules: any, template: string): Promise<string> => {
      const ai = getAiClient();
      const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Merge these modules into the provided JSON template.
-        Modules: ${JSON.stringify(modules)}
-        Template: ${template}
-        Return the filled JSON string.`,
+        contents: `ACT AS: Senior AI Prompt Architect.
+        TASK: Merge the provided 'Input Modules' into the 'Target JSON Template'.
+        
+        Input Modules: ${JSON.stringify(modules)}
+        Target JSON Template: ${template}
+
+        CRITICAL INSTRUCTIONS:
+        1. INTELLIGENT PLACEMENT: Do not just overwrite keys. Analyze the content of the Input Modules.
+        2. FRAGMENTATION: If the template has nested keys (e.g. 'style' -> 'lighting', 'camera'), you MUST split the input content to fill those specific slots accurately.
+        3. OPTIMIZATION: Enhance the values during the merge. Ensure the tone matches the template's structure.
+        4. PRESERVATION: If the template has specific settings (like 'resolution': '8k'), keep them unless the input explicitly contradicts them.
+        
+        RETURN ONLY THE FILLED JSON OBJECT.`,
         config: { responseMimeType: "application/json" }
     });
     return response.text || "{}";
