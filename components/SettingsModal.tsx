@@ -25,6 +25,13 @@ const UploadIcon: React.FC<{className?: string}> = ({ className = "w-5 h-5" }) =
     </svg>
 );
 
+// Chart Icon for Usage
+const ChartIcon: React.FC<{className?: string}> = ({ className = "w-5 h-5" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+    </svg>
+);
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySaved, addToast, savedPrompts = [], onPromptsUpdate }) => {
   const [apiKey, setApiKey] = useState('');
   const [username, setUsername] = useState('');
@@ -32,12 +39,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
   const [confirmClear, setConfirmClear] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Usage Stats
+  const [storageUsed, setStorageUsed] = useState({ usedKB: 0, percent: 0, totalMB: 5 });
+  const [apiUsage, setApiUsage] = useState(0);
+
   useEffect(() => {
     const storedKey = localStorage.getItem('userGeminiKey');
     if (storedKey) setApiKey(storedKey);
     
     const storedUser = localStorage.getItem('promptStudioUsername');
     if (storedUser) setUsername(storedUser);
+
+    // Calculate Storage Usage Manually
+    const calculateStorage = () => {
+        let totalCharLength = 0;
+        for (let key in localStorage) {
+            if (localStorage.hasOwnProperty(key)) {
+                totalCharLength += (localStorage[key].length + key.length);
+            }
+        }
+        // Browsers typically limit to 5M characters (~5MB or 10MB depending on encoding)
+        // We'll use 5M chars as the conservative baseline for the progress bar.
+        const limitChars = 5200000; // Approx 5MB
+        const usedKB = Math.round((totalCharLength * 2) / 1024); // Est. UTF-16 size
+        const percent = Math.min(100, Math.round((totalCharLength / limitChars) * 100));
+        
+        setStorageUsed({
+            usedKB,
+            percent,
+            totalMB: 5
+        });
+    };
+    calculateStorage();
+
+    // Load API Usage
+    const today = new Date().toISOString().split('T')[0];
+    const usageData = localStorage.getItem('gemini_api_usage');
+    if (usageData) {
+        const parsed = JSON.parse(usageData);
+        if (parsed.date === today) {
+            setApiUsage(parsed.count);
+        } else {
+            setApiUsage(0);
+        }
+    }
+
   }, []);
 
   const handleSave = () => {
@@ -178,6 +224,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
         </div>
         
         <div className="space-y-6">
+            
+            {/* Usage Stats (New) */}
+            <section className="bg-gray-900/40 p-4 rounded-xl border border-white/5 space-y-4">
+                 <div className="flex items-center gap-2 mb-2">
+                     <ChartIcon className="w-5 h-5 text-indigo-400" />
+                     <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wide">Estadísticas de Uso</h3>
+                 </div>
+                 
+                 {/* Storage Bar */}
+                 <div>
+                     <div className="flex justify-between text-xs mb-1">
+                         <span className="text-gray-400">Almacenamiento Local</span>
+                         <span className={storageUsed.percent > 80 ? 'text-red-400 font-bold' : 'text-gray-300'}>
+                             {storageUsed.usedKB} KB / ~{storageUsed.totalMB} MB
+                         </span>
+                     </div>
+                     <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                         <div 
+                            className={`h-full transition-all duration-500 ${
+                                storageUsed.percent < 60 ? 'bg-teal-500' : 
+                                storageUsed.percent < 85 ? 'bg-amber-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${storageUsed.percent}%` }}
+                         />
+                     </div>
+                     {storageUsed.percent > 80 && (
+                         <p className="text-[10px] text-red-400 mt-1">
+                             ⚠️ Almacenamiento casi lleno. Exporta y limpia tu galería.
+                         </p>
+                     )}
+                 </div>
+
+                 {/* API Count */}
+                 <div className="flex justify-between items-center bg-black/20 p-2 rounded-lg">
+                     <span className="text-xs text-gray-400">Peticiones IA (Hoy)</span>
+                     <span className="text-sm font-bold text-indigo-300">{apiUsage}</span>
+                 </div>
+            </section>
+
             {/* User Profile Section */}
              <section className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-200 border-b border-white/10 pb-2">Perfil de Creador</h3>

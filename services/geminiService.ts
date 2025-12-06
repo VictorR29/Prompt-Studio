@@ -8,6 +8,31 @@ const getAiClient = () => {
     return new GoogleGenAI({ apiKey });
 };
 
+// --- API USAGE TRACKING ---
+const trackApiRequest = () => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const storageKey = 'gemini_api_usage';
+        const stored = localStorage.getItem(storageKey);
+        
+        let usage = { date: today, count: 0 };
+        
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.date === today) {
+                usage = parsed;
+            }
+        }
+        
+        usage.count += 1;
+        localStorage.setItem(storageKey, JSON.stringify(usage));
+    } catch (e) {
+        // Silent fail to not disrupt app flow
+        console.warn("Could not track API usage", e);
+    }
+};
+// --------------------------
+
 // Helper to translate and format safety errors
 const SAFETY_CATEGORY_MAP: Record<string, string> = {
     'HARM_CATEGORY_HARASSMENT': 'Acoso',
@@ -56,6 +81,7 @@ const cleanAndParseJson = (text: string): any => {
 };
 
 export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: string, images?: {imageBase64: string, mimeType: string}[]) => {
+    trackApiRequest();
     const ai = getAiClient();
     
     const responseSchema: Schema = {
@@ -103,6 +129,7 @@ export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: stri
 };
 
 export const analyzeImageFeature = async (mode: ExtractionMode, images: {imageBase64: string, mimeType: string}[]) => {
+    trackApiRequest();
     const ai = getAiClient();
     const parts: Part[] = [];
     images.forEach(img => parts.push({
@@ -141,6 +168,7 @@ export const analyzeImageFeature = async (mode: ExtractionMode, images: {imageBa
 };
 
 export const generateIdeasForStyle = async (prompt: string): Promise<string[]> => {
+    trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -159,6 +187,7 @@ export const generateIdeasForStyle = async (prompt: string): Promise<string[]> =
 };
 
 export const modularizePrompt = async (prompt: string): Promise<Partial<Record<ExtractionMode, string>>> => {
+    trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -259,6 +288,7 @@ export const attemptLocalModularization = (text: string): Partial<Record<Extract
 export const generateAndModularizePrompt = async (
     input: { idea?: string; style?: string; images?: {imageBase64: string, mimeType: string}[] }
 ): Promise<Partial<Record<ExtractionMode, string>>> => {
+    trackApiRequest();
     const ai = getAiClient();
     const parts: Part[] = [];
 
@@ -328,6 +358,7 @@ export const generateAndModularizePrompt = async (
 };
 
 export const assembleMasterPrompt = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     const jsonModules = JSON.stringify(modules);
     
@@ -349,6 +380,7 @@ export const assembleMasterPrompt = async (modules: Partial<Record<ExtractionMod
 };
 
 export const optimizePromptFragment = async (mode: ExtractionMode, context: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
+    trackApiRequest();
     const ai = getAiClient();
     const currentVal = context[mode] || "";
     
@@ -374,6 +406,7 @@ export const optimizePromptFragment = async (mode: ExtractionMode, context: Part
 };
 
 export const createJsonTemplate = async (input: string): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -387,14 +420,17 @@ export const createJsonTemplate = async (input: string): Promise<string> => {
 };
 
 export const generateStructuredPromptMetadata = async (prompt: string, images?: any) => {
+    // trackApiRequest handled in generateFeatureMetadata
     return generateFeatureMetadata('style', prompt, images ? [images] : undefined);
 };
 
 export const generateMasterPromptMetadata = async (prompt: string, images?: any[]) => {
+    // trackApiRequest handled in generateFeatureMetadata
     return generateFeatureMetadata('style', prompt, images);
 };
 
 export const adaptFragmentToContext = async (mode: ExtractionMode, fragment: string, context: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -414,6 +450,7 @@ export const adaptFragmentToContext = async (mode: ExtractionMode, fragment: str
 };
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     try {
         const response = await ai.models.generateContent({
@@ -436,6 +473,7 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
 };
 
 export const generateNegativePrompt = async (positivePrompt: string): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -449,6 +487,7 @@ export const generateNegativePrompt = async (positivePrompt: string): Promise<st
 
 // IMPROVED: Direct JSON Generation with Intelligent Fragmentation
 export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     const jsonModules = JSON.stringify(modules);
 
@@ -485,6 +524,7 @@ export const generateStructuredPromptFromImage = async (image: {imageBase64: str
 
 // IMPROVED: Template Merging with Optimization
 export const mergeModulesIntoJsonTemplate = async (modules: any, template: string): Promise<string> => {
+     trackApiRequest();
      const ai = getAiClient();
      const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -512,6 +552,7 @@ export const modularizeImageAnalysis = async (images: any[]): Promise<any> => {
 };
 
 export const getCreativeAssistantResponse = async (history: any[], currentFragments: any): Promise<AssistantResponse> => {
+    trackApiRequest();
     const ai = getAiClient();
     // System instruction to guide the chat
     const systemInstruction = `You are an Expert AI Art Director & Prompt Engineer.
@@ -560,6 +601,7 @@ export const getCreativeAssistantResponse = async (history: any[], currentFragme
 };
 
 export const generateHybridFragment = async (targetMode: ExtractionMode, sources: {text?: string, imageBase64?: string, mimeType?: string}[], feedback: string): Promise<string> => {
+    trackApiRequest();
     const ai = getAiClient();
     const parts: Part[] = [];
     
