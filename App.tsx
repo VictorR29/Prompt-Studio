@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -23,6 +22,7 @@ import { FusionLab } from './components/FusionLab';
 import LZString from 'lz-string';
 import { ShareCard } from './components/ShareCard';
 import { toBlob } from 'html-to-image';
+import { db } from './utils/db'; // Import IndexedDB wrapper
 
 interface ToastMessage {
   id: number;
@@ -57,24 +57,8 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>('editor');
   
-  // Lazy initialization for savedPrompts to prevent race conditions
-  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>(() => {
-    try {
-      const storedPrompts = localStorage.getItem('savedPrompts');
-      if (storedPrompts) {
-        const parsedPrompts = JSON.parse(storedPrompts);
-        // Migration logic for older prompts without a 'type'
-        return parsedPrompts.map((p: any) => ({
-          ...p,
-          type: p.type || 'style',
-        }));
-      }
-      return [];
-    } catch (error) {
-      console.error("Error al cargar los prompts desde localStorage:", error);
-      return [];
-    }
-  });
+  // State for prompts (UI representation)
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
 
   const [promptForEditor, setPromptForEditor] = useState<SavedPrompt | null>(null);
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>('style');
@@ -104,9 +88,47 @@ const App: React.FC = () => {
     setToasts(prevToasts => [...prevToasts, { id, message, type }]);
   }, []);
 
-  const addPromptToGallery = useCallback((newPrompt: SavedPrompt) => {
-    setSavedPrompts(prev => [newPrompt, ...prev]);
-  }, []);
+  // INITIAL LOAD & MIGRATION Logic
+  useEffect(() => {
+    const initData = async () => {
+        try {
+            // 1. Check for legacy data in localStorage
+            const legacyPrompts = localStorage.getItem('savedPrompts');
+            if (legacyPrompts) {
+                try {
+                    const parsed = JSON.parse(legacyPrompts);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        console.log(`Migrating ${parsed.length} prompts to IndexedDB...`);
+                        await db.saveMany(parsed);
+                        localStorage.removeItem('savedPrompts'); // Clear legacy data
+                        addToast('Galería migrada a base de datos optimizada.', 'success');
+                    }
+                } catch (e) {
+                    console.error("Migration failed", e);
+                }
+            }
+
+            // 2. Load from IndexedDB
+            const prompts = await db.getAllPrompts();
+            setSavedPrompts(prompts);
+        } catch (e) {
+            console.error("Failed to load prompts form DB", e);
+            addToast("Error al cargar la galería.", 'error');
+        }
+    };
+    initData();
+  }, [addToast]);
+
+  // Modified Add Prompt - saves to DB then updates State
+  const addPromptToGallery = useCallback(async (newPrompt: SavedPrompt) => {
+    try {
+        await db.savePrompt(newPrompt);
+        setSavedPrompts(prev => [newPrompt, ...prev]);
+    } catch (e) {
+        console.error("DB Save failed", e);
+        addToast("Error al guardar en base de datos.", 'error');
+    }
+  }, [addToast]);
 
   const importSharedPrompt = useCallback(async (promptToImport: SavedPrompt) => {
         // Add to gallery immediately with existing info
@@ -115,10 +137,16 @@ const App: React.FC = () => {
         // Generate cover image in background if none exists
         if (!promptToImport.coverImage) {
             try {
-                // We don't block the UI here, just update state when ready
+                // We don't block the UI here, just update state/DB when ready
                 const coverUrl = await generateImageFromPrompt(promptToImport.prompt);
+                const updatedPrompt = { ...promptToImport, coverImage: coverUrl };
+                
+                // Update DB
+                await db.savePrompt(updatedPrompt);
+                
+                // Update UI
                 setSavedPrompts(prev => prev.map(p => 
-                    p.id === promptToImport.id ? { ...p, coverImage: coverUrl } : p
+                    p.id === promptToImport.id ? updatedPrompt : p
                 ));
             } catch (e) {
                 console.warn("Could not generate cover for imported prompt", e);
@@ -221,7 +249,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const hasCompleted = localStorage.getItem('hasCompletedWalkthrough');
     if (!hasCompleted) {
-        // Delay to allow UI to settle before starting the tour
         setTimeout(() => setIsWalkthroughActive(true), 500);
     }
   }, []);
@@ -229,12 +256,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkApiKey = () => {
         const userKey = localStorage.getItem('userGeminiKey');
-        // The app is considered configured if a user key is set.
-        // The fallback to process.env.API_KEY will be handled in the service.
         if (userKey) {
             setIsApiKeySet(true);
         } else {
-             // Check for the fallback key to avoid showing the setup screen if not needed.
             if(process.env.API_KEY) {
                 setIsApiKeySet(true);
             } else {
@@ -247,7 +271,6 @@ const App: React.FC = () => {
 
   const handleKeySaved = () => {
     setIsApiKeySet(true);
-    // If there was a pending shared prompt, load it into gallery now
     if (pendingSharedPrompt) {
         importSharedPrompt(pendingSharedPrompt);
         setView('gallery');
@@ -273,32 +296,30 @@ const App: React.FC = () => {
     setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
   };
 
-  // Robust LocalStorage saving with Quota Limit detection
-  useEffect(() => {
-    try {
-        localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
-    } catch (e: any) {
-        console.error("LocalStorage error:", e);
-        if (e.name === 'QuotaExceededError' || e.message?.includes('quota')) {
-            addToast("⚠️ Almacenamiento lleno. Exporta y borra prompts antiguos para seguir guardando.", "error");
-        } else {
-            // Only show generic toast if it's not a known quota issue to avoid spamming
-           // addToast("Error al guardar en almacenamiento local.", "warning");
-        }
-    }
-  }, [savedPrompts, addToast]);
+  // Removed LocalStorage Effect for savedPrompts. 
+  // We now persist changes immediately via db.* methods.
   
   useEffect(() => {
-    // Cuando cambia el modo, limpia el estado para evitar confusiones.
     setImages([]);
     setPrompt('');
     setError(null);
   }, [extractionMode]);
 
 
-  const handleUpdatePrompts = useCallback((newPrompts: SavedPrompt[]) => {
-    setSavedPrompts(newPrompts);
-  }, []);
+  const handleUpdatePrompts = useCallback(async (newPrompts: SavedPrompt[]) => {
+    // This is mainly for bulk import/clear
+    // For import, we save to DB first
+    try {
+        await db.clearAll(); // Assuming full replacement for import/clear actions
+        if (newPrompts.length > 0) {
+            await db.saveMany(newPrompts);
+        }
+        setSavedPrompts(newPrompts);
+    } catch (e) {
+        console.error("Bulk update failed", e);
+        addToast("Error al actualizar la base de datos", 'error');
+    }
+  }, [addToast]);
 
   const handleImagesUpload = useCallback(async (files: File[]) => {
     if (images.length + files.length > maxImages) {
@@ -370,7 +391,7 @@ const App: React.FC = () => {
 
         if (images.length > 0) {
             setGlobalLoaderState({ active: true, message: 'Procesando portada...' });
-            // ALWAYS use collage to force resize/compression of images to avoid LocalStorage Quota exceeded
+            // ALWAYS use collage to force resize/compression
             coverImageDataUrl = await createImageCollage(images.map(img => ({ base64: img.base64, mimeType: img.mimeType })));
         }
         
@@ -385,7 +406,8 @@ const App: React.FC = () => {
             coverImage: coverImageDataUrl,
             ...metadata,
         };
-        addPromptToGallery(newPrompt);
+        
+        await addPromptToGallery(newPrompt); // Updated to use async DB call
         addToast('Prompt guardado en la galería', 'success');
         setImages([]);
         setPrompt('');
@@ -401,9 +423,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeletePrompt = (id: string) => {
-      setSavedPrompts(prev => prev.filter(p => p.id !== id));
-      addToast('Prompt eliminado.', 'success');
+  const handleDeletePrompt = async (id: string) => {
+      try {
+        await db.deletePrompt(id);
+        setSavedPrompts(prev => prev.filter(p => p.id !== id));
+        addToast('Prompt eliminado.', 'success');
+      } catch (e) {
+          addToast('Error al eliminar.', 'error');
+      }
   };
 
   const handleUseFeatureInEditor = useCallback((featurePrompt: string) => {
@@ -434,12 +461,10 @@ const App: React.FC = () => {
       setSelectedPromptForModal(null);
   }, []);
   
-  // Global Share Function
   const handleSharePrompt = useCallback(async (prompt: SavedPrompt) => {
       setPromptToShare(prompt);
       setGlobalLoaderState({ active: true, message: 'Creando ficha visual...' });
       
-      // Delay to ensure DOM is updated with the new prompt in ShareCard
       setTimeout(async () => {
           if (!shareCardRef.current) {
               setGlobalLoaderState({ active: false, message: '' });
@@ -451,7 +476,7 @@ const App: React.FC = () => {
                   cacheBust: true,
                   pixelRatio: 3, 
                   backgroundColor: '#0A0814',
-                  fontEmbedCSS: '', // Fix for Google Fonts CORS error
+                  fontEmbedCSS: '', 
               });
               
                const cleanTitle = (prompt.title || 'prompt').replace(/\s+/g, '-').toLowerCase();
@@ -476,7 +501,7 @@ const App: React.FC = () => {
               addToast('Error al generar la imagen para compartir', 'error');
           } finally {
               setGlobalLoaderState({ active: false, message: '' });
-              setPromptToShare(null); // Cleanup
+              setPromptToShare(null);
           }
       }, 500);
   }, [addToast]);
@@ -501,7 +526,6 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-transparent text-gray-200 font-sans flex flex-col">
       <Header view={view} setView={handleSetView} onOpenSettings={() => setIsSettingsModalOpen(true)} />
       
-      {/* Hidden Share Card for generating images */}
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
           {promptToShare && shareUrl && <ShareCard ref={shareCardRef} promptData={promptToShare} shareUrl={shareUrl} />}
       </div>

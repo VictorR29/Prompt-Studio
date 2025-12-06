@@ -40,7 +40,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Usage Stats
-  const [storageUsed, setStorageUsed] = useState({ usedKB: 0, percent: 0, totalMB: 5 });
+  const [storageUsed, setStorageUsed] = useState({ usedMB: 0, percent: 0, totalMB: 0 });
   const [apiUsage, setApiUsage] = useState(0);
 
   useEffect(() => {
@@ -50,25 +50,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
     const storedUser = localStorage.getItem('promptStudioUsername');
     if (storedUser) setUsername(storedUser);
 
-    // Calculate Storage Usage Manually
-    const calculateStorage = () => {
+    // Calculate Storage Usage using Navigator Storage API (for IndexedDB support)
+    const calculateStorage = async () => {
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const { usage, quota } = await navigator.storage.estimate();
+                if (usage !== undefined && quota !== undefined) {
+                    const usedMB = Math.round(usage / (1024 * 1024));
+                    const totalMB = Math.round(quota / (1024 * 1024));
+                    const percent = Math.min(100, Math.round((usage / quota) * 100));
+                    
+                    setStorageUsed({
+                        usedMB,
+                        percent,
+                        totalMB
+                    });
+                    return;
+                }
+            } catch (e) {
+                console.warn("Storage estimate failed", e);
+            }
+        }
+        
+        // Fallback for non-supported browsers (Local Storage only calculation)
         let totalCharLength = 0;
         for (let key in localStorage) {
             if (localStorage.hasOwnProperty(key)) {
                 totalCharLength += (localStorage[key].length + key.length);
             }
         }
-        // Browsers typically limit to 5M characters (~5MB or 10MB depending on encoding)
-        // We'll use 5M chars as the conservative baseline for the progress bar.
-        const limitChars = 5200000; // Approx 5MB
-        const usedKB = Math.round((totalCharLength * 2) / 1024); // Est. UTF-16 size
-        const percent = Math.min(100, Math.round((totalCharLength / limitChars) * 100));
-        
-        setStorageUsed({
-            usedKB,
-            percent,
-            totalMB: 5
-        });
+        const usedMB = parseFloat((totalCharLength * 2 / (1024 * 1024)).toFixed(2));
+        setStorageUsed({ usedMB, percent: (usedMB/5)*100, totalMB: 5 });
     };
     calculateStorage();
 
@@ -113,7 +125,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
   };
   
   const handleClearGallery = () => {
-    localStorage.removeItem('savedPrompts');
+    // Parent handles actual DB clear via onPromptsUpdate callback logic
     if (onPromptsUpdate) {
         onPromptsUpdate([]);
     }
@@ -229,15 +241,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
             <section className="bg-gray-900/40 p-4 rounded-xl border border-white/5 space-y-4">
                  <div className="flex items-center gap-2 mb-2">
                      <ChartIcon className="w-5 h-5 text-indigo-400" />
-                     <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wide">Estadísticas de Uso</h3>
+                     <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wide">Estadísticas de Uso (Global)</h3>
                  </div>
                  
                  {/* Storage Bar */}
                  <div>
                      <div className="flex justify-between text-xs mb-1">
-                         <span className="text-gray-400">Almacenamiento Local</span>
+                         <span className="text-gray-400">Almacenamiento (App + DB)</span>
                          <span className={storageUsed.percent > 80 ? 'text-red-400 font-bold' : 'text-gray-300'}>
-                             {storageUsed.usedKB} KB / ~{storageUsed.totalMB} MB
+                             {storageUsed.usedMB} MB / {storageUsed.totalMB > 1000 ? `${(storageUsed.totalMB/1024).toFixed(1)} GB` : `${storageUsed.totalMB} MB`}
                          </span>
                      </div>
                      <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -249,11 +261,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
                             style={{ width: `${storageUsed.percent}%` }}
                          />
                      </div>
-                     {storageUsed.percent > 80 && (
-                         <p className="text-[10px] text-red-400 mt-1">
-                             ⚠️ Almacenamiento casi lleno. Exporta y limpia tu galería.
-                         </p>
-                     )}
                  </div>
 
                  {/* API Count */}
@@ -331,7 +338,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
             <section className="space-y-4">
                  <h3 className="text-lg font-semibold text-gray-200 border-b border-white/10 pb-2">Gestión de Datos</h3>
                  <p className="text-gray-400 text-sm">
-                    Tus prompts se guardan en el almacenamiento local. Exporta una copia de seguridad antes de borrar.
+                    Tus prompts se guardan en la base de datos del navegador (IndexedDB). Exporta una copia de seguridad antes de borrar.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                     <button
@@ -369,7 +376,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onKeySave
                 ) : (
                     <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg animate-fade-in-subtle">
                         <p className="text-xs text-red-200 mb-2 text-center">
-                            ¿Estás seguro? Esta acción borrará TODOS los prompts y no se puede deshacer.
+                            ¿Estás seguro? Esta acción borrará TODOS los prompts de la base de datos y no se puede deshacer.
                             <br/><span className="font-bold">Asegúrate de haber exportado antes.</span>
                         </p>
                         <div className="flex gap-2">
