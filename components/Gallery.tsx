@@ -30,7 +30,29 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
   const [activeContextMenuId, setActiveContextMenuId] = useState<string | null>(null);
+  const [numColumns, setNumColumns] = useState(2); // Default mobile
   const loaderRef = useRef<HTMLDivElement>(null);
+
+  // Responsive Column Calculation
+  useEffect(() => {
+      const updateColumns = () => {
+          const width = window.innerWidth;
+          if (width >= 1024) {
+              setNumColumns(4); // Desktop
+          } else if (width >= 768) {
+              setNumColumns(3); // Tablet
+          } else {
+              setNumColumns(2); // Mobile
+          }
+      };
+
+      // Initial call
+      updateColumns();
+
+      // Listener
+      window.addEventListener('resize', updateColumns);
+      return () => window.removeEventListener('resize', updateColumns);
+  }, []);
 
   const handleFilterToggle = useCallback((type: string) => {
     setActiveFilters(prevFilters => {
@@ -82,7 +104,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
           setVisibleCount(prevCount => prevCount + SUBSEQUENT_LOAD_COUNT);
         }
       },
-      { root: null, rootMargin: '200px', threshold: 0.1 }
+      { root: null, rootMargin: '400px', threshold: 0.1 } // Increased margin for smoother loading
     );
 
     observer.observe(element);
@@ -99,6 +121,18 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   }, [activeContextMenuId]);
 
   const promptsToShow = filteredPrompts.slice(0, visibleCount);
+
+  // Deterministic Column Distribution
+  // Instead of CSS columns, we split the array into N arrays.
+  // This ensures Item 0 is ALWAYS in Col 1, Item 1 in Col 2, etc.
+  // No shuffling on re-render.
+  const columns = useMemo(() => {
+      const cols: SavedPrompt[][] = Array.from({ length: numColumns }, () => []);
+      promptsToShow.forEach((prompt, index) => {
+          cols[index % numColumns].push(prompt);
+      });
+      return cols;
+  }, [promptsToShow, numColumns]);
 
   return (
     <div className="w-full">
@@ -170,23 +204,28 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
         </div>
       )}
 
-      <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
-        {promptsToShow.map((prompt) => {
-            const isSelected = multiSelect && selection ? selection.some(p => p.id === prompt.id) : false;
-            return (
-            <PromptCard 
-                key={prompt.id} 
-                promptData={prompt} 
-                onClick={() => onSelect(prompt)}
-                isSelected={isSelected} 
-                onDelete={onDelete}
-                onEdit={onEdit}
-                onShare={onShare}
-                activeContextMenuId={activeContextMenuId}
-                onSetActiveContextMenu={setActiveContextMenuId}
-            />
-            );
-        })}
+      {/* Stable Masonry Layout */}
+      <div className="flex gap-4 items-start">
+        {columns.map((colPrompts, colIndex) => (
+            <div key={colIndex} className="flex-1 flex flex-col gap-4 min-w-0">
+                {colPrompts.map((prompt) => {
+                    const isSelected = multiSelect && selection ? selection.some(p => p.id === prompt.id) : false;
+                    return (
+                        <PromptCard 
+                            key={prompt.id} 
+                            promptData={prompt} 
+                            onClick={() => onSelect(prompt)}
+                            isSelected={isSelected} 
+                            onDelete={onDelete}
+                            onEdit={onEdit}
+                            onShare={onShare}
+                            activeContextMenuId={activeContextMenuId}
+                            onSetActiveContextMenu={setActiveContextMenuId}
+                        />
+                    );
+                })}
+            </div>
+        ))}
       </div>
 
       {visibleCount < filteredPrompts.length && (
