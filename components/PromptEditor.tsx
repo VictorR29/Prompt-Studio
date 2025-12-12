@@ -121,14 +121,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setShowNegativeSection(false);
 
         try {
-            // First, try local modularization (fast path for JSON)
+            // First, try enhanced local modularization (improved to handle JSON better)
             let modularized = attemptLocalModularization(promptText);
 
-            if (!modularized) {
-                 // Fallback to AI for plain text
-                 modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
+            if (modularized) {
+                 addToast("Estructura JSON detectada. Cargada y distribuida en módulos.", 'success');
             } else {
-                 addToast("Estructura JSON detectada. Cargada al instante.", 'success');
+                 // Fallback to AI for plain text if it's not JSON
+                 modularized = await modularizePrompt(promptText) as Record<ExtractionMode, string>;
             }
             
             // Check content
@@ -174,32 +174,42 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             }
 
             try {
-                // OPTIMIZATION: Try to parse locally first to avoid AI latency for JSON prompts
+                // TRY LOCAL PARSE FIRST: Especially critical for saved JSON/Structured prompts
+                // to ensure we load them exactly as saved without AI hallucination/modification
                 let modularized = attemptLocalModularization(promptData.prompt);
 
                 if (!modularized) {
-                    // Only call AI if it's plain text and not a structured JSON
-                    modularized = await modularizePrompt(promptData.prompt) as Record<ExtractionMode, string>;
+                     // Only use AI if it's strictly plain text and not a JSON structure
+                     // And only if it's not explicitly a 'structured' type which implies JSON
+                     if (promptData.type !== 'structured') {
+                        modularized = await modularizePrompt(promptData.prompt) as Record<ExtractionMode, string>;
+                     }
                 }
 
                 if (isMounted) {
                     const hasContent = modularized && Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
-                     if (!hasContent) {
+                    
+                    if (!hasContent) {
+                        // If parsing failed completely, load raw text
                         setFragments({ ...initialFragments, subject: promptData.prompt });
-                     } else {
-                        // Ensure we strictly typecast or handle the partial record safely
+                        
+                        // If it was supposed to be structured but failed, warn user
+                        if (promptData.type === 'structured') {
+                            addToast("El JSON no se pudo analizar correctamente. Se cargó como texto plano.", 'warning');
+                        }
+                    } else {
+                        // Cast safely
                         setFragments(modularized as Record<ExtractionMode, string>);
                         if (modularized?.negative) {
                             setNegativePrompt(modularized.negative);
                             setShowNegativeSection(true);
                         }
-                     }
+                    }
                     setFinalPrompt(promptData.prompt);
                     setViewMode('editor');
                 }
             } catch (err) {
                 if (isMounted) {
-                    // Fallback on error
                     setFragments({ ...initialFragments, subject: promptData.prompt });
                     setFinalPrompt(promptData.prompt);
                     setViewMode('editor');

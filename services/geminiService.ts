@@ -226,56 +226,100 @@ export const modularizePrompt = async (prompt: string): Promise<Partial<Record<E
     return cleanAndParseJson(response.text || "{}");
 };
 
-// NEW: Local function to map JSON structure to modules instantly (0 latency)
+// HELPER: Recursively flatten a nested object into a string representation
+const flattenObjectToString = (obj: any): string => {
+    if (typeof obj === 'string') return obj;
+    if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
+    if (Array.isArray(obj)) {
+        return obj.map(flattenObjectToString).join(', ');
+    }
+    if (typeof obj === 'object' && obj !== null) {
+        return Object.entries(obj)
+            .map(([key, val]) => {
+                const flatVal = flattenObjectToString(val);
+                // Skip very common generic keys if possible, or format nicely
+                return `${key}: ${flatVal}`;
+            })
+            .join('; ');
+    }
+    return '';
+};
+
+// IMPROVED: Local function to map JSON structure to modules instantly (0 latency)
 export const attemptLocalModularization = (text: string): Partial<Record<ExtractionMode, string>> | null => {
     try {
+        let jsonString = text;
+        // Try to find JSON object bounds if text contains noise
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+            jsonString = text.substring(firstBrace, lastBrace + 1);
+        }
+
         // Clean markdown code blocks often present in AI outputs
-        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const cleanText = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(cleanText);
         
-        // If it's not an object (e.g. just a string), return null to use AI
-        if (typeof json !== 'object' || json === null) return null;
+        // If it's not an object (e.g. just a string or array), return null to use AI fallback
+        if (typeof json !== 'object' || json === null || Array.isArray(json)) return null;
 
         // Map common JSON keys to our internal ExtractionModes
         const map: Record<string, ExtractionMode> = {
-            'subject': 'subject', 'character': 'subject', 'main_subject': 'subject',
-            'pose': 'pose', 'action': 'pose',
-            'expression': 'expression', 'emotion': 'expression',
-            'outfit': 'outfit', 'clothing': 'outfit', 'attire': 'outfit',
-            'object': 'object', 'props': 'object',
-            'scene': 'scene', 'environment': 'scene', 'background': 'scene', 'location': 'scene',
-            'color': 'color', 'palette': 'color', 'lighting': 'color', // Lighting often fits with color/atmos
-            'composition': 'composition', 'camera': 'composition', 'framing': 'composition',
-            'style': 'style', 'visual_style': 'style', 'aesthetic': 'style', 'art_style': 'style',
+            'subject': 'subject', 'character': 'subject', 'main_subject': 'subject', 'person': 'subject',
+            'pose': 'pose', 'action': 'pose', 'posture': 'pose',
+            'expression': 'expression', 'emotion': 'expression', 'facial_expression': 'expression',
+            'outfit': 'outfit', 'clothing': 'outfit', 'attire': 'outfit', 'costume': 'outfit', 'clothes': 'outfit',
+            'object': 'object', 'props': 'object', 'items': 'object',
+            'scene': 'scene', 'environment': 'scene', 'background': 'scene', 'location': 'scene', 'setting': 'scene',
+            'color': 'color', 'palette': 'color', 'colors': 'color', 'color_palette': 'color',
+            'composition': 'composition', 'camera': 'composition', 'framing': 'composition', 'angle': 'composition', 'lighting': 'composition', 'light': 'composition',
+            'style': 'style', 'visual_style': 'style', 'aesthetic': 'style', 'art_style': 'style', 'medium': 'style', 'art_type': 'style',
             'negative': 'negative', 'negative_prompt': 'negative'
         };
 
         const result: Partial<Record<ExtractionMode, string>> = {};
+        let hasMappedContent = false;
 
         Object.keys(json).forEach(key => {
-            const normalizedKey = key.toLowerCase();
+            const normalizedKey = key.toLowerCase().trim();
             const targetModule = map[normalizedKey];
+            const value = json[key];
             
+            // Skip empty values
+            if (!value) return;
+
+            const stringValue = flattenObjectToString(value);
+            if (!stringValue.trim()) return;
+
             if (targetModule) {
-                const value = json[key];
-                if (typeof value === 'string') {
-                    result[targetModule] = value;
-                } else if (typeof value === 'object' && value !== null) {
-                    // Keep nested structure as formatted JSON string for editing
-                    result[targetModule] = JSON.stringify(value, null, 2);
+                // If the module already has content (e.g. 'lighting' and 'camera' both map to 'composition'), append it.
+                if (result[targetModule]) {
+                    result[targetModule] = result[targetModule] + '; ' + stringValue;
+                } else {
+                    result[targetModule] = stringValue;
                 }
-            } else if (typeof json[key] === 'object' && json[key] !== null) {
-                // If we have a key we don't recognize but it's an object (like "technical_settings"),
-                // try to see if its children map to anything, otherwise dump to Style or Composition
-                if (normalizedKey.includes('tech') || normalizedKey.includes('camera')) {
-                     const existing = result['composition'] ? result['composition'] + '\n' : '';
-                     result['composition'] = existing + `${key}: ${JSON.stringify(json[key])}`;
+                hasMappedContent = true;
+            } else {
+                // Unknown key handling
+                // Check for keys that might contain specific keywords to route them
+                if (normalizedKey.includes('light') || normalizedKey.includes('cam')) {
+                     const existing = result['composition'] ? result['composition'] + '; ' : '';
+                     result['composition'] = existing + `${key}: ${stringValue}`;
+                     hasMappedContent = true;
+                } else if (normalizedKey.includes('mood') || normalizedKey.includes('atmos')) {
+                     const existing = result['scene'] ? result['scene'] + '; ' : '';
+                     result['scene'] = existing + `${key}: ${stringValue}`;
+                     hasMappedContent = true;
+                } else if (normalizedKey.includes('detail') || normalizedKey.includes('quality')) {
+                     const existing = result['style'] ? result['style'] + '; ' : '';
+                     result['style'] = existing + `${key}: ${stringValue}`;
+                     hasMappedContent = true;
                 }
             }
         });
 
         // If we found at least one valid module, return the result
-        if (Object.keys(result).length > 0) {
+        if (hasMappedContent) {
             return result;
         }
 
