@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { SavedPrompt } from '../types';
 import { PromptCard } from './PromptCard';
 import { SearchIcon } from './icons/SearchIcon';
@@ -59,7 +60,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   // Scroll to Top Logic
   useEffect(() => {
     const handleScroll = () => {
-      // Reduced threshold from 300 to 100 to show button earlier
+      // Threshold 100px
       if (window.scrollY > 100) {
         setShowScrollTop(true);
       } else {
@@ -260,16 +261,19 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
          </div>
       )}
 
-      {/* Scroll to Top Button */}
-      <button
-        onClick={scrollToTop}
-        className={`fixed bottom-20 right-4 md:bottom-8 md:right-8 p-3 rounded-full bg-teal-600/90 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/50 backdrop-blur-sm border border-white/10 transition-all duration-300 transform z-50 group ${
-          showScrollTop ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
-        }`}
-        aria-label="Volver arriba"
-      >
-        <ArrowUpIcon className="w-6 h-6 group-hover:-translate-y-1 transition-transform duration-300" />
-      </button>
+      {/* Scroll to Top Button - Using Portal to detach from parent transform/animations */}
+      {typeof document !== 'undefined' && createPortal(
+        <button
+          onClick={scrollToTop}
+          className={`fixed bottom-24 right-5 md:bottom-10 md:right-10 p-3 rounded-full bg-teal-600/90 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/50 backdrop-blur-sm border border-white/10 transition-all duration-300 transform z-[999] group ${
+            showScrollTop ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+          }`}
+          aria-label="Volver arriba"
+        >
+          <ArrowUpIcon className="w-6 h-6 group-hover:-translate-y-1 transition-transform duration-300" />
+        </button>,
+        document.body
+      )}
     </div>
   );
 };
