@@ -59,7 +59,8 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   // Scroll to Top Logic
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 300) {
+      // Reduced threshold from 300 to 100 to show button earlier
+      if (window.scrollY > 100) {
         setShowScrollTop(true);
       } else {
         setShowScrollTop(false);
@@ -67,6 +68,9 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
+    // Check initial position
+    handleScroll();
+    
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -146,9 +150,6 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   const promptsToShow = filteredPrompts.slice(0, visibleCount);
 
   // Deterministic Column Distribution
-  // Instead of CSS columns, we split the array into N arrays.
-  // This ensures Item 0 is ALWAYS in Col 1, Item 1 in Col 2, etc.
-  // No shuffling on re-render.
   const columns = useMemo(() => {
       const cols: SavedPrompt[][] = Array.from({ length: numColumns }, () => []);
       promptsToShow.forEach((prompt, index) => {
@@ -262,7 +263,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
       {/* Scroll to Top Button */}
       <button
         onClick={scrollToTop}
-        className={`fixed bottom-20 right-4 md:bottom-8 md:right-8 p-3 rounded-full bg-teal-600/90 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/50 backdrop-blur-sm border border-white/10 transition-all duration-300 transform z-40 group ${
+        className={`fixed bottom-20 right-4 md:bottom-8 md:right-8 p-3 rounded-full bg-teal-600/90 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/50 backdrop-blur-sm border border-white/10 transition-all duration-300 transform z-50 group ${
           showScrollTop ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
         }`}
         aria-label="Volver arriba"
