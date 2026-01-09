@@ -3,6 +3,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { SavedPrompt } from '../types';
 import { PromptCard } from './PromptCard';
 import { SearchIcon } from './icons/SearchIcon';
+import { ArrowUpIcon } from './icons/ArrowUpIcon';
 import { PROMPT_TYPE_CONFIG } from '../config';
 
 interface GalleryProps {
@@ -31,6 +32,7 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD_COUNT);
   const [activeContextMenuId, setActiveContextMenuId] = useState<string | null>(null);
   const [numColumns, setNumColumns] = useState(2); // Default mobile
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   // Responsive Column Calculation
@@ -53,6 +55,27 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
       window.addEventListener('resize', updateColumns);
       return () => window.removeEventListener('resize', updateColumns);
   }, []);
+
+  // Scroll to Top Logic
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
 
   const handleFilterToggle = useCallback((type: string) => {
     setActiveFilters(prevFilters => {
@@ -235,6 +258,17 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
              <div className="w-2 h-2 bg-teal-500 rounded-full animate-bounce mx-1" style={{ animationDelay: '0.2s' }}></div>
          </div>
       )}
+
+      {/* Scroll to Top Button */}
+      <button
+        onClick={scrollToTop}
+        className={`fixed bottom-20 right-4 md:bottom-8 md:right-8 p-3 rounded-full bg-teal-600/90 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/50 backdrop-blur-sm border border-white/10 transition-all duration-300 transform z-40 group ${
+          showScrollTop ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+        }`}
+        aria-label="Volver arriba"
+      >
+        <ArrowUpIcon className="w-6 h-6 group-hover:-translate-y-1 transition-transform duration-300" />
+      </button>
     </div>
   );
 };
