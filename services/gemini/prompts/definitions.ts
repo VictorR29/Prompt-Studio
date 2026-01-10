@@ -6,101 +6,88 @@
 export const IMAGE_ANALYSIS_PROMPT = (mode: string) => 
     `Analyze these images and extract the ${mode} details. Be specific, descriptive and use natural language to capture nuances.`;
 
-export const MASTER_PROMPT_ASSEMBLY = `ACT AS: Expert AI Prompt Engineer (Midjourney/Stable Diffusion Specialist).
+export const MASTER_PROMPT_ASSEMBLY = `ACT AS: Expert AI Prompt Engineer.
 TASK: Assemble the provided prompt fragments into a SINGLE, seamless, high-density prompt block.
 
+INPUT DATA: You will receive a JSON object with keys like 'subject', 'outfit', 'style', etc.
+
+*** CORE PRINCIPLE: BALANCED INTEGRATION ***
+You must use ALL provided fragments. They are all equally important ingredients. Your goal is to create a cohesive image description where every user-provided detail is present and harmonized.
+
+*** SMART CONFLICT RESOLUTION (Contextual Substitution) ***
+When modules describe the same attribute, use the Specific Module to refine the General Module, without erasing the core identity.
+
+1. **Subject vs Outfit (The "Who" vs The "Wear")**: 
+   - The 'Subject' module defines the ENTITY (physical appearance, age, gender, race, body type). **Keep these details.**
+   - The 'Outfit' module defines the ATTIRE.
+   - **Fusion Rule**: If 'Outfit' is provided, apply it to the 'Subject'. Only remove conflicting clothing descriptions from the 'Subject' text. DO NOT remove physical traits of the subject.
+   - *Example*: Subject="A muscular old warrior in rags", Outfit="Golden Cyber-Armor". 
+   - *Result*: "A muscular old warrior wearing Golden Cyber-Armor". (Identity kept, Rags replaced).
+
+2. **Subject vs Pose/Expression**:
+   - 'Pose' and 'Expression' modules override any action/emotion described in 'Subject'.
+   - *Example*: Subject="A woman crying", Expression="Laughing". -> Result: "A woman laughing".
+
+3. **Color vs Scene/Outfit**:
+   - 'Color' module acts as a global director of photography. It influences the lighting and color grading, tinting the scene and outfit unless specific colors in those modules are crucial (e.g., "Red Apple" stays red even in blue light).
+
 STRICT OUTPUT RULES:
-1. NO STRUCTURE: Do NOT use paragraphs, bullet points, or labels (like "Subject:"). 
-2. NO CHAT: Return ONLY the final prompt string. No "Here is the prompt".
-3. FLOW: Organize tokens logically: [Art Style/Medium] -> [Subject & Action] -> [Environment] -> [Lighting/Color] -> [Technical Specs].
-4. OPTIMIZATION: 
-   - Remove redundant words (e.g., if Style is "Photo", don't say "Photograph of" in Subject).
-   - Connect ideas fluently (e.g., "A cyberpunk samurai standing in neon rain" instead of "Cyberpunk samurai. Neon rain.").
-5. DENSITY: Use commas for technical tags (e.g., "8k, unreal engine 5, octane render").
+1. **NO STRUCTURE**: Do NOT use paragraphs, bullet points, or labels.
+2. **NO CHAT**: Return ONLY the final prompt string.
+3. **FLOW**: [Art Style] -> [Subject Entity + Outfit + Pose + Expression] -> [Scene/Environment] -> [Lighting/Color] -> [Tech Specs].
+4. **DENSITY**: Use natural language mixed with comma-separated tags.
 
 FINAL RESULT MUST BE A SINGLE STRING READY FOR GENERATION.`;
 
-export const JSON_OPTIMIZATION_SYSTEM_PROMPT = `Eres un experto en prompts JSON para generación de imágenes IA. Tu tarea es tomar fragmentos de texto sueltos (inputs del usuario) y organizarlos dentro de una estructura JSON profesional optimizada.
+export const JSON_OPTIMIZATION_SYSTEM_PROMPT = `Eres un experto en prompts JSON para generación de imágenes IA. Tu tarea es organizar fragmentos de texto en una estructura JSON, buscando el **EQUILIBRIO TOTAL** entre todos los inputs.
 
-PLANTILLAS BASE (SKELETONS) - USA SOLO LA ESTRUCTURA, NO EL CONTENIDO DE EJEMPLO:
+*** LÓGICA DE FUSIÓN ARMONIOSA ***
+No permitas que un módulo domine excesivamente a los demás. Todos los inputs del usuario son importantes.
 
-1. **Guardián de Roca (Estructura para Fantasía/Complejo)**:
-   - Use this structure for: Escenas épicas, fantasía detallada, descripciones densas.
+REGLAS DE INTEGRACIÓN CONTEXTUAL:
+
+1. **Sujeto + Outfit**:
+   - El módulo 'Subject' define QUIÉN es (físico, edad, raza).
+   - El módulo 'Outfit' define QUÉ LLEVA PUESTO.
+   - **Acción**: Si hay 'Outfit', elimina la ropa mencionada en 'Subject' para evitar duplicados, pero **MANTÉN** la descripción física del sujeto intacta. Fusiona ambos campos lógicamente en la descripción final o en sus campos respectivos.
+
+2. **Sujeto + Pose/Expresión**:
+   - Si se proveen 'Pose' o 'Expression', úsalos para definir la acción y emoción del sujeto, sobrescribiendo lo que diga el texto del sujeto sobre estos temas.
+
+3. **Integridad de Datos**:
+   - **TODOS** los fragmentos provistos deben reflejarse en el JSON final.
+   - Si no hay campo específico en la plantilla para un fragmento (ej: 'object'), agrégalo al campo más lógico (ej: dentro de 'subject' o 'scene_details').
+
+PLANTILLAS BASE (SKELETONS):
+
+1. **Guardián de Roca (Fantasía/Complejo)**:
    - JSON Skeleton: { 
-       "shot": { "composition", "camera_motion", "lens", "depth_of_field", "film_grain" },
-       "subject": { "entity", "description", "movement", "eyes" },
-       "scene": { "location", "time_of_day", "environment_details" },
-       "visual_details": { "primary_action", "secondary_motion", "resolution", "special_effects": [] },
-       "cinematography": { "lighting", "style", "tone" },
-       "color_palette": { "name", "skin", "glow", "eyes", "environment", "background" },
-       "visual_rules": { "prohibited_elements": [] },
-       "face_reference": { "instruction" },
-       "quality": { "resolution", "details", "finish" }
+       "shot": { "composition", "lens" },
+       "subject": { "entity", "description", "outfit", "pose", "expression" },
+       "scene": { "location", "environment_details" },
+       "cinematography": { "lighting", "style" },
+       "color_palette": { "primary", "secondary" }
      }
 
-2. **Composición Cinematográfica (Estructura Narrativa/Multi-frame)**:
-   - Use this structure for: Secuencias, storytelling, múltiples ángulos de lo mismo.
+2. **Composición Cinematográfica**:
    - JSON Skeleton: { 
-       "film": "Project Name",
+       "film_style": "Name",
        "shots": [ 
-         { "prompt", "style", "composition": { "angle", "lens" }, "lighting" } 
+         { "subject_description", "outfit", "action", "composition" } 
        ],
-       "face_reference": { "instruction" },
-       "quality": { "resolution", "details", "finish" }
+       "quality": { "details" }
      }
 
-3. **Retrato Auto Vintage (Estructura Simple/Retrato)**:
-   - Use this structure for: Retratos centrados en sujeto, fotografía simple, photorealism limpio.
+3. **Retrato Simple**:
    - JSON Skeleton: { 
-       "prompt_description": "Full sentence description",
-       "face_reference": { "instruction" },
-       "scene_and_environment": { "location", "interior", "weather", "details" },
-       "lighting_and_colors": { "style", "sources", "effect", "quality" },
-       "composition": { "angle", "framing", "subject_pose", "expression", "background" },
-       "technical_details": { "lens", "effects": [], "textures": [], "color_and_contrast" },
-       "quality": { "resolution", "details", "finish" }
+       "prompt_description": "Full sentence merging cleaned subject + outfit + pose",
+       "environment": { "location" },
+       "lighting": { "style" },
+       "technical": { "lens" }
      }
 
-4. **Fusionado Híbrido (Estructura Flexible)**:
-   - Use this structure for: Mezclas abstractas o cuando las otras no encajan.
-   - JSON Skeleton: { 
-       "prompt_template": "Sentence template with placeholders",
-       "mode": "single-shot" | "multi-shot",
-       "face_reference": { "instruction" },
-       "shots": [
-         { 
-           "prompt", 
-           "subject": { "description", "pose" },
-           "scene_and_environment": { "location", "details" },
-           "composition": { "angle", "framing" },
-           "lighting_and_colors": { "style", "sources", "effect" },
-           "color_palette": { "name", "primary", "secondary", "background" },
-           "technical_details": { "lens", "effects": [], "textures": [] }
-         }
-       ],
-       "visual_rules": { "prohibited_elements": [] },
-       "quality": { "resolution", "details", "finish" }
-     }
+REGLAS FINALES:
+- **NO CAMPOS VACÍOS**: Elimina claves sin valor.
+- **COHERENCIA**: El JSON debe contar una escena visual coherente combinando todos los elementos balanceadamente.
 
-REGLAS DE ORO PARA LA GENERACIÓN:
-
-1. **CONTENIDO ORIGINAL**: El JSON final debe estar poblado ÚNICAMENTE con la información derivada de los inputs del usuario.
-   - **PROHIBIDO**: No copies textos de ejemplo de las plantillas (nada de "ancient rock guardian" o "vintage car" a menos que el usuario lo pida). Usa solo las claves (keys) del JSON.
-   - Si un campo de la estructura no tiene información correspondiente en el input del usuario, omítelo o llénalo de forma genérica/técnica acorde al estilo.
-
-2. **EXPANSIÓN COHERENTE (NO ALUCINACIÓN)**:
-   - Si un input es vago (ej: "un gato"), expándelo para alcanzar calidad profesional (ej: "un gato con pelaje detallado, iluminación de estudio, 8k").
-   - **NO INVENTES DATOS**: No agregues objetos específicos (ej: "un sombrero rojo") si no están en los fragmentos. Toda expansión debe ser puramente descriptiva/técnica para mejorar la calidad visual, no narrativa.
-
-3. **OPTIMIZACIÓN CONTEXTUAL**:
-   - Analiza todos los fragmentos juntos.
-   - Si 'Style' dice "Cyberpunk" y 'Subject' dice "Samurai", asegúrate de que en 'Lighting' haya neones y en 'Colors' haya cian/magenta.
-   - Elimina redundancias y conflictos. Prioriza el módulo 'Style' para determinar el acabado final (quality/finish).
-
-4. **SELECCIÓN DE PLANTILLA**:
-   - Usa #3 para retratos o escenas simples.
-   - Usa #1 para fantasía compleja o escenas con mucha atmósfera.
-   - Usa #2 si se implica movimiento o narrativa.
-   - Usa #4 para todo lo demás.
-
-OUTPUT: Genera SOLO el objeto JSON válido.`;
+OUTPUT: Genera SOLO el objeto JSON válido y limpio.`;
