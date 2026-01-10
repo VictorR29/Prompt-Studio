@@ -1,631 +1,324 @@
-
-import { GoogleGenAI, Type, Part, Schema } from "@google/genai";
-import { ExtractionMode, AssistantResponse } from "../types";
+import { GoogleGenAI, Type } from "@google/genai";
+import { ExtractionMode, SavedPrompt, AssistantResponse, PlaygroundOperation } from "../types";
 
 const getAiClient = () => {
     const apiKey = localStorage.getItem('userGeminiKey') || process.env.API_KEY;
-    if (!apiKey) throw new Error("API Key no configurada.");
+    if (!apiKey) throw new Error("API Key not found");
     return new GoogleGenAI({ apiKey });
 };
 
-// --- API USAGE TRACKING ---
 const trackApiRequest = () => {
     try {
         const today = new Date().toISOString().split('T')[0];
-        const storageKey = 'gemini_api_usage';
-        const stored = localStorage.getItem(storageKey);
-        
-        let usage = { date: today, count: 0 };
-        
-        if (stored) {
-            const parsed = JSON.parse(stored);
+        const usageData = localStorage.getItem('gemini_api_usage');
+        let count = 0;
+        if (usageData) {
+            const parsed = JSON.parse(usageData);
             if (parsed.date === today) {
-                usage = parsed;
+                count = parsed.count;
             }
         }
-        
-        usage.count += 1;
-        localStorage.setItem(storageKey, JSON.stringify(usage));
+        localStorage.setItem('gemini_api_usage', JSON.stringify({ date: today, count: count + 1 }));
     } catch (e) {
-        // Silent fail to not disrupt app flow
-        console.warn("Could not track API usage", e);
+        console.warn("Analytics error", e);
     }
 };
-// --------------------------
 
-// Helper to translate and format safety errors
-const SAFETY_CATEGORY_MAP: Record<string, string> = {
-    'HARM_CATEGORY_HARASSMENT': 'Acoso',
-    'HARM_CATEGORY_HATE_SPEECH': 'Discurso de Odio',
-    'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'Contenido Sexualmente Explícito',
-    'HARM_CATEGORY_DANGEROUS_CONTENT': 'Contenido Peligroso/Dañino',
-    'HARM_CATEGORY_CIVIC_INTEGRITY': 'Integridad Cívica'
-};
-
-const formatSafetyError = (candidate: any): string => {
-    if (!candidate.safetyRatings) return "Contenido bloqueado por seguridad.";
-    
-    const blockedReasons = candidate.safetyRatings
-        .filter((r: any) => r.probability === 'HIGH' || r.probability === 'MEDIUM')
-        .map((r: any) => {
-            const cat = SAFETY_CATEGORY_MAP[r.category] || r.category;
-            const prob = r.probability === 'HIGH' ? 'Alta' : 'Media';
-            return `${cat} (${prob})`;
-        });
-
-    if (blockedReasons.length > 0) {
-        return `Generación bloqueada. Se detectó posible: ${blockedReasons.join(', ')}. Por favor reformula tu entrada.`;
-    }
-    
-    return "El contenido fue marcado como inseguro por los filtros de IA.";
-};
-
-const cleanAndParseJson = (text: string): any => {
-    // Remove markdown code blocks if present
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+export const attemptLocalModularization = (text: string): Record<ExtractionMode, string> | null => {
     try {
-        return JSON.parse(cleanText);
+        const json = JSON.parse(text);
+        if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+            // Basic validation to check if keys resemble ExtractionMode
+            const keys = Object.keys(json);
+            const validKeys = ['subject', 'style', 'scene', 'color', 'light', 'composition'];
+            if (keys.some(k => validKeys.includes(k))) {
+                return json as Record<ExtractionMode, string>;
+            }
+        }
     } catch (e) {
-        // If simple parse fails, try to find the first '{' and last '}'
-        const firstBrace = cleanText.indexOf('{');
-        const lastBrace = cleanText.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-             try {
-                return JSON.parse(cleanText.substring(firstBrace, lastBrace + 1));
-            } catch (e2) {
-                // Ignore
-            }
-        }
-        return {}; // Return empty object on failure to avoid app crash
+        // Not JSON
     }
-};
-
-export const generateFeatureMetadata = async (mode: ExtractionMode, prompt: string, images?: {imageBase64: string, mimeType: string}[]) => {
-    trackApiRequest();
-    const ai = getAiClient();
-    
-    const responseSchema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-            title: { type: Type.STRING },
-            category: { type: Type.STRING },
-            notes: { type: Type.STRING },
-            artType: { type: Type.STRING }
-        },
-        required: ["title", "category", "notes", "artType"]
-    };
-
-    const textPrompt = `Generate metadata for this ${mode} prompt: "${prompt}". 
-    REQUIREMENTS:
-    1. Title: Concise and evocative (2-5 words) in English.
-    2. Category: Broad style/theme (e.g., Sci-Fi, Portrait) in English.
-    3. ArtType: Specific medium (e.g., Digital Art, Oil Painting) in English.
-    4. Notes: A detailed technical analysis of the visual style in SPANISH.
-       Follow this specific logic:
-       - Identify Key Elements: Extract essential descriptors (aesthetics, technique, lighting, shading).
-       - Grouping: Group elements into themes (style, line, color/lighting, composition).
-       - Synthesis: Write a single concise paragraph in Spanish using connecting phrases like "Caracterizado por," "Utiliza," "Presenta," and "Se enfoca en".
-       - Terminology: Translate general descriptions to Spanish but keep specific technical art terms precise (e.g., "cel-shading", "lineart", "bokeh").
-       - Goal: A technical executive summary of the visual requirements.`;
-
-    const parts: Part[] = [];
-    if (images) {
-        images.forEach(img => parts.push({
-            inlineData: { mimeType: img.mimeType, data: img.imageBase64 }
-        }));
-    }
-    parts.push({ text: textPrompt });
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts },
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: responseSchema
-        }
-    });
-
-    return cleanAndParseJson(response.text || "{}");
-};
-
-export const analyzeImageFeature = async (mode: ExtractionMode, images: {imageBase64: string, mimeType: string}[]) => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const parts: Part[] = [];
-    images.forEach(img => parts.push({
-        inlineData: { mimeType: img.mimeType, data: img.imageBase64 }
-    }));
-    
-    let instruction = `Analyze these images and extract strictly the '${mode}' aspect. Return ONLY the detailed text description.`;
-
-    if (mode === 'subject') {
-        instruction += ` IMPORTANT: If there are multiple distinct subjects/characters, describe them separately using the format 'Subject 1: [details]... Subject 2: [details]...'. Do not merge them into one entity.`;
-    } else if (mode === 'outfit') {
-        instruction += ` STRICT CONSTRAINT: Describe ONLY the garments, accessories, and fabrics. DO NOT describe the person, body type, hair, eyes, skin, or pose. Imagine the clothes on an invisible mannequin.`;
-    } else if (['pose', 'expression', 'object', 'scene', 'composition'].includes(mode)) {
-        instruction += ` STRICT CONSTRAINT: Focus ONLY on the '${mode}'. DO NOT describe the subject's physical appearance (hair, face, body) unless it is technically required for the '${mode}' (e.g., for expression, describe facial muscles; for pose, describe limb position). Ignore clothing colors.`;
-    } else if (mode === 'color') {
-        instruction += ` STRICT CONSTRAINT: Extract the color palette and assign it to abstract zones like [Primary Outfit], [Accents], [Background], [Atmosphere]. DO NOT describe specific objects or garments from the reference image (e.g., do not say 'red dress' if you see a red dress, say '[Primary Outfit]: Red'). The goal is to apply this color scheme to ANY subject.`;
-    }
-    
-    parts.push({ text: instruction });
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts }
-    });
-
-    // Check for safety blocks even if text is returned (sometimes partial)
-    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-        const warning = formatSafetyError(response.candidates[0]);
-        if (!response.text) {
-            throw new Error(warning);
-        }
-        return { result: response.text, warning: `Advertencia: ${warning}` };
-    }
-
-    return { result: response.text || "", warning: undefined };
-};
-
-export const generateIdeasForStyle = async (prompt: string): Promise<string[]> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Given this style description: "${prompt}", suggest 5 distinct subjects/concepts that would be visually striking in this specific style.
-        Act as a Creative Director.
-        Return strictly a JSON array of strings (e.g., ["A cyberpunk samurai in rain", "A quiet forest stream at dawn"]).`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-            }
-        }
-    });
-    return cleanAndParseJson(response.text || "[]");
-};
-
-export const modularizePrompt = async (prompt: string): Promise<Partial<Record<ExtractionMode, string>>> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Analyze this image prompt and break it down into the following modules: 
-        subject, pose, expression, outfit, object, scene, color, composition, style.
-        Also extract any 'negative' prompt aspects if explicitly stated.
-        Prompt: "${prompt}"
-        Return a JSON object where keys are the module names and values are the extracted text. Empty strings if not present.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    subject: { type: Type.STRING },
-                    pose: { type: Type.STRING },
-                    expression: { type: Type.STRING },
-                    outfit: { type: Type.STRING },
-                    object: { type: Type.STRING },
-                    scene: { type: Type.STRING },
-                    color: { type: Type.STRING },
-                    composition: { type: Type.STRING },
-                    style: { type: Type.STRING },
-                    negative: { type: Type.STRING }
-                }
-            },
-            safetySettings: [
-                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-            ]
-        }
-    });
-    
-    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-        throw new Error(formatSafetyError(response.candidates[0]));
-    }
-
-    return cleanAndParseJson(response.text || "{}");
-};
-
-// HELPER: Recursively flatten a nested object into a string representation
-const flattenObjectToString = (obj: any): string => {
-    if (typeof obj === 'string') return obj;
-    if (typeof obj === 'number' || typeof obj === 'boolean') return String(obj);
-    if (Array.isArray(obj)) {
-        return obj.map(flattenObjectToString).join(', ');
-    }
-    if (typeof obj === 'object' && obj !== null) {
-        return Object.entries(obj)
-            .map(([key, val]) => {
-                const flatVal = flattenObjectToString(val);
-                // Skip very common generic keys if possible, or format nicely
-                return `${key}: ${flatVal}`;
-            })
-            .join('; ');
-    }
-    return '';
-};
-
-// IMPROVED: Local function to map JSON structure to modules instantly (0 latency)
-export const attemptLocalModularization = (text: string): Partial<Record<ExtractionMode, string>> | null => {
-    try {
-        let jsonString = text;
-        // Try to find JSON object bounds if text contains noise
-        const firstBrace = text.indexOf('{');
-        const lastBrace = text.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-            jsonString = text.substring(firstBrace, lastBrace + 1);
-        }
-
-        // Clean markdown code blocks often present in AI outputs
-        const cleanText = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-        const json = JSON.parse(cleanText);
-        
-        // If it's not an object (e.g. just a string or array), return null to use AI fallback
-        if (typeof json !== 'object' || json === null || Array.isArray(json)) return null;
-
-        // Map common JSON keys to our internal ExtractionModes
-        const map: Record<string, ExtractionMode> = {
-            'subject': 'subject', 'character': 'subject', 'main_subject': 'subject', 'person': 'subject',
-            'pose': 'pose', 'action': 'pose', 'posture': 'pose',
-            'expression': 'expression', 'emotion': 'expression', 'facial_expression': 'expression',
-            'outfit': 'outfit', 'clothing': 'outfit', 'attire': 'outfit', 'costume': 'outfit', 'clothes': 'outfit',
-            'object': 'object', 'props': 'object', 'items': 'object',
-            'scene': 'scene', 'environment': 'scene', 'background': 'scene', 'location': 'scene', 'setting': 'scene',
-            'color': 'color', 'palette': 'color', 'colors': 'color', 'color_palette': 'color',
-            'composition': 'composition', 'camera': 'composition', 'framing': 'composition', 'angle': 'composition', 'lighting': 'composition', 'light': 'composition',
-            'style': 'style', 'visual_style': 'style', 'aesthetic': 'style', 'art_style': 'style', 'medium': 'style', 'art_type': 'style',
-            'negative': 'negative', 'negative_prompt': 'negative'
-        };
-
-        const result: Partial<Record<ExtractionMode, string>> = {};
-        let hasMappedContent = false;
-
-        Object.keys(json).forEach(key => {
-            const normalizedKey = key.toLowerCase().trim();
-            const targetModule = map[normalizedKey];
-            const value = json[key];
-            
-            // Skip empty values
-            if (!value) return;
-
-            const stringValue = flattenObjectToString(value);
-            if (!stringValue.trim()) return;
-
-            if (targetModule) {
-                // If the module already has content (e.g. 'lighting' and 'camera' both map to 'composition'), append it.
-                if (result[targetModule]) {
-                    result[targetModule] = result[targetModule] + '; ' + stringValue;
-                } else {
-                    result[targetModule] = stringValue;
-                }
-                hasMappedContent = true;
-            } else {
-                // Unknown key handling
-                // Check for keys that might contain specific keywords to route them
-                if (normalizedKey.includes('light') || normalizedKey.includes('cam')) {
-                     const existing = result['composition'] ? result['composition'] + '; ' : '';
-                     result['composition'] = existing + `${key}: ${stringValue}`;
-                     hasMappedContent = true;
-                } else if (normalizedKey.includes('mood') || normalizedKey.includes('atmos')) {
-                     const existing = result['scene'] ? result['scene'] + '; ' : '';
-                     result['scene'] = existing + `${key}: ${stringValue}`;
-                     hasMappedContent = true;
-                } else if (normalizedKey.includes('detail') || normalizedKey.includes('quality')) {
-                     const existing = result['style'] ? result['style'] + '; ' : '';
-                     result['style'] = existing + `${key}: ${stringValue}`;
-                     hasMappedContent = true;
-                }
-            }
-        });
-
-        // If we found at least one valid module, return the result
-        if (hasMappedContent) {
-            return result;
-        }
-
-        return null; // Fallback to AI if no known keys found
-    } catch (e) {
-        return null; // Not JSON, use AI
-    }
-};
-
-export const generateAndModularizePrompt = async (
-    input: { idea?: string; style?: string; images?: {imageBase64: string, mimeType: string}[] }
-): Promise<Partial<Record<ExtractionMode, string>>> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const parts: Part[] = [];
-
-    if (input.images) {
-        input.images.forEach(img => parts.push({
-            inlineData: { mimeType: img.mimeType, data: img.imageBase64 }
-        }));
-    }
-
-    let promptText = `
-    ACT AS: Professional AI Art Director (Midjourney/Flux Expert).
-    
-    TASK: 
-    1. ANALYZE the user's input (Idea + Style + Images).
-    2. CREATIVELY EXPAND: You MUST turn simple inputs into a highly detailed, professional prompt. 
-       - If input is "a cat", you must invent the breed, the lighting, the scene, the mood. 
-       - DO NOT simply repeat "a cat". Invent a masterpiece.
-    3. DISTRIBUTE: Break your *newly created* rich description into the specific JSON fields below.
-
-    USER INPUT:
-    - Idea: "${input.idea || ''}"
-    - Style: "${input.style || ''}"
-    ${input.images ? '- (See attached images for visual reference)' : ''}
-    
-    JSON OUTPUT REQUIREMENTS:
-    - 'subject': Detailed description of the character/subject.
-    - 'pose': The specific action or stance.
-    - 'style': Art mediums, influences, engine settings (e.g. Unreal Engine 5).
-    - 'lighting': (Include in 'scene' or 'composition')
-    - 'negative': LEAVE EMPTY. Do NOT generate a negative prompt unless the User Input explicitly includes negative constraints (e.g. "no blurry", "avoid red"). DO NOT hallucinate negative prompts.
-    - ALL VALUES MUST BE IN ENGLISH AND HIGHLY DETAILED.
-    `;
-
-    parts.push({ text: promptText });
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts },
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    subject: { type: Type.STRING },
-                    pose: { type: Type.STRING },
-                    expression: { type: Type.STRING },
-                    outfit: { type: Type.STRING },
-                    object: { type: Type.STRING },
-                    scene: { type: Type.STRING },
-                    color: { type: Type.STRING },
-                    composition: { type: Type.STRING },
-                    style: { type: Type.STRING },
-                    negative: { type: Type.STRING }
-                }
-            },
-            safetySettings: [
-                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-            ]
-        }
-    });
-
-    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-        throw new Error(formatSafetyError(response.candidates[0]));
-    }
-
-    return cleanAndParseJson(response.text || "{}");
-};
-
-export const assembleMasterPrompt = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const jsonModules = JSON.stringify(modules);
-    
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Act as a Midjourney Prompt Engineer. 
-        Assemble these separate prompt modules into a single, cohesive, high-quality text prompt.
-        
-        Rules:
-        1. Eliminate redundancies (e.g. if Subject and Outfit both say "red dress", say it once).
-        2. Ensure logical flow: Subject -> Action/Pose -> Outfit -> Scene -> Lighting -> Style.
-        3. Add specific high-quality art keywords if missing (e.g. "8k", "masterpiece") appropriate for the style.
-        4. Return ONLY the final prompt string.
-        
-        Modules: ${jsonModules}`
-    });
-    
-    return response.text || "";
-};
-
-export const optimizePromptFragment = async (mode: ExtractionMode, context: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const currentVal = context[mode] || "";
-    
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Context: A generative art prompt.
-        Current '${mode}' description: "${currentVal}".
-        
-        Task: Generate 3 distinct, highly detailed, and creative variations/improvements for this '${mode}'.
-        Make them "Midjourney-ready" (descriptive, evocative).
-        
-        Return strictly a JSON array of strings.`,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-            }
-        }
-    });
-    
-    return cleanAndParseJson(response.text || "[]");
-};
-
-export const createJsonTemplate = async (input: string): Promise<string> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Convert this text/json into a clean, structured JSON prompt template for image generation. 
-        Ensure keys like 'subject', 'style', 'lighting' etc.
-        Input: ${input}
-        Return strictly JSON.`,
-        config: { responseMimeType: "application/json" }
-    });
-    return response.text || "{}";
-};
-
-export const generateStructuredPromptMetadata = async (prompt: string, images?: any) => {
-    // trackApiRequest handled in generateFeatureMetadata
-    return generateFeatureMetadata('style', prompt, images ? [images] : undefined);
-};
-
-export const generateMasterPromptMetadata = async (prompt: string, images?: any[]) => {
-    // trackApiRequest handled in generateFeatureMetadata
-    return generateFeatureMetadata('style', prompt, images);
-};
-
-export const adaptFragmentToContext = async (mode: ExtractionMode, fragment: string, context: Partial<Record<ExtractionMode, string>>): Promise<string> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Task: Rewrite the following '${mode}' fragment to fit seamlessly into the existing prompt Context.
-        
-        Fragment to Insert: "${fragment}"
-        Target Context: ${JSON.stringify(context)}
-        
-        Rules:
-        1. Maintain the core visual idea of the fragment.
-        2. Adjust tone, style, and detail level to match the Context.
-        3. Resolve conflicts (e.g. if context is "cyberpunk" and fragment is "medieval", adapt fragment to "cyberpunk medieval").
-        4. Return ONLY the rewritten fragment string.
-        `
-    });
-    return response.text || fragment;
+    return null;
 };
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: prompt }] },
-        });
-        
-        if (response.candidates?.[0]?.content?.parts) {
-            for (const part of response.candidates[0].content.parts) {
-                if (part.inlineData && part.inlineData.data) {
-                    return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+    // Default to gemini-2.5-flash-image for generation as per guidelines
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: { parts: [{ text: prompt }] },
+    });
+    
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+        if (part.inlineData && part.inlineData.data) {
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
+    }
+    throw new Error("No image generated");
+};
+
+export const analyzeImageFeature = async (mode: string, images: { imageBase64: string, mimeType: string }[]): Promise<{ result: string; warning?: string }> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    
+    // Using gemini-3-flash-preview for analysis (multimodal)
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: {
+            parts: [
+                ...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
+                { text: `Analyze these images and extract the ${mode} details. Be specific and descriptive.` }
+            ]
+        }
+    });
+    return { result: response.text || "" };
+};
+
+export const generateFeatureMetadata = async (mode: string, prompt: string, images?: { imageBase64: string, mimeType: string }[]) => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const parts: any[] = [{ text: `Generate metadata for this ${mode} prompt: "${prompt}". Return JSON with title, category, artType, notes.` }];
+    if (images) {
+        parts.unshift(...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })));
+    }
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: { parts },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    category: { type: Type.STRING },
+                    artType: { type: Type.STRING },
+                    notes: { type: Type.STRING }
                 }
             }
         }
-        throw new Error("No image data returned from API");
-    } catch (e) {
-        console.error("Image gen failed", e);
-        throw e;
+    });
+    
+    return JSON.parse(response.text || "{}");
+};
+
+export const generateIdeasForStyle = async (stylePrompt: string): Promise<string[]> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Suggest 5 distinct subjects that would look good in this style: "${stylePrompt}". Return a JSON array of strings.`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            }
+        }
+    });
+    return JSON.parse(response.text || "[]");
+};
+
+export const modularizePrompt = async (prompt: string): Promise<Record<string, string>> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Break down this prompt into components: "${prompt}"`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    subject: { type: Type.STRING },
+                    style: { type: Type.STRING },
+                    pose: { type: Type.STRING },
+                    expression: { type: Type.STRING },
+                    outfit: { type: Type.STRING },
+                    object: { type: Type.STRING },
+                    scene: { type: Type.STRING },
+                    composition: { type: Type.STRING },
+                    color: { type: Type.STRING },
+                    negative: { type: Type.STRING }
+                }
+            }
+        }
+    });
+    return JSON.parse(response.text || "{}");
+};
+
+export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Assemble these components into a high-quality image generation prompt: ${JSON.stringify(fragments)}`,
+    });
+    return response.text || "";
+};
+
+export const optimizePromptFragment = async (mode: string, fragments: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Suggest 3 improvements for the "${mode}" component given the context: ${JSON.stringify(fragments)}. Return JSON array.`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
+    });
+    return JSON.parse(response.text || "[]");
+};
+
+export const mergeModulesIntoJsonTemplate = async (fragments: Partial<Record<ExtractionMode, string>>, template: string): Promise<string> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Merge these fragments ${JSON.stringify(fragments)} into this JSON template: ${template}. Return the filled JSON string.`,
+        config: { responseMimeType: "application/json" }
+    });
+    return response.text || "{}";
+};
+
+export const createJsonTemplate = async (json: string): Promise<string> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Generalize this JSON prompt into a reusable template: ${json}`,
+        config: { responseMimeType: "application/json" }
+    });
+    return response.text || "{}";
+};
+
+export const generateStructuredPromptMetadata = async (prompt: string, image?: { imageBase64: string, mimeType: string }) => {
+    return generateFeatureMetadata('structured', prompt, image ? [image] : undefined);
+};
+
+export const generateMasterPromptMetadata = async (prompt: string, images?: { imageBase64: string, mimeType: string }[]) => {
+    return generateFeatureMetadata('master', prompt, images);
+};
+
+export const adaptFragmentToContext = async (mode: string, fragment: string, context: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Adapt this "${mode}" description: "${fragment}" to fit this context: ${JSON.stringify(context)}.`,
+    });
+    return response.text || fragment;
+};
+
+export const generateAndModularizePrompt = async (input: { idea: string, style: string, images?: { imageBase64: string, mimeType: string }[] }): Promise<Record<string, string>> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const parts: any[] = [{ text: `Generate a detailed prompt based on idea: "${input.idea}" and style: "${input.style}", then break it down into components.` }];
+    if (input.images) {
+        parts.unshift(...input.images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })));
     }
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: { parts },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    subject: { type: Type.STRING },
+                    style: { type: Type.STRING },
+                    pose: { type: Type.STRING },
+                    expression: { type: Type.STRING },
+                    outfit: { type: Type.STRING },
+                    object: { type: Type.STRING },
+                    scene: { type: Type.STRING },
+                    composition: { type: Type.STRING },
+                    color: { type: Type.STRING },
+                    negative: { type: Type.STRING }
+                }
+            }
+        }
+    });
+    return JSON.parse(response.text || "{}");
+};
+
+export const modularizeImageAnalysis = async (images: { imageBase64: string, mimeType: string }[]): Promise<Record<string, string>> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: {
+            parts: [
+                ...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
+                { text: "Analyze this image and break down the prompt components." }
+            ]
+        },
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    subject: { type: Type.STRING },
+                    style: { type: Type.STRING },
+                    scene: { type: Type.STRING },
+                    // Simplified for analysis
+                    color: { type: Type.STRING },
+                    composition: { type: Type.STRING }
+                }
+            }
+        }
+    });
+    return JSON.parse(response.text || "{}");
 };
 
 export const generateNegativePrompt = async (positivePrompt: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Analyze this prompt: "${positivePrompt}".
-        Generate a "Negative Prompt" (things to avoid) suitable for Stable Diffusion/Flux.
-        Include standard quality fixes (e.g. blurry, low quality) AND logic-specific exclusions based on the prompt subject.
-        Return ONLY the negative prompt string.`
+        model: 'gemini-3-flash-preview',
+        contents: `Generate a negative prompt for this positive prompt: "${positivePrompt}". Keep it comma separated.`,
     });
     return response.text || "";
 };
 
-// IMPROVED: Direct JSON Generation with Intelligent Fragmentation
-export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+export const generateStructuredPromptFromImage = async (images: { imageBase64: string, mimeType: string }[]): Promise<any> => {
     trackApiRequest();
     const ai = getAiClient();
-    const jsonModules = JSON.stringify(modules);
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `ACT AS: Senior AI Prompt Architect.
-        TASK: Transform the provided flat prompt modules into a highly structured, optimized, and functional JSON prompt for generative AI (Midjourney/Flux/SD).
-
-        INPUT MODULES: ${jsonModules}
-
-        RULES FOR JSON GENERATION:
-        1. VOCABULARY OPTIMIZATION: Do not just copy/paste. Upgrade simple terms to professional art/photography terminology (e.g. "bright" -> "volumetric high-key lighting").
-        2. SMART FRAGMENTATION:
-           - Detect extensive or complex sections (specifically in 'style', 'composition', 'scene', 'outfit').
-           - BREAK THEM DOWN into nested sub-objects (e.g. "style": { "medium": "...", "technique": "..." }).
-        3. ORGANIZATION: 
-           - Group related concepts.
-           - Ensure keys are snake_case, descriptive, and clean.
-        4. FUNCTIONALITY: The output must be valid JSON, ready to be used or parsed by a sophisticated generation pipeline.
-
-        RETURN ONLY THE JSON OBJECT.`,
-        config: {
-            responseMimeType: "application/json"
-        }
-    });
-
-    return response.text || "{}";
-};
-
-export const generateStructuredPromptFromImage = async (image: {imageBase64: string, mimeType: string}): Promise<string> => {
-     const result = await analyzeImageFeature('style', [image]);
-     return result.result || "";
-};
-
-// IMPROVED: Template Merging with Optimization
-export const mergeModulesIntoJsonTemplate = async (modules: any, template: string): Promise<string> => {
-     trackApiRequest();
-     const ai = getAiClient();
      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `ACT AS: Senior AI Prompt Architect.
-        TASK: Merge the provided 'Input Modules' into the 'Target JSON Template'.
-        
-        Input Modules: ${JSON.stringify(modules)}
-        Target JSON Template: ${template}
-
-        CRITICAL INSTRUCTIONS:
-        1. INTELLIGENT PLACEMENT: Do not just overwrite keys. Analyze the content of the Input Modules.
-        2. FRAGMENTATION: If the template has nested keys (e.g. 'style' -> 'lighting', 'camera'), you MUST split the input content to fill those specific slots accurately.
-        3. OPTIMIZATION: Enhance the values during the merge. Ensure the tone matches the template's structure.
-        4. PRESERVATION: If the template has specific settings (like 'resolution': '8k'), keep them unless the input explicitly contradicts them.
-        
-        RETURN ONLY THE FILLED JSON OBJECT.`,
+        model: 'gemini-3-flash-preview',
+        contents: {
+             parts: [
+                ...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
+                { text: "Generate a structured JSON prompt describing this image." }
+            ]
+        },
         config: { responseMimeType: "application/json" }
     });
-    return response.text || "{}";
+    return JSON.parse(response.text || "{}");
 };
 
-export const modularizeImageAnalysis = async (images: any[]): Promise<any> => {
-    // Just a wrapper
-    return {}; 
-};
-
-export const getCreativeAssistantResponse = async (history: any[], currentFragments: any): Promise<AssistantResponse> => {
+export const getCreativeAssistantResponse = async (history: any[], context: any): Promise<AssistantResponse> => {
     trackApiRequest();
     const ai = getAiClient();
-    // System instruction to guide the chat
-    const systemInstruction = `You are an Expert AI Art Director & Prompt Engineer.
-    Your goal is to help the user refine their generative art prompt in real-time.
-    
-    Current Prompt State (JSON Modules): ${JSON.stringify(currentFragments)}
-    
-    Instructions:
-    1. Chat casually but professionally.
-    2. When the user asks for a change (e.g. "make it sci-fi", "add a cat"), you must UPDATE the relevant modules.
-    3. Return a JSON response with:
-       - 'message': Your reply to the user.
-       - 'updates': An array of objects { "module": "subject|style|etc", "value": "new text" } for changed fields.
-       - 'assembled_prompt': The full, updated linear prompt text.
-    
-    Do NOT hallucinate modules outside standard keys (subject, style, etc).
-    `;
-    
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: history, // Pass the chat history
+        model: 'gemini-3-flash-preview',
+        contents: {
+            role: 'user',
+            parts: [
+                { text: `Context: ${JSON.stringify(context)}. Chat history: ${JSON.stringify(history)}. Provide updates to the prompt modules.` }
+            ]
+        },
         config: {
-            systemInstruction: systemInstruction,
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
                     message: { type: Type.STRING },
-                    updates: { 
+                    updates: {
                         type: Type.ARRAY,
                         items: {
                             type: Type.OBJECT,
@@ -640,43 +333,111 @@ export const getCreativeAssistantResponse = async (history: any[], currentFragme
             }
         }
     });
-    
-    return cleanAndParseJson(response.text || "{}");
+    return JSON.parse(response.text || "{}") as AssistantResponse;
 };
 
-export const generateHybridFragment = async (targetMode: ExtractionMode, sources: {text?: string, imageBase64?: string, mimeType?: string}[], feedback: string): Promise<string> => {
+export const generateHybridFragment = async (targetMode: string, inputs: any[], feedback: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
-    const parts: Part[] = [];
+    const parts: any[] = [{ text: `Create a hybrid "${targetMode}" description based on these inputs. User feedback: ${feedback}` }];
     
-    // Add images
-    sources.forEach(s => {
-        if (s.imageBase64 && s.mimeType) {
-            parts.push({ inlineData: { data: s.imageBase64, mimeType: s.mimeType } });
+    inputs.forEach(input => {
+        if (input.imageBase64) {
+             parts.push({ inlineData: { data: input.imageBase64, mimeType: input.mimeType } });
+        } else if (input.text) {
+             parts.push({ text: `Reference text: ${input.text}` });
         }
     });
-    
-    // Construct prompt
-    let textPrompt = `Act as a Master Visual Alchemist.
-    Task: Create a new, unique '${targetMode}' description by fusing the "visual DNA" of the provided references.
-    
-    References provided (Images and/or Text):
-    ${sources.map((s, i) => s.text ? `Ref ${i+1} (Text): "${s.text}"` : `Ref ${i+1}: [Image]`).join('\n')}
-    
-    User Feedback/Constraints: "${feedback}"
-    
-    Instructions:
-    1. Analyze the essence of each reference.
-    2. Synthesize them into a single, cohesive, highly detailed description for '${targetMode}'.
-    3. If User Feedback exists, prioritize it.
-    4. Return ONLY the resulting description text.`;
-    
-    parts.push({ text: textPrompt });
-    
+
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: { parts }
     });
-    
     return response.text || "";
+};
+
+// IMPROVED: Direct JSON Generation with STRICT INVALIDITY HIERARCHY
+export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const jsonModules = JSON.stringify(modules);
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `ACT AS: Senior AI Prompt Analyst & Data Architect.
+        TASK: Distill the provided prompt modules into a STRICT Hierarchical JSON Map optimized for Diffusion Models (Stable Diffusion/Flux/Midjourney).
+
+        INPUT DATA: ${jsonModules}
+
+        CRITICAL HIERARCHY OF INVALIDITY (The "Cleaner" Logic):
+        You must apply these rules in order to strip redundancy and prevent hallucinations:
+
+        1. COLOR (Supreme Priority):
+           - Rule: INVALIDATES any color adjectives in other modules.
+           - Logic: If 'color' module exists (e.g. "cyan and magenta neons"), REMOVE all color terms from 'subject', 'outfit', 'scene', 'style'.
+           - Application: Apply the colors regionally (e.g. "cyan eyes", "magenta light") in the output, do not wash everything in one color.
+
+        2. OUTFIT, POSE, EXPRESSION (Specialists) > SUBJECT (Identity Base):
+           - Rule: Specialist modules OVERRIDE the Subject description.
+           - If 'outfit' exists: DELETE clothing/armor descriptions from 'subject'.
+           - If 'pose' exists: DELETE action verbs/posture from 'subject'.
+           - If 'expression' exists: DELETE facial expressions from 'subject'.
+           - Result: 'subject' must be stripped down to basic identity (ethnicity, age, body type, hair style).
+
+        3. SCENE & OBJECT > SUBJECT:
+           - Rule: Context overrides Base.
+           - If 'scene' exists: DELETE location/background details from 'subject'.
+
+        4. COMPOSITION > STYLE/SUBJECT:
+           - Rule: Technical specs belong in Composition.
+           - DELETE camera angles/framing terms from 'style' and 'subject'.
+
+        5. STYLE (Global Atmosphere):
+           - Rule: Style defines the render.
+           - DELETE generic quality tags (e.g. "realistic", "8k", "detailed") from all other modules.
+
+        CRITICAL ENGINEERING RULES:
+
+        1. GLOBAL SYNTHESIS (THE GLUE - CRITICAL ORDER):
+           - Generate a root field "global_synthesis".
+           - MANDATORY ORDER: [ART STYLE] + [MAIN SUBJECT] + [KEY ATMOSPHERE].
+           - This ensures the rendering engine sets the style *before* drawing the subject.
+           - Limit: Max 20 words.
+
+        2. TOKEN DISTILLATION & PROSE ELIMINATION:
+           - DO NOT copy-paste the raw text. DECONSTRUCT IT.
+           - EXTRACT only essential keywords/tokens.
+           - BAN grammatical connectors ("the", "is", "with a", "depicted in", "standing on").
+           - OUTPUT FORMAT: Comma-separated technical tags.
+
+        3. HIERARCHY & WEIGHTS:
+           - Use "influence_weight" as a FLOAT (0.1 to 1.0).
+           - Structure output into "layers":
+             a. "foundation": 'style' (Weight 1.0), 'composition' (Weight 0.8-0.9).
+             b. "figure": 'subject' (Weight 0.8-0.9), 'pose', 'expression'.
+             c. "environment": 'scene', 'outfit', 'object', 'color' (Weight 0.4-0.7).
+
+        OUTPUT STRUCTURE EXAMPLE:
+        {
+          "global_synthesis": "Cyberpunk oil painting, cyborg samurai, neon rain.",
+          "layers": {
+            "foundation": {
+              "style": { "key_concept": "oil painting, impasto, cyberpunk, unreal engine 5", "raw_fragment": "original text...", "influence_weight": 1.0 }
+            },
+            "figure": {
+              "subject": { "key_concept": "cyborg samurai, metallic skin, katana", "raw_fragment": "original text...", "influence_weight": 0.9 }
+            },
+            ...
+          }
+        }
+
+        CRITICAL: If a module is empty in Input, OMIT it from the output.
+
+        RETURN ONLY THE JSON OBJECT.`,
+        config: {
+            responseMimeType: "application/json"
+        }
+    });
+
+    return response.text || "{}";
 };

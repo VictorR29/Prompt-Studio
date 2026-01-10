@@ -116,19 +116,19 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
         setCurrentPromptText(text); // Initialize with the raw text
         
         try {
-            // Attempt modularization with a timeout assumption (the API doesn't support explicit timeout easily, but we catch errors)
+            // Attempt modularization
             let modularized = await modularizePrompt(text);
             
             // Validation: Check if we have at least one non-empty value to avoid empty state
-            const hasContent = Object.values(modularized).some(val => val && val.trim().length > 0);
+            const hasContent = Object.values(modularized).some(val => val && typeof val === 'string' && val.trim().length > 0);
             
             if (!hasContent) {
                  // Fallback: If AI returns empty modules, treat whole text as subject
-                 modularized = { ...initialFragments, subject: text };
+                 modularized = { ...initialFragments, subject: text } as Record<ExtractionMode, string>;
                  addToast("Estructura simple detectada.", 'warning');
             }
             
-            setFragments(modularized);
+            setFragments(modularized as Partial<Record<ExtractionMode, string>>);
             setViewState('chat');
         } catch (error) {
             console.error("Analysis failed", error);
