@@ -8,15 +8,12 @@ import {
     mergeModulesIntoJsonTemplate, 
     createJsonTemplate, 
     generateStructuredPromptMetadata, 
-    adaptFragmentToContext, 
     analyzeImageFeature,
     generateAndModularizePrompt,
-    modularizeImageAnalysis,
     generateMasterPromptMetadata,
     generateImageFromPrompt,
     generateNegativePrompt,
     assembleOptimizedJson,
-    generateStructuredPromptFromImage,
     attemptLocalModularization
 } from '../services/gemini';
 import { EXTRACTION_MODE_MAP } from '../config';
@@ -30,8 +27,7 @@ import { PromptModule } from './PromptModule';
 import { UndoIcon } from './icons/UndoIcon';
 import { GalleryModal } from './GalleryModal';
 import { CloseIcon } from './icons/CloseIcon';
-import { fileToBase64 } from '../utils/fileUtils';
-import { createImageCollage, resizeImageFile } from '../utils/imageUtils';
+import { resizeImageFile, createImageCollage } from '../utils/imageUtils';
 import { ImageUploader } from './ImageUploader';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -499,20 +495,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                 const selectedPrompt = Array.isArray(selectedPrompts) ? selectedPrompts[0] : selectedPrompts as SavedPrompt;
                  if (!selectedPrompt) return;
 
-                setOptimizingModule(targetModule);
-                setGlobalLoader({ active: true, message: 'Adaptando fragmento al contexto...' });
-                try {
-                    const adaptedFragment = String(await adaptFragmentToContext(targetModule, selectedPrompt.prompt, fragments));
-                    handleFragmentChange(targetModule, adaptedFragment);
-                    addToast(`Fragmento adaptado e insertado en '${EXTRACTION_MODE_MAP[targetModule].label}'`, 'success');
-                } catch (err) {
-                    const errorMessage = err instanceof Error ? err.message : 'Ocurrió un error desconocido.';
-                    addToast(`Error al adaptar: ${errorMessage}`, 'error');
-                    handleFragmentChange(targetModule, selectedPrompt.prompt);
-                } finally {
-                    setOptimizingModule(null);
-                    setGlobalLoader({ active: false, message: '' });
-                }
+                // DIRECT IMPORT: No AI adaptation here.
+                // We copy the raw text to preserve the original fragment exactly as saved.
+                // Contextual optimization happens later during final generation.
+                handleFragmentChange(targetModule, selectedPrompt.prompt);
+                addToast(`Fragmento importado a '${EXTRACTION_MODE_MAP[targetModule].label}'`, 'success');
             }
         }
     };
