@@ -40,6 +40,7 @@ export const PROMPT_TYPE_CONFIG: Record<SavedPrompt['type'], PromptTypeInfo> = {
     object: { className: 'bg-indigo-500/20 text-indigo-300 ring-indigo-500/30', text: 'Objeto' },
     composition: { className: 'bg-cyan-500/20 text-cyan-300 ring-cyan-500/30', text: 'Composición' },
     color: { className: 'bg-orange-500/20 text-orange-300 ring-orange-500/30', text: 'Color' },
+    negative: { className: 'bg-red-900/20 text-red-400 ring-red-500/30', text: 'Negativo' },
 };
 
 

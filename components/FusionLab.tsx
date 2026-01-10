@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
 import { EXTRACTION_MODE_MAP, EXTRACTION_MODES } from '../config';
-import { generateHybridFragment, generateImageFromPrompt } from '../services/geminiService';
+import { generateHybridFragment, generateImageFromPrompt } from '../services/gemini';
 import { fileToBase64 } from '../utils/fileUtils';
 import { createImageCollage } from '../utils/imageUtils';
 import { SparklesIcon } from './icons/SparklesIcon';

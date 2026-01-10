@@ -1,10 +1,9 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Loader } from './Loader';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { CheckIcon } from './icons/CheckIcon';
-import { generateIdeasForStyle } from '../services/geminiService';
+import { generateIdeasForStyle } from '../services/gemini';
 import { ExtractionMode } from '../types';
 import { EXTRACTION_MODE_MAP } from '../config';
 

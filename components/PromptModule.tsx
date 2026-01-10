@@ -7,7 +7,7 @@ import { GalleryIcon } from './icons/GalleryIcon';
 import { SaveIcon } from './icons/SaveIcon';
 import { ImageIcon } from './icons/ImageIcon';
 import { CloseIcon } from './icons/CloseIcon';
-import { generateImageFromPrompt } from '../services/geminiService';
+import { generateImageFromPrompt } from '../services/gemini';
 
 type ImageState = { url: string; base64: string; mimeType: string; };
 

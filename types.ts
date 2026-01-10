@@ -3,7 +3,7 @@ export type ExtractionMode = 'style' | 'subject' | 'pose' | 'expression' | 'scen
 
 export interface SavedPrompt {
   id: string;
-  type: 'style' | 'structured' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'master' | 'subject' | 'object' | 'hybrid';
+  type: 'style' | 'structured' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'master' | 'subject' | 'object' | 'hybrid' | 'negative';
   prompt: string;
   negativePrompt?: string; // Optional field for negative prompt
   coverImage: string; // base64 data URL

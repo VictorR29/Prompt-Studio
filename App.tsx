@@ -5,7 +5,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { PromptDisplay } from './components/PromptDisplay';
 import { Gallery } from './components/Gallery';
 import { PromptEditor } from './components/PromptEditor';
-import { generateFeatureMetadata, analyzeImageFeature, generateImageFromPrompt } from './services/geminiService';
+import { generateFeatureMetadata, analyzeImageFeature, generateImageFromPrompt } from './services/gemini';
 import { fileToBase64 } from './utils/fileUtils';
 import { SavedPrompt, ExtractionMode, AppView } from './types';
 import { ExtractorModeSelector } from './components/ExtractorModeSelector';

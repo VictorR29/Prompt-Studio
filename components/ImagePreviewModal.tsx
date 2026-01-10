@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon } from './icons/CloseIcon';
-import { generateImageFromPrompt } from '../services/geminiService';
+import { generateImageFromPrompt } from '../services/gemini';
 import { Loader } from './Loader';
 
 interface ImagePreviewModalProps {

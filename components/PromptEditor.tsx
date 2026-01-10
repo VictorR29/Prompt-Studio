@@ -18,7 +18,7 @@ import {
     assembleOptimizedJson,
     generateStructuredPromptFromImage,
     attemptLocalModularization
-} from '../services/geminiService';
+} from '../services/gemini';
 import { EXTRACTION_MODE_MAP } from '../config';
 import { Loader } from './Loader';
 import { ClipboardIcon } from './icons/ClipboardIcon';
