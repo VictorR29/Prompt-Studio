@@ -3,60 +3,77 @@
  * Prompts de sistema y definiciones constantes para los modelos de Gemini.
  */
 
-export const IMAGE_ANALYSIS_PROMPT = (mode: string) => 
-    `Analyze these images and extract the ${mode} details. Be specific, descriptive and use natural language to capture nuances.`;
+export const IMAGE_ANALYSIS_PROMPT = (mode: string) => {
+    const isColorMode = mode === 'color';
+
+    const colorSpecifics = isColorMode 
+        ? `CRITICAL FOR 'color' MODE: 
+           - IGNORE the subject, composition, pose, or objects. 
+           - EXTRACT ONLY THE PALETTE. 
+           - List dominant colors, accent colors, lighting temperature (warm/cool), and saturation.
+           - Example output: "Deep obsidian black and neon cyan palette with magenta rim lighting and high contrast."`
+        : `Focus EXCLUSIVELY on the '${mode}' aspect.`;
+
+    return `Analyze the provided images and generate a concise image generation prompt.
+${colorSpecifics}
+
+STRICT OUTPUT RULES:
+1. Return ONLY the raw prompt text. No introductions, no "Here is the prompt", no labels (e.g., do NOT write "${mode}:"), no markdown.
+2. Format as a SINGLE, continuous paragraph.
+3. Keep it concise and dense (avoid unnecessary wordiness).
+4. Do NOT use bullet points or lists.
+5. Focus purely on visual description suitable for text-to-image AI.`;
+};
 
 export const MASTER_PROMPT_ASSEMBLY = `ACT AS: Expert AI Prompt Engineer.
 TASK: Assemble the provided prompt fragments into a SINGLE, seamless, high-density prompt block.
 
-INPUT DATA: You will receive a JSON object with keys like 'subject', 'outfit', 'style', etc.
+INPUT DATA: You will receive a JSON object with keys like 'subject', 'outfit', 'style', 'color', etc.
 
 *** CORE PRINCIPLE: BALANCED INTEGRATION ***
-You must use ALL provided fragments. They are all equally important ingredients. Your goal is to create a cohesive image description where every user-provided detail is present and harmonized.
+You must use ALL provided fragments. They are all equally important ingredients.
 
-*** SMART CONFLICT RESOLUTION (Contextual Substitution) ***
-When modules describe the same attribute, use the Specific Module to refine the General Module, without erasing the core identity.
+*** CRITICAL: INTELLIGENT RECOLORING LOGIC ***
+The 'Color' module is the SUPREME AUTHORITY on the visual palette.
+- **Action**: You must ACTIVELY RECOLOR the 'Subject', 'Outfit', and 'Scene' using the 'Color' module.
+- **Priority**: If the 'Color' module specifies "Black and Gold", and the Subject is "A knight", output "A black and gold knight". 
+- **Conflict**: If the Subject has a defined color (e.g., "Red Tie") that strictly clashes with the 'Color' palette (e.g., "Blue Monochrome"), blend them intelligently (e.g., "Blue suit with a dark purple tie") OR let the 'Color' module override if it implies a global lighting filter.
 
-1. **Subject vs Outfit (The "Who" vs The "Wear")**: 
-   - The 'Subject' module defines the ENTITY (physical appearance, age, gender, race, body type). **Keep these details.**
-   - The 'Outfit' module defines the ATTIRE.
-   - **Fusion Rule**: If 'Outfit' is provided, apply it to the 'Subject'. Only remove conflicting clothing descriptions from the 'Subject' text. DO NOT remove physical traits of the subject.
-   - *Example*: Subject="A muscular old warrior in rags", Outfit="Golden Cyber-Armor". 
-   - *Result*: "A muscular old warrior wearing Golden Cyber-Armor". (Identity kept, Rags replaced).
+*** CONTEXTUAL SUBSTITUTION RULES ***
 
+1. **Subject vs Outfit**: 
+   - 'Subject' defines ENTITY. 'Outfit' defines ATTIRE.
+   - Combine them: Apply 'Outfit' to 'Subject'. Remove conflicting clothes from 'Subject'.
+   
 2. **Subject vs Pose/Expression**:
-   - 'Pose' and 'Expression' modules override any action/emotion described in 'Subject'.
-   - *Example*: Subject="A woman crying", Expression="Laughing". -> Result: "A woman laughing".
+   - 'Pose' and 'Expression' override any action in 'Subject'.
 
-3. **Color vs Scene/Outfit**:
-   - 'Color' module acts as a global director of photography. It influences the lighting and color grading, tinting the scene and outfit unless specific colors in those modules are crucial (e.g., "Red Apple" stays red even in blue light).
+3. **Global Styling**:
+   - 'Style' and 'Color' wrap the entire prompt.
 
 STRICT OUTPUT RULES:
 1. **NO STRUCTURE**: Do NOT use paragraphs, bullet points, or labels.
 2. **NO CHAT**: Return ONLY the final prompt string.
-3. **FLOW**: [Art Style] -> [Subject Entity + Outfit + Pose + Expression] -> [Scene/Environment] -> [Lighting/Color] -> [Tech Specs].
+3. **FLOW**: [Art Style] -> [Recolored Subject + Outfit + Pose + Expression] -> [Recolored Scene] -> [Lighting/Color Specs] -> [Tech Specs].
 4. **DENSITY**: Use natural language mixed with comma-separated tags.
 
 FINAL RESULT MUST BE A SINGLE STRING READY FOR GENERATION.`;
 
-export const JSON_OPTIMIZATION_SYSTEM_PROMPT = `Eres un experto en prompts JSON para generación de imágenes IA. Tu tarea es organizar fragmentos de texto en una estructura JSON, buscando el **EQUILIBRIO TOTAL** entre todos los inputs.
+export const JSON_OPTIMIZATION_SYSTEM_PROMPT = `Eres un experto en prompts JSON para generación de imágenes IA. Tu tarea es organizar fragmentos de texto en una estructura JSON, buscando el **EQUILIBRIO TOTAL**.
 
-*** LÓGICA DE FUSIÓN ARMONIOSA ***
-No permitas que un módulo domine excesivamente a los demás. Todos los inputs del usuario son importantes.
+*** REGLA DE ORO: DOMINIO CROMÁTICO ***
+El módulo 'color' (si existe) tiene PRIORIDAD GLOBAL.
+- Debes "recolorear" los campos 'subject', 'outfit' y 'scene' usando la paleta del módulo 'color'.
+- Ejemplo: Si subject="Un coche deportivo" y color="Cyberpunk neon pink and blue", el JSON final debe decir en subject: "Un coche deportivo rosa neón y azul".
+- No te limites a poner la paleta en un campo separado; intégrala en las descripciones de los objetos.
 
 REGLAS DE INTEGRACIÓN CONTEXTUAL:
 
 1. **Sujeto + Outfit**:
-   - El módulo 'Subject' define QUIÉN es (físico, edad, raza).
-   - El módulo 'Outfit' define QUÉ LLEVA PUESTO.
-   - **Acción**: Si hay 'Outfit', elimina la ropa mencionada en 'Subject' para evitar duplicados, pero **MANTÉN** la descripción física del sujeto intacta. Fusiona ambos campos lógicamente en la descripción final o en sus campos respectivos.
-
-2. **Sujeto + Pose/Expresión**:
-   - Si se proveen 'Pose' o 'Expression', úsalos para definir la acción y emoción del sujeto, sobrescribiendo lo que diga el texto del sujeto sobre estos temas.
-
-3. **Integridad de Datos**:
-   - **TODOS** los fragmentos provistos deben reflejarse en el JSON final.
-   - Si no hay campo específico en la plantilla para un fragmento (ej: 'object'), agrégalo al campo más lógico (ej: dentro de 'subject' o 'scene_details').
+   - Fusiona lógicamente. Si hay 'Outfit', elimina la ropa redundante en 'Subject'.
+   
+2. **Integridad de Datos**:
+   - Todos los conceptos visuales clave de los inputs deben estar presentes.
 
 PLANTILLAS BASE (SKELETONS):
 
@@ -80,7 +97,7 @@ PLANTILLAS BASE (SKELETONS):
 
 3. **Retrato Simple**:
    - JSON Skeleton: { 
-       "prompt_description": "Full sentence merging cleaned subject + outfit + pose",
+       "prompt_description": "Full sentence merging cleaned subject + outfit + pose (RECOLORED)",
        "environment": { "location" },
        "lighting": { "style" },
        "technical": { "lens" }
@@ -88,6 +105,6 @@ PLANTILLAS BASE (SKELETONS):
 
 REGLAS FINALES:
 - **NO CAMPOS VACÍOS**: Elimina claves sin valor.
-- **COHERENCIA**: El JSON debe contar una escena visual coherente combinando todos los elementos balanceadamente.
+- **COHERENCIA**: El JSON debe describir una imagen visualmente unificada por la paleta de colores.
 
 OUTPUT: Genera SOLO el objeto JSON válido y limpio.`;
