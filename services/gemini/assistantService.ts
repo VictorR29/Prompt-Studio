@@ -41,13 +41,32 @@ export const getCreativeAssistantResponse = async (history: any[], context: any)
 export const generateHybridFragment = async (targetMode: string, inputs: any[], feedback: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
-    const parts: any[] = [{ text: `Create a hybrid "${targetMode}" description based on these inputs. User feedback: ${feedback}` }];
     
-    inputs.forEach(input => {
+    // Construcción del prompt con reglas estrictas de salida
+    const promptText = `
+ACT AS: Expert AI Visual Prompt Engineer.
+TASK: Synthesize a single, cohesive, high-density description for the module "${targetMode}" by fusing the DNA of the provided visual and text inputs.
+
+USER INSTRUCTIONS (THE CATALYST): "${feedback || "Blend the inputs perfectly to create a unified concept."}"
+
+STRICT OUTPUT RULES:
+1. Return ONLY the raw prompt text.
+2. NO introductions (e.g., "Here is the prompt").
+3. NO labels (e.g., "Style:", "Hybrid:").
+4. NO markdown formatting.
+5. NO bullet points.
+6. Must be a SINGLE, continuous paragraph.
+7. Focus exclusively on visual descriptions suitable for image generation.
+`;
+
+    const parts: any[] = [{ text: promptText }];
+    
+    inputs.forEach((input, index) => {
         if (input.imageBase64) {
+             parts.push({ text: `[Input ${index + 1} (Image Reference)]` });
              parts.push({ inlineData: { data: input.imageBase64, mimeType: input.mimeType } });
         } else if (input.text) {
-             parts.push({ text: `Reference text: ${input.text}` });
+             parts.push({ text: `[Input ${index + 1} (Text Reference)]: "${input.text}"` });
         }
     });
 
@@ -55,5 +74,11 @@ export const generateHybridFragment = async (targetMode: string, inputs: any[], 
         model: 'gemini-3-flash-preview',
         contents: { parts }
     });
-    return response.text || "";
+    
+    // Limpieza adicional por seguridad
+    let result = response.text?.trim() || "";
+    // Eliminar posibles comillas envolventes o etiquetas markdown si el modelo falla en obedecer
+    result = result.replace(/^["']|["']$/g, '').replace(/^```(json|text)?/g, '').replace(/```$/g, '');
+    
+    return result;
 };
