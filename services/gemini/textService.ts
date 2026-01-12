@@ -52,9 +52,36 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
 export const optimizePromptFragment = async (mode: string, fragments: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
     trackApiRequest();
     const ai = getAiClient();
+    const targetValue = fragments[mode as ExtractionMode] || "";
+
+    if (!targetValue.trim()) return [];
+
+    const prompt = `ACT AS: Elite AI Prompt Engineer.
+TASK: Optimize the specific text fragment for the '${mode}' module of an image generation prompt.
+
+TARGET TEXT TO OPTIMIZE: "${targetValue}"
+FULL CONTEXT (Other modules): ${JSON.stringify(fragments)}
+
+*** ADAPTIVE OPTIMIZATION LOGIC ***
+1. **ANALYZE DENSITY**:
+   - If the input is **VAGUE/SHORT** (e.g., "cat", "blue light"): **EXPAND & ENRICH**. Add professional artistic terms, lighting specifics, textures, and details relevant to '${mode}'.
+   - If the input is **DETAILED/STRUCTURED**: **POLISH & REFINE**. Elevate the vocabulary (e.g., change "shiny" to "iridescent"), fix grammar, and improve flow. Do NOT add unnecessary length if it's already complete.
+
+*** STRICT RULES ***
+1. Output **ONLY** the final, ready-to-use prompt text.
+2. **NO** instructions (e.g., do NOT write "Add more light" or "Ensure...").
+3. **NO** conversational filler.
+4. **ALWAYS IN ENGLISH**.
+5. Return exactly 3 variations following this pattern:
+   - Variation 1: **Conservative Polish** (High fidelity to original, better vocab).
+   - Variation 2: **Balanced Enhancement** (The optimal version).
+   - Variation 3: **Creative/Rich** (Highly descriptive and artistic).
+
+Return JSON array of strings.`;
+
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Suggest 3 improvements for the "${mode}" component given the context: ${JSON.stringify(fragments)}. Return JSON array.`,
+        contents: prompt,
         config: {
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }

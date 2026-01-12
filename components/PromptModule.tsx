@@ -38,6 +38,12 @@ const SmallLoader: React.FC = () => (
     </svg>
 );
 
+const VARIANT_LABELS = [
+    { text: "Pulido", desc: "Corrección gramatical y vocabulario preciso", color: "text-blue-400" },
+    { text: "Mejorado", desc: "Equilibrio ideal entre detalle y brevedad", color: "text-green-400" },
+    { text: "Detallado", desc: "Rico en descripciones artísticas y técnicas", color: "text-purple-400" }
+];
+
 export const PromptModule: React.FC<PromptModuleProps> = ({ 
     mode, 
     config, 
@@ -220,18 +226,46 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                     </div>
                 )}
             </div>
+            
+            {/* AI Optimization Suggestions Block */}
             {suggestions.length > 0 && !isAnalyzingImages && (
-                <div className="space-y-2 animate-fade-slide-in-up">
-                    {suggestions.map((s, i) => (
-                        <button key={i} onClick={() => {
-                            onChange(mode, s);
-                            onClearSuggestions(mode);
-                        }} className="w-full text-left p-2 text-xs rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 transition-colors">
-                            {s}
-                        </button>
-                    ))}
+                <div className="space-y-3 animate-fade-slide-in-up mt-2 p-2 bg-black/20 rounded-lg border border-white/5 relative">
+                    <button 
+                        onClick={() => onClearSuggestions(mode)}
+                        className="absolute top-2 right-2 text-gray-500 hover:text-white transition-colors"
+                        aria-label="Cerrar sugerencias"
+                    >
+                        <CloseIcon className="w-3 h-3" />
+                    </button>
+                    
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest pl-1 mb-1">Resultados de Optimización</p>
+                    
+                    {suggestions.map((s, i) => {
+                        const variant = VARIANT_LABELS[i] || { text: `Variante ${i+1}`, desc: "", color: "text-gray-400" };
+                        return (
+                            <div key={i} className="group">
+                                <div className="flex items-center justify-between mb-1 pl-1 pr-1">
+                                    <span className={`text-[11px] font-bold uppercase tracking-wide ${variant.color}`}>
+                                        {variant.text}
+                                    </span>
+                                    {/* Optional: Add info icon or tooltip here for description */}
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        onChange(mode, s);
+                                        onClearSuggestions(mode);
+                                    }} 
+                                    className="w-full text-left p-3 text-xs rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all ring-1 ring-white/10 hover:ring-teal-500/50 shadow-sm relative overflow-hidden group-hover:shadow-md"
+                                >
+                                    <div className="absolute inset-0 w-1 bg-gradient-to-b from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    {s}
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
+
             <div className="flex items-center justify-end space-x-2 pt-2 border-t border-white/10" data-tour-id="module-actions-footer">
                 <input
                     id={inputId.current}
