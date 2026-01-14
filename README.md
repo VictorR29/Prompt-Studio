@@ -62,6 +62,13 @@ Tu API Key y tus prompts se almacenan **localmente en tu navegador**. La aplicac
 
 ---
 
-### 📄 Licencia
+## ⚖️ Licencia y Autoría
 
-Este proyecto es de código abierto bajo la Licencia MIT.
+Este proyecto ha sido creado y es mantenido por **Victor Ramones**.
+
+Distribuido bajo la licencia **GNU GPL v3**. 
+
+**¿Qué significa esto?**
+- Eres libre de usar, estudiar y modificar este código.
+- **Atribución:** Debes citar siempre al autor original.
+- **Copyleft:** Si mejoras o modificas este software y lo distribuyes, **estás obligado** a compartir esas mejoras bajo esta misma licencia (código abierto y gratuito). No se permite cerrar el código para fines comerciales privados sin permiso.
