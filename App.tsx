@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -614,9 +613,11 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="text-center p-4 text-gray-500 text-sm">
-        <p>Desarrollado con React, Tailwind CSS y la API de Gemini.</p>
+      <footer className="text-center p-6 text-gray-500 text-sm flex flex-col items-center gap-2">
+        <p>&copy; 2026 Victor Ramones</p>
+        <p className="opacity-70 text-xs">Desarrollado con React, Tailwind CSS y la API de Gemini.</p>
       </footer>
+
       {selectedPromptForModal && (
         <PromptModal
           promptData={selectedPromptForModal}
