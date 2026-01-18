@@ -9,67 +9,75 @@ export const IMAGE_ANALYSIS_PROMPT = (mode: string) => {
     switch (mode) {
         case 'subject':
             specificInstructions = `CRITICAL FOR 'subject' MODE:
-            - Describe the main character/object and their immediate context (e.g., outfit, essential accessories).
-            - Include enough detail to prevent the subject from appearing incomplete or nude if human.
-            - IGNORE art style, camera angles, or background scenery unless integral to the character's identity.`;
+            - DETAILED VISUALS: Describe physical traits (age, race, skin texture, body build), hair (style, color), and distinctive features (scars, tattoos, makeup).
+            - ESSENTIAL CONTEXT: Include immediate context if it defines the subject (e.g., 'holding a glowing staff', 'sitting on a throne').
+            - GOAL: Provide enough detail to replicate the exact character identity.
+            - IGNORE: Art style, camera settings, or background scenery.`;
             break;
         case 'style':
             specificInstructions = `CRITICAL FOR 'style' MODE:
-            - EXTRACT ONLY the artistic medium (e.g., oil, digital, photo), technique, brushwork, and visual aesthetic.
-            - IGNORE the content of the image (who is in it, what they are doing).`;
+            - VISUAL DNA: Extract the medium (oil painting, 3D render, polaroid), rendering engine (Unreal 5, Octane), texture quality (film grain, brushwork), and artistic school.
+            - LIGHTING & ATMOSPHERE: Describe the specific lighting mood (volumetric, noir, studio softbox) and color grading style.
+            - IGNORE: The actual subject matter or scene content.`;
             break;
         case 'pose':
             specificInstructions = `CRITICAL FOR 'pose' MODE:
-            - EXTRACT ONLY the body position, gesture, limb placement, and stance.
-            - IGNORE the character's identity, clothes, or the background.`;
+            - ANATOMY: Describe exact limb positioning, hand gestures, head tilt, and spine curvature.
+            - DYNAMICS: Capture the action energy (floating, sprinting, slouching) and camera perspective relative to the body (profile, foreshortened).
+            - IGNORE: Character identity, outfit details, or background.`;
             break;
         case 'expression':
             specificInstructions = `CRITICAL FOR 'expression' MODE:
-            - EXTRACT ONLY the facial emotion, gaze direction, and micro-expressions.
-            - IGNORE who the person is or what style the image is in.`;
+            - MICRO-DETAILS: Describe the exact state of eyebrows, eyes (gaze direction, openness), mouth, and muscle tension.
+            - EMOTION: Capture the nuanced emotion (e.g., 'subtle disdain', 'manic joy') rather than just 'happy'.
+            - IGNORE: Identity, style, or general body pose.`;
             break;
         case 'outfit':
             specificInstructions = `CRITICAL FOR 'outfit' MODE:
-            - EXTRACT ONLY the clothing, armor, jewelry, fabrics, and textures.
-            - IGNORE the person wearing them, their pose, or the background.`;
+            - MATERIALITY: Describe fabric textures (silk, matte leather, distressed denim), heavy elements (armor, metal), and fit.
+            - LAYERS: List garments from inner to outer, including specific accessories (belts, jewelry).
+            - IGNORE: The person wearing it, pose, or background.`;
             break;
         case 'object':
             specificInstructions = `CRITICAL FOR 'object' MODE:
-            - EXTRACT ONLY the specific object or prop.
-            - IGNORE the surroundings or who is holding it.`;
+            - STRUCTURE: Describe the object's shape, material properties, wear and tear, and mechanical details.
+            - IGNORE: The background or the person holding it (focus strictly on the item).`;
             break;
         case 'scene':
             specificInstructions = `CRITICAL FOR 'scene' MODE:
-            - EXTRACT ONLY the location, environment, weather, time of day, and background elements.
-            - IGNORE the foreground characters or subjects.`;
+            - WORLD BUILDING: Describe architecture, vegetation, terrain, weather, time of day, and lighting sources.
+            - DEPTH: Detail the foreground, midground, and background elements.
+            - IGNORE: The main character/subject in the foreground.`;
             break;
         case 'composition':
             specificInstructions = `CRITICAL FOR 'composition' MODE:
-            - EXTRACT ONLY the camera angle, framing (e.g., close-up, wide), depth of field, and perspective.
-            - IGNORE the actual subject matter or style.`;
+            - CAMERA SPECS: Identify shot type (macro, wide-angle), lens characteristics (fisheye, telephoto), depth of field (bokeh), framing rules, and angle.
+            - IGNORE: The actual subject content or style.`;
             break;
         case 'color':
             specificInstructions = `CRITICAL FOR 'color' MODE:
-            - EXTRACT ONLY the color palette, lighting temperature, saturation, and contrast.
-            - IGNORE shapes, subjects, or composition.`;
+            - PALETTE: List dominant colors, accent tones, and lighting temperature (warm/cool).
+            - VALUES: Describe saturation levels and contrast (high-key, low-key, faded).
+            - IGNORE: Shapes or specific objects.`;
             break;
         case 'negative':
              specificInstructions = `CRITICAL FOR 'negative' MODE:
-             - Identify visual defects or elements that should be avoided based on this image (e.g., blur, noise, distortion).`;
+             - FLAWS: Identify visual defects to avoid (blur, artifacts, bad anatomy, watermark, text, chromatic aberration).`;
              break;
         default:
-            specificInstructions = `Focus EXCLUSIVELY on the '${mode}' aspect. IGNORE all other visual elements.`;
+            specificInstructions = `Focus EXCLUSIVELY on the '${mode}' aspect. Describe it with high fidelity to replicate the image.`;
     }
 
-    return `Analyze the provided images to generate a specific text-to-image prompt fragment.
+    return `Analyze the provided images to generate a High-Fidelity text-to-image prompt fragment for the '${mode}' aspect.
 
 ${specificInstructions}
 
 STRICT OUTPUT RULES:
-1. Return ONLY the prompt text. No "Here is the prompt", no labels, no markdown.
-2. Keep it concise.
-3. DO NOT describe elements outside the requested mode (e.g., do not describe the dress if asking for 'pose').
-4. For 'subject', ensure sufficient context to avoid inappropriate results (e.g., nudity), but keep it focused on the entity.`;
+1. Return ONLY the prompt text. No introductory filler.
+2. DENSITY OVER BREVITY: The prompt must be detailed enough to REPLICATE the image feature exactly. Do not be vague.
+3. Use precise, descriptive adjectives and nouns.
+4. DO NOT describe elements outside the requested mode.
+5. For 'subject', ensure sufficient context to avoid inappropriate results (e.g., nudity), but keep it focused on the entity.`;
 };
 
 export const MASTER_PROMPT_ASSEMBLY = `ACT AS: Expert AI Prompt Engineer.
