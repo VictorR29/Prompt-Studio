@@ -4,25 +4,72 @@
  */
 
 export const IMAGE_ANALYSIS_PROMPT = (mode: string) => {
-    const isColorMode = mode === 'color';
+    let specificInstructions = "";
 
-    const colorSpecifics = isColorMode 
-        ? `CRITICAL FOR 'color' MODE: 
-           - IGNORE the subject, composition, pose, or objects. 
-           - EXTRACT ONLY THE PALETTE. 
-           - List dominant colors, accent colors, lighting temperature (warm/cool), and saturation.
-           - Example output: "Deep obsidian black and neon cyan palette with magenta rim lighting and high contrast."`
-        : `Focus EXCLUSIVELY on the '${mode}' aspect.`;
+    switch (mode) {
+        case 'subject':
+            specificInstructions = `CRITICAL FOR 'subject' MODE:
+            - Describe the main character/object and their immediate context (e.g., outfit, essential accessories).
+            - Include enough detail to prevent the subject from appearing incomplete or nude if human.
+            - IGNORE art style, camera angles, or background scenery unless integral to the character's identity.`;
+            break;
+        case 'style':
+            specificInstructions = `CRITICAL FOR 'style' MODE:
+            - EXTRACT ONLY the artistic medium (e.g., oil, digital, photo), technique, brushwork, and visual aesthetic.
+            - IGNORE the content of the image (who is in it, what they are doing).`;
+            break;
+        case 'pose':
+            specificInstructions = `CRITICAL FOR 'pose' MODE:
+            - EXTRACT ONLY the body position, gesture, limb placement, and stance.
+            - IGNORE the character's identity, clothes, or the background.`;
+            break;
+        case 'expression':
+            specificInstructions = `CRITICAL FOR 'expression' MODE:
+            - EXTRACT ONLY the facial emotion, gaze direction, and micro-expressions.
+            - IGNORE who the person is or what style the image is in.`;
+            break;
+        case 'outfit':
+            specificInstructions = `CRITICAL FOR 'outfit' MODE:
+            - EXTRACT ONLY the clothing, armor, jewelry, fabrics, and textures.
+            - IGNORE the person wearing them, their pose, or the background.`;
+            break;
+        case 'object':
+            specificInstructions = `CRITICAL FOR 'object' MODE:
+            - EXTRACT ONLY the specific object or prop.
+            - IGNORE the surroundings or who is holding it.`;
+            break;
+        case 'scene':
+            specificInstructions = `CRITICAL FOR 'scene' MODE:
+            - EXTRACT ONLY the location, environment, weather, time of day, and background elements.
+            - IGNORE the foreground characters or subjects.`;
+            break;
+        case 'composition':
+            specificInstructions = `CRITICAL FOR 'composition' MODE:
+            - EXTRACT ONLY the camera angle, framing (e.g., close-up, wide), depth of field, and perspective.
+            - IGNORE the actual subject matter or style.`;
+            break;
+        case 'color':
+            specificInstructions = `CRITICAL FOR 'color' MODE:
+            - EXTRACT ONLY the color palette, lighting temperature, saturation, and contrast.
+            - IGNORE shapes, subjects, or composition.`;
+            break;
+        case 'negative':
+             specificInstructions = `CRITICAL FOR 'negative' MODE:
+             - Identify visual defects or elements that should be avoided based on this image (e.g., blur, noise, distortion).`;
+             break;
+        default:
+            specificInstructions = `Focus EXCLUSIVELY on the '${mode}' aspect. IGNORE all other visual elements.`;
+    }
 
-    return `Analyze the provided images and generate a concise image generation prompt.
-${colorSpecifics}
+    return `Analyze the provided images to generate a specific text-to-image prompt fragment.
+
+${specificInstructions}
 
 STRICT OUTPUT RULES:
-1. Return ONLY the raw prompt text. No introductions, no "Here is the prompt", no labels (e.g., do NOT write "${mode}:"), no markdown.
-2. Format as a SINGLE, continuous paragraph.
-3. Keep it concise and dense (avoid unnecessary wordiness).
-4. Do NOT use bullet points or lists.
-5. Focus purely on visual description suitable for text-to-image AI.`;
+1. Return ONLY the prompt text. No "Here is the prompt", no labels, no markdown.
+2. Keep it concise.
+3. DO NOT describe elements outside the requested mode (e.g., do not describe the dress if asking for 'pose').
+4. For 'subject', ensure sufficient context to avoid inappropriate results (e.g., nudity), but keep it focused on the entity.`;
 };
 
 export const MASTER_PROMPT_ASSEMBLY = `ACT AS: Expert AI Prompt Engineer.
