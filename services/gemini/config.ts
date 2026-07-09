@@ -1,6 +1,17 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+export type ModelRole = 'creative' | 'extraction';
+
+export function defaultModelConfig(role: ModelRole): { temperature: number; topP: number } {
+    switch (role) {
+        case 'creative':
+            return { temperature: 0.7, topP: 0.95 };
+        case 'extraction':
+            return { temperature: 0.2, topP: 0.5 };
+    }
+}
+
 export const getAiClient = () => {
     const apiKey = localStorage.getItem('userGeminiKey') || process.env.API_KEY;
     if (!apiKey) throw new Error("API Key not found");

@@ -1,16 +1,23 @@
 
 import { Type } from "@google/genai";
-import { getAiClient, trackApiRequest } from "./config";
+import { getAiClient, trackApiRequest, defaultModelConfig } from "./config";
 import { ExtractionMode } from "../../types";
 import { MASTER_PROMPT_ASSEMBLY } from "./prompts/definitions";
+
+const MODULARIZE_SYSTEM_INSTRUCTION = `You are an AI prompt engineer analyzing an image generation prompt.
+Break the following prompt into its visual components: subject, style, scene, color palette, composition, lighting, pose, expression, outfit, and any objects.
+Return a JSON object where each key is a module name and the value is the extracted text for that module.
+If a component is not present in the input, return an empty string for that key.`;
 
 export const modularizePrompt = async (prompt: string): Promise<Record<string, string>> => {
     trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Break down this prompt into components: "${prompt}"`,
+        contents: { role: "user", parts: [{ text: prompt }] },
         config: {
+            systemInstruction: MODULARIZE_SYSTEM_INSTRUCTION,
+            ...defaultModelConfig('extraction'),
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -29,7 +36,11 @@ export const modularizePrompt = async (prompt: string): Promise<Record<string, s
             }
         }
     });
-    return JSON.parse(response.text || "{}");
+    try {
+        return JSON.parse(response.text || "{}");
+    } catch {
+        return {};
+    }
 };
 
 export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
@@ -44,27 +55,21 @@ export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionM
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `${MASTER_PROMPT_ASSEMBLY}\n\nINPUT FRAGMENTS: ${JSON.stringify(activeFragments)}`,
+        contents: { role: "user", parts: [{ text: `INPUT FRAGMENTS: ${JSON.stringify(activeFragments)}` }] },
+        config: {
+            systemInstruction: MASTER_PROMPT_ASSEMBLY,
+            ...defaultModelConfig('creative'),
+        },
     });
     return response.text?.trim() || "";
 };
 
-export const optimizePromptFragment = async (mode: string, fragments: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
-    trackApiRequest();
-    const ai = getAiClient();
-    const targetValue = fragments[mode as ExtractionMode] || "";
-
-    if (!targetValue.trim()) return [];
-
-    const prompt = `ACT AS: Elite AI Prompt Engineer.
-TASK: Optimize the specific text fragment for the '${mode}' module of an image generation prompt.
-
-TARGET TEXT TO OPTIMIZE: "${targetValue}"
-FULL CONTEXT (Other modules): ${JSON.stringify(fragments)}
+const OPTIMIZE_SYSTEM_INSTRUCTION = `ACT AS: Elite AI Prompt Engineer.
+TASK: Optimize a specific text fragment of an image generation prompt.
 
 *** ADAPTIVE OPTIMIZATION LOGIC ***
 1. **ANALYZE DENSITY**:
-   - If the input is **VAGUE/SHORT** (e.g., "cat", "blue light"): **EXPAND & ENRICH**. Add professional artistic terms, lighting specifics, textures, and details relevant to '${mode}'.
+   - If the input is **VAGUE/SHORT** (e.g., "cat", "blue light"): **EXPAND & ENRICH**. Add professional artistic terms, lighting specifics, textures, and details relevant to the module.
    - If the input is **DETAILED/STRUCTURED**: **POLISH & REFINE**. Elevate the vocabulary (e.g., change "shiny" to "iridescent"), fix grammar, and improve flow. Do NOT add unnecessary length if it's already complete.
 
 *** STRICT RULES ***
@@ -79,33 +84,63 @@ FULL CONTEXT (Other modules): ${JSON.stringify(fragments)}
 
 Return JSON array of strings.`;
 
+export const optimizePromptFragment = async (mode: string, fragments: Partial<Record<ExtractionMode, string>>): Promise<string[]> => {
+    trackApiRequest();
+    const ai = getAiClient();
+    const targetValue = fragments[mode as ExtractionMode] || "";
+
+    if (!targetValue.trim()) return [];
+
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: prompt,
+        contents: { role: "user", parts: [{ text: `Optimize the following text for the '${mode}' module.\n\nTARGET TEXT TO OPTIMIZE: "${targetValue}"\nFULL CONTEXT (Other modules): ${JSON.stringify(fragments)}` }] },
         config: {
+            systemInstruction: OPTIMIZE_SYSTEM_INSTRUCTION,
+            ...defaultModelConfig('extraction'),
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
         }
     });
-    return JSON.parse(response.text || "[]");
+    try {
+        return JSON.parse(response.text || "[]");
+    } catch {
+        return [];
+    }
 };
+
+const ADAPT_SYSTEM_INSTRUCTION = `You are an AI prompt engineer. Rewrite the following description to better fit the provided visual context.
+Preserve the core meaning and key details, but adjust wording to match the overall scene described in the context.
+Return ONLY the rewritten description, no labels or explanations.`;
 
 export const adaptFragmentToContext = async (mode: string, fragment: string, context: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Adapt this "${mode}" description: "${fragment}" to fit this context: ${JSON.stringify(context)}.`,
+        contents: { role: "user", parts: [{ text: `Adapt this "${mode}" description: "${fragment}" to fit this context: ${JSON.stringify(context)}.` }] },
+        config: {
+            systemInstruction: ADAPT_SYSTEM_INSTRUCTION,
+            ...defaultModelConfig('creative'),
+        },
     });
     return response.text || fragment;
 };
+
+const NEGATIVE_PROMPT_SYSTEM_INSTRUCTION = `You are an AI prompt engineer creating negative prompts for image generation.
+A negative prompt tells the AI what NOT to include in an image.
+Generate a comma-separated list of elements, styles, colors, and artifacts to avoid, based on the positive prompt provided.
+Return ONLY the comma-separated text.`;
 
 export const generateNegativePrompt = async (positivePrompt: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Generate a negative prompt for this positive prompt: "${positivePrompt}". Keep it comma separated.`,
+        contents: { role: "user", parts: [{ text: positivePrompt }] },
+        config: {
+            systemInstruction: NEGATIVE_PROMPT_SYSTEM_INSTRUCTION,
+            ...defaultModelConfig('creative'),
+        },
     });
     return response.text || "";
 };

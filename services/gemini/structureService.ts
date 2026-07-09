@@ -1,6 +1,6 @@
 
 import { Type } from "@google/genai";
-import { getAiClient, trackApiRequest } from "./config";
+import { defaultModelConfig, getAiClient, trackApiRequest } from "./config";
 import { ExtractionMode } from "../../types";
 import { JSON_OPTIMIZATION_SYSTEM_PROMPT } from "./prompts/definitions";
 
@@ -48,8 +48,10 @@ export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMo
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `${JSON_OPTIMIZATION_SYSTEM_PROMPT}\n\nINPUT DATA (FRAGMENTS): ${jsonModules}`,
+        contents: { role: "user", parts: [{ text: `INPUT DATA (FRAGMENTS): ${jsonModules}` }] },
         config: {
+            systemInstruction: JSON_OPTIMIZATION_SYSTEM_PROMPT,
+            ...defaultModelConfig('extraction'),
             responseMimeType: "application/json"
         }
     });
@@ -69,8 +71,12 @@ export const createJsonTemplate = async (json: string): Promise<string> => {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Generalize this JSON prompt into a reusable template: ${json}`,
-        config: { responseMimeType: "application/json" }
+        contents: { role: "user", parts: [{ text: json }] },
+        config: {
+            systemInstruction: "You are an AI prompt engineer creating reusable prompt templates. Given a JSON prompt, generalize it into a template by: 1. Keeping structural keys intact. 2. Replacing specific descriptions with placeholder descriptions (e.g. 'a red sports car' -> '[subject description]'). 3. Preserving all style, composition, and formatting rules. Return JSON with the same structure but generalized values.",
+            ...defaultModelConfig('extraction'),
+            responseMimeType: "application/json"
+        }
     });
     
     try {
@@ -87,8 +93,12 @@ export const mergeModulesIntoJsonTemplate = async (fragments: Partial<Record<Ext
     const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Merge these fragments ${JSON.stringify(fragments)} into this JSON template: ${template}. Return the filled JSON string. Ensure no data from fragments is lost.`,
-        config: { responseMimeType: "application/json" }
+        contents: { role: "user", parts: [{ text: `Fragments: ${JSON.stringify(fragments)}\nTemplate: ${template}` }] },
+        config: {
+            systemInstruction: "Merge the provided fragments into the JSON template. Return the filled JSON string. Ensure no data from fragments is lost.",
+            ...defaultModelConfig('extraction'),
+            responseMimeType: "application/json"
+        }
     });
     
     try {
@@ -106,12 +116,16 @@ export const generateStructuredPromptFromImage = async (images: { imageBase64: s
      const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
-             parts: [
+            role: "user",
+            parts: [
                 ...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
-                { text: "Generate a structured JSON prompt describing this image." }
             ]
         },
-        config: { responseMimeType: "application/json" }
+        config: {
+            systemInstruction: "You are an AI visual analyst. Analyze the provided image(s) and generate a structured JSON prompt describing all visible elements. Include: subject (main entity), style (artistic style), scene (background/environment), color palette (dominant colors), and composition (layout/angle). Be specific and detailed in each field. Return a valid JSON object.",
+            ...defaultModelConfig('extraction'),
+            responseMimeType: "application/json"
+        }
     });
     try {
         const rawJson = JSON.parse(response.text || "{}");
@@ -124,15 +138,17 @@ export const generateStructuredPromptFromImage = async (images: { imageBase64: s
 export const generateAndModularizePrompt = async (input: { idea: string, style: string, images?: { imageBase64: string, mimeType: string }[] }): Promise<Record<string, string>> => {
     trackApiRequest();
     const ai = getAiClient();
-    const parts: any[] = [{ text: `Generate a detailed prompt based on idea: "${input.idea}" and style: "${input.style}", then break it down into components.` }];
+    const parts: any[] = [{ text: `Idea: "${input.idea}"\nStyle: "${input.style}"` }];
     if (input.images) {
         parts.unshift(...input.images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })));
     }
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: { parts },
+        contents: { role: "user", parts },
         config: {
+            systemInstruction: "You are an AI prompt engineer. Generate a detailed image generation prompt based on the user's idea and style, then break it into modular components: subject, style, scene, color, composition, lighting, pose, expression, outfit, and objects. Return a JSON object with each component as a key.",
+            ...defaultModelConfig('extraction'),
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -166,12 +182,14 @@ export const modularizeImageAnalysis = async (images: { imageBase64: string, mim
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
+            role: "user",
             parts: [
                 ...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
-                { text: "Analyze this image and break down the prompt components." }
             ]
         },
         config: {
+            systemInstruction: "You are an AI visual analyst. Analyze the provided image(s) and break down the visual elements into prompt components. Extract: the main subject, artistic style, scene/environment, color palette, and composition. Be detailed and specific for each component. Return a valid JSON object with exactly these keys: subject, style, scene, color, composition.",
+            ...defaultModelConfig('extraction'),
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,

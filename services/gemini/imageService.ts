@@ -1,5 +1,5 @@
 
-import { getAiClient, trackApiRequest } from "./config";
+import { defaultModelConfig, getAiClient, trackApiRequest } from "./config";
 import { IMAGE_ANALYSIS_PROMPT } from "./prompts/definitions";
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
@@ -9,6 +9,9 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: prompt }] },
+        config: {
+            ...defaultModelConfig('creative')
+        },
     });
     
     const parts = response.candidates?.[0]?.content?.parts || [];
@@ -28,11 +31,13 @@ export const analyzeImageFeature = async (mode: string, images: { imageBase64: s
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
-            parts: [
-                ...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
-                { text: IMAGE_ANALYSIS_PROMPT(mode) }
-            ]
-        }
+            role: "user",
+            parts: images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })),
+        },
+        config: {
+            systemInstruction: IMAGE_ANALYSIS_PROMPT(mode),
+            ...defaultModelConfig('extraction')
+        },
     });
     return { result: response.text?.trim() || "" };
 };
