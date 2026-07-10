@@ -1,6 +1,6 @@
 
 import { Type } from "@google/genai";
-import { getAiClient, trackApiRequest, defaultModelConfig } from "./config";
+import { getAiClient, trackApiRequest, defaultModelConfig, trackApiCall } from "./config";
 import { ExtractionMode } from "../../types";
 import { MASTER_PROMPT_ASSEMBLY } from "./prompts/definitions";
 
@@ -12,6 +12,7 @@ If a component is not present in the input, return an empty string for that key.
 export const modularizePrompt = async (prompt: string): Promise<Record<string, string>> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: prompt }] },
@@ -36,6 +37,13 @@ export const modularizePrompt = async (prompt: string): Promise<Record<string, s
             }
         }
     });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
+    });
     try {
         return JSON.parse(response.text || "{}");
     } catch {
@@ -53,6 +61,7 @@ export const assembleMasterPrompt = async (fragments: Record<string, string>): P
         return acc;
     }, {} as any);
 
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { role: "user", parts: [{ text: `INPUT FRAGMENTS: ${JSON.stringify(activeFragments)}` }] },
@@ -60,6 +69,13 @@ export const assembleMasterPrompt = async (fragments: Record<string, string>): P
             systemInstruction: MASTER_PROMPT_ASSEMBLY,
             ...defaultModelConfig('creative'),
         },
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-2.5-flash',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     return response.text?.trim() || "";
 };
@@ -91,6 +107,7 @@ export const optimizePromptFragment = async (mode: string, fragments: Partial<Re
 
     if (!targetValue.trim()) return [];
 
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: `Optimize the following text for the '${mode}' module.\n\nTARGET TEXT TO OPTIMIZE: "${targetValue}"\nFULL CONTEXT (Other modules): ${JSON.stringify(fragments)}` }] },
@@ -100,6 +117,13 @@ export const optimizePromptFragment = async (mode: string, fragments: Partial<Re
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     try {
         return JSON.parse(response.text || "[]");
@@ -115,6 +139,7 @@ Return ONLY the rewritten description, no labels or explanations.`;
 export const adaptFragmentToContext = async (mode: string, fragment: string, context: Partial<Record<ExtractionMode, string>>): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: `Adapt this "${mode}" description: "${fragment}" to fit this context: ${JSON.stringify(context)}.` }] },
@@ -122,6 +147,13 @@ export const adaptFragmentToContext = async (mode: string, fragment: string, con
             systemInstruction: ADAPT_SYSTEM_INSTRUCTION,
             ...defaultModelConfig('creative'),
         },
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     return response.text || fragment;
 };
@@ -134,6 +166,7 @@ Return ONLY the comma-separated text.`;
 export const generateNegativePrompt = async (positivePrompt: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: positivePrompt }] },
@@ -141,6 +174,13 @@ export const generateNegativePrompt = async (positivePrompt: string): Promise<st
             systemInstruction: NEGATIVE_PROMPT_SYSTEM_INSTRUCTION,
             ...defaultModelConfig('creative'),
         },
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     return response.text || "";
 };

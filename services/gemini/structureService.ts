@@ -1,6 +1,6 @@
 
 import { Type } from "@google/genai";
-import { defaultModelConfig, getAiClient, trackApiRequest } from "./config";
+import { defaultModelConfig, getAiClient, trackApiRequest, trackApiCall } from "./config";
 import { JSON_OPTIMIZATION_SYSTEM_PROMPT } from "./prompts/definitions";
 
 /**
@@ -45,6 +45,7 @@ export const assembleOptimizedJson = async (modules: Record<string, string>): Pr
 
     const jsonModules = JSON.stringify(activeModules);
 
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { role: "user", parts: [{ text: `INPUT DATA (FRAGMENTS): ${jsonModules}` }] },
@@ -53,6 +54,13 @@ export const assembleOptimizedJson = async (modules: Record<string, string>): Pr
             ...defaultModelConfig('extraction'),
             responseMimeType: "application/json"
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-2.5-flash',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
 
     try {
@@ -68,6 +76,7 @@ export const assembleOptimizedJson = async (modules: Record<string, string>): Pr
 export const createJsonTemplate = async (json: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: json }] },
@@ -76,6 +85,13 @@ export const createJsonTemplate = async (json: string): Promise<string> => {
             ...defaultModelConfig('extraction'),
             responseMimeType: "application/json"
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     
     try {
@@ -90,6 +106,7 @@ export const createJsonTemplate = async (json: string): Promise<string> => {
 export const mergeModulesIntoJsonTemplate = async (fragments: Record<string, string>, template: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: `Fragments: ${JSON.stringify(fragments)}\nTemplate: ${template}` }] },
@@ -98,6 +115,13 @@ export const mergeModulesIntoJsonTemplate = async (fragments: Record<string, str
             ...defaultModelConfig('extraction'),
             responseMimeType: "application/json"
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     
     try {
@@ -112,7 +136,8 @@ export const mergeModulesIntoJsonTemplate = async (fragments: Record<string, str
 export const generateStructuredPromptFromImage = async (images: { imageBase64: string, mimeType: string }[]): Promise<any> => {
     trackApiRequest();
     const ai = getAiClient();
-     const response = await ai.models.generateContent({
+    const _start = performance.now();
+    const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
             role: "user",
@@ -125,6 +150,13 @@ export const generateStructuredPromptFromImage = async (images: { imageBase64: s
             ...defaultModelConfig('extraction'),
             responseMimeType: "application/json"
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     try {
         const rawJson = JSON.parse(response.text || "{}");
@@ -142,6 +174,7 @@ export const generateAndModularizePrompt = async (input: { idea: string, style: 
         parts.unshift(...input.images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })));
     }
 
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts },
@@ -166,6 +199,13 @@ export const generateAndModularizePrompt = async (input: { idea: string, style: 
             }
         }
     });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
+    });
     
     try {
         const rawJson = JSON.parse(response.text || "{}");
@@ -178,6 +218,7 @@ export const generateAndModularizePrompt = async (input: { idea: string, style: 
 export const modularizeImageAnalysis = async (images: { imageBase64: string, mimeType: string }[]): Promise<Record<string, string>> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
@@ -201,6 +242,13 @@ export const modularizeImageAnalysis = async (images: { imageBase64: string, mim
                 }
             }
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     try {
         const rawJson = JSON.parse(response.text || "{}");

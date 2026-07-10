@@ -1,6 +1,6 @@
 
 import { Type } from "@google/genai";
-import { getAiClient, trackApiRequest, defaultModelConfig } from "./config";
+import { getAiClient, trackApiRequest, defaultModelConfig, trackApiCall } from "./config";
 import { AssistantResponse } from "../../types";
 
 const CREATIVE_ASSISTANT_SYSTEM_INSTRUCTION = `You are an AI creative assistant inside a prompt builder application.
@@ -16,6 +16,7 @@ Return a JSON object matching the AssistantResponse type.`;
 export const getCreativeAssistantResponse = async (history: any[], context: any): Promise<AssistantResponse> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: {
@@ -44,6 +45,13 @@ export const getCreativeAssistantResponse = async (history: any[], context: any)
                 }
             }
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     try {
         return JSON.parse(response.text || "{}") as AssistantResponse;
@@ -88,6 +96,7 @@ STRICT OUTPUT RULES:
         }
     });
 
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts },
@@ -95,6 +104,13 @@ STRICT OUTPUT RULES:
             systemInstruction,
             ...defaultModelConfig('creative'),
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
 
     // Limpieza adicional por seguridad

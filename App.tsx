@@ -1,7 +1,8 @@
 
-import React, { useCallback } from 'react';
+import React, { Suspense, useCallback } from 'react';
 import { useAppContext } from './context/AppContext';
 import { Header } from './components/Header';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { SavedPrompt } from './types';
 import { Loader } from './components/Loader';
 import { Toast } from './components/Toast';
@@ -11,7 +12,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { WalkthroughGuide } from './components/WalkthroughGuide';
 import { ApiKeySetup } from './components/ApiKeySetup';
 import ExtractorView from './views/ExtractorView';
-import GalleryView from './views/GalleryView';
+const GalleryView = React.lazy(() => import('./views/GalleryView'));
 import EditorView from './views/EditorView';
 import PlaygroundView from './views/PlaygroundView';
 import FusionView from './views/FusionView';
@@ -60,29 +61,41 @@ const App: React.FC = () => {
       </div>
 
       <main className="flex-grow container mx-auto p-4 md:p-8 w-full pb-24 md:pb-8">
-        {ctx.view === 'extractor' && (
-          <ExtractorView addToast={ctx.addToast} setGlobalLoader={ctx.setGlobalLoader}
-            onFeaturePrompt={handleUseFeatureInEditor} addPromptToGallery={ctx.addPromptToGallery} />
-        )}
-        {ctx.view === 'gallery' && (
-          <GalleryView prompts={ctx.savedPrompts} onSelect={ctx.handleSelectPromptForModal}
-            onDelete={ctx.handleDeletePrompt} onEdit={ctx.handleEditPrompt} onShare={ctx.handleSharePrompt} />
-        )}
-        {ctx.view === 'editor' && (
-          <EditorView key={ctx.promptForEditor?.id || 'new-editor'} initialPrompt={ctx.promptForEditor}
-            onSavePrompt={ctx.addPromptToGallery} savedPrompts={ctx.savedPrompts}
-            setView={ctx.handleSetView} onNavigateToGallery={() => ctx.handleSetView('gallery')}
-            addToast={ctx.addToast} setGlobalLoader={ctx.setGlobalLoader} />
-        )}
-        {ctx.view === 'playground' && (
-          <PlaygroundView initialPrompt={ctx.promptForPlayground} savedPrompts={ctx.savedPrompts}
-            onSavePrompt={ctx.addPromptToGallery} addToast={ctx.addToast}
-            setGlobalLoader={ctx.setGlobalLoader} />
-        )}
-        {ctx.view === 'fusion' && (
-          <FusionView savedPrompts={ctx.savedPrompts} onSavePrompt={ctx.addPromptToGallery}
-            addToast={ctx.addToast} setGlobalLoader={ctx.setGlobalLoader} />
-        )}
+        <ErrorBoundary key="extractor" viewName="Extractor">
+          {ctx.view === 'extractor' && (
+            <ExtractorView addToast={ctx.addToast} setGlobalLoader={ctx.setGlobalLoader}
+              onFeaturePrompt={handleUseFeatureInEditor} addPromptToGallery={ctx.addPromptToGallery} />
+          )}
+        </ErrorBoundary>
+        <ErrorBoundary key="gallery" viewName="Gallery">
+          {ctx.view === 'gallery' && (
+            <Suspense fallback={<Loader />}>
+              <GalleryView prompts={ctx.savedPrompts} onSelect={ctx.handleSelectPromptForModal}
+                onDelete={ctx.handleDeletePrompt} onEdit={ctx.handleEditPrompt} onShare={ctx.handleSharePrompt} />
+            </Suspense>
+          )}
+        </ErrorBoundary>
+        <ErrorBoundary key="editor" viewName="Editor">
+          {ctx.view === 'editor' && (
+            <EditorView key={ctx.promptForEditor?.id || 'new-editor'} initialPrompt={ctx.promptForEditor}
+              onSavePrompt={ctx.addPromptToGallery} savedPrompts={ctx.savedPrompts}
+              setView={ctx.handleSetView} onNavigateToGallery={() => ctx.handleSetView('gallery')}
+              addToast={ctx.addToast} setGlobalLoader={ctx.setGlobalLoader} />
+          )}
+        </ErrorBoundary>
+        <ErrorBoundary key="playground" viewName="Playground">
+          {ctx.view === 'playground' && (
+            <PlaygroundView initialPrompt={ctx.promptForPlayground} savedPrompts={ctx.savedPrompts}
+              onSavePrompt={ctx.addPromptToGallery} addToast={ctx.addToast}
+              setGlobalLoader={ctx.setGlobalLoader} />
+          )}
+        </ErrorBoundary>
+        <ErrorBoundary key="fusion" viewName="Fusion">
+          {ctx.view === 'fusion' && (
+            <FusionView savedPrompts={ctx.savedPrompts} onSavePrompt={ctx.addPromptToGallery}
+              addToast={ctx.addToast} setGlobalLoader={ctx.setGlobalLoader} />
+          )}
+        </ErrorBoundary>
       </main>
 
       <footer className="text-center p-6 text-gray-500 text-sm flex flex-col items-center gap-2">

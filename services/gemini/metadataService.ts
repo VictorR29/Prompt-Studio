@@ -1,6 +1,6 @@
 
 import { Type } from "@google/genai";
-import { getAiClient, trackApiRequest, defaultModelConfig } from "./config";
+import { getAiClient, trackApiRequest, defaultModelConfig, trackApiCall } from "./config";
 
 export const generateFeatureMetadata = async (mode: string, prompt: string, images?: { imageBase64: string, mimeType: string }[]) => {
     trackApiRequest();
@@ -10,6 +10,7 @@ export const generateFeatureMetadata = async (mode: string, prompt: string, imag
         parts.unshift(...images.map(img => ({ inlineData: { data: img.imageBase64, mimeType: img.mimeType } })));
     }
 
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts },
@@ -30,6 +31,13 @@ Return a JSON object with exactly these keys: title, category, artType, notes.`,
             }
         }
     });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
+    });
     
     try {
         return JSON.parse(response.text || "{}");
@@ -41,6 +49,7 @@ Return a JSON object with exactly these keys: title, category, artType, notes.`,
 export const generateIdeasForStyle = async (stylePrompt: string): Promise<string[]> => {
     trackApiRequest();
     const ai = getAiClient();
+    const _start = performance.now();
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: stylePrompt }] },
@@ -53,6 +62,13 @@ export const generateIdeasForStyle = async (stylePrompt: string): Promise<string
                 items: { type: Type.STRING }
             }
         }
+    });
+    const _latency = Math.round(performance.now() - _start);
+    trackApiCall({
+        model: 'gemini-3-flash-preview',
+        promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+        responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+        latencyMs: _latency,
     });
     try {
         return JSON.parse(response.text || "[]");

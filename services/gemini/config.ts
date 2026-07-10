@@ -1,7 +1,27 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+export interface TrackApiCallParams {
+  model: string;
+  promptTokens: number;
+  responseTokens: number;
+  latencyMs: number;
+}
+
 export type ModelRole = 'creative' | 'extraction';
+
+export function trackApiCall(params: TrackApiCallParams): void {
+  try {
+    console.group(`[Gemini API] ${params.model}`);
+    console.log(`Prompt Tokens: ${params.promptTokens ?? 'N/A'}`);
+    console.log(`Response Tokens: ${params.responseTokens ?? 'N/A'}`);
+    console.log(`Total Tokens: ${(params.promptTokens ?? 0) + (params.responseTokens ?? 0)}`);
+    console.log(`Latency: ${params.latencyMs}ms`);
+    console.groupEnd();
+  } catch {
+    // NFR14 — must never throw
+  }
+}
 
 export function defaultModelConfig(role: ModelRole): { temperature: number; topP: number } {
     switch (role) {
