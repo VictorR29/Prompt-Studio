@@ -3,13 +3,13 @@
 
 **Prompt Studio** es la herramienta definitiva para creadores de IA generativa (Midjourney, Stable Diffusion, Flux, DALL-E). No es solo un editor; es un **Director Creativo Asistido por IA** que te ayuda a construir, refinar, fusionar y organizar prompts complejos con precisión quirúrgica.
 
-Potenciada por **Google Gemini 2.5**, esta aplicación ofrece un flujo de trabajo modular y multimodal único.
+Potenciada por **Google Gemini 2.5 / 3 Flash**, esta aplicación ofrece un flujo de trabajo modular y multimodal único.
 
 ---
 
 ## 🌟 Funcionalidades Principales
 
-### 1. 🧬 Laboratorio de Fusión (Nuevo)
+### 1. 🧬 Laboratorio de Fusión
 Experimenta con la **"Alquimia Visual"**.
 *   **Mezcla de Conceptos:** Sube hasta 3 imágenes o selecciona fragmentos de texto de tu galería.
 *   **Síntesis Inteligente:** La IA analiza el "ADN visual" de cada referencia y genera un nuevo fragmento híbrido que combina lo mejor de cada fuente.
@@ -38,6 +38,17 @@ Ingeniería inversa de imágenes.
 
 ---
 
+## 🛡️ Estabilidad y Observabilidad
+
+Prompt Studio incorpora varias capas de fiabilidad que no son visibles al usuario pero mejoran significativamente la experiencia:
+
+- **Error Boundaries:** Cada vista está envuelta en un Error Boundary que captura errores de renderizado, muestra un fallback con opción de reintentar y registra el stack trace en consola.
+- **API Logging Estructurado:** Cada llamada a Gemini se registra en consola con `console.group` incluyendo modelo, tokens de entrada/salida y latencia en ms. Facilita el debugging sin herramientas externas.
+- **Lazy Loading:** La Galería se carga bajo demanda mediante `React.lazy` + `Suspense`, reduciendo el bundle inicial.
+- **Tests:** Suite de 39 tests (unit + integración) con Vitest y Testing Library. Cobertura de Error Boundary, servicios Gemini, y flujo Extractor → Editor.
+
+---
+
 ## 🧠 Lógica de Optimización "Elite"
 
 Prompt Studio no se limita a concatenar texto. Utiliza algoritmos de IA para:
@@ -49,16 +60,27 @@ Prompt Studio no se limita a concatenar texto. Utiliza algoritmos de IA para:
 
 ## 🛠️ Stack Tecnológico
 
-*   **Frontend:** React 19, TypeScript, Vite.
-*   **Estilos:** Tailwind CSS con diseño "Glassmorphism" y soporte móvil nativo (PWA-ready).
-*   **IA:** Google Gemini API (`gemini-2.5-flash` para lógica/texto, `gemini-2.5-flash-image` para visión).
-*   **Almacenamiento:** LocalStorage (Client-Side) para máxima privacidad.
+*   **Frontend:** React 19, TypeScript 5.8, Vite 7.
+*   **Estilos:** Tailwind CSS 3.4 — paneles sólidos por vista, glass para header/modals, acentos de color por sección.
+*   **IA:** Google Gemini API (`@google/genai`) — `gemini-2.5-flash` para generación de texto, `gemini-2.5-flash-image` para generación de imágenes, `gemini-3-flash-preview` para análisis multimodal.
+*   **Almacenamiento:** IndexedDB para prompts (con migración automática desde localStorage), localStorage para API key y configuración.
+*   **Testing:** Vitest + @testing-library/react + jsdom.
+
+---
+
+## 🎨 Diseño
+
+La interfaz utiliza un sistema de paneles con jerarquía visual clara:
+*   **Header y modales:** Fondo glass (backdrop-blur) para transparencia y profundidad.
+*   **Vistas principales:** Paneles sólidos con bordes sutiles para máximo contraste y legibilidad.
+*   **Acentos por vista:** Teal (Extractor), violeta (Editor), esmeralda (Galería), ámbar (Fusión), cyan (Playground).
+*   **Accesibilidad:** Navegación completa por teclado, roles ARIA, gestión de foco, y targets táctiles de 44×44px en móvil.
 
 ---
 
 ### 🛡️ Privacidad
 
-Tu API Key y tus prompts se almacenan **localmente en tu navegador**. La aplicación conecta directamente con la API de Google, sin servidores intermedios que lean tus datos.
+Tu API Key se almacena **localmente en tu navegador** (localStorage). Tus prompts se guardan en **IndexedDB** del navegador. La aplicación conecta directamente con la API de Google, sin servidores intermedios que lean tus datos. Puedes exportar tu galería completa a JSON en cualquier momento.
 
 ---
 
@@ -66,9 +88,9 @@ Tu API Key y tus prompts se almacenan **localmente en tu navegador**. La aplicac
 
 Este proyecto ha sido creado y es mantenido por **Victor Ramones**.
 
-Distribuido bajo la licencia **GNU GPL v3**. 
+Distribuido bajo la licencia **GNU General Public License v3.0**.
 
 **¿Qué significa esto?**
 - Eres libre de usar, estudiar y modificar este código.
 - **Atribución:** Debes citar siempre al autor original.
-- **Copyleft:** Si mejoras o modificas este software y lo distribuyes, **estás obligado** a compartir esas mejoras bajo esta misma licencia (código abierto y gratuito). No se permite cerrar el código para fines comerciales privados sin permiso.
+- **Copyleft:** Si mejoras o modificas este software y lo distribuyes, **estás obligado** a compartir esas mejoras bajo esta misma licencia. El uso comercial está permitido siempre que las modificaciones se distribuyan como código abierto bajo GPL v3.
