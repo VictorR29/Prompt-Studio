@@ -120,11 +120,11 @@ const Slot: React.FC<{
                     </div>
                 </>
             ) : (
-                <div className="flex flex-col items-center justify-center gap-3 p-4 w-full h-full">
-                    <span className="text-sm font-semibold text-gray-500 mb-1">{label}</span>
-                    <div className="flex gap-4">
-                        <label htmlFor={inputId} className="cursor-pointer bg-gray-800 hover:bg-gray-700 p-3 rounded-xl transition-colors group/btn shadow-md ring-1 ring-white/5" title="Subir Imagen">
-                            <ImageIcon className="w-6 h-6 text-gray-400 group-hover/btn:text-white" />
+                <div className="flex flex-col items-center justify-center gap-2 p-3 w-full h-full">
+                    <span className="text-sm font-bold text-gray-400">{label}</span>
+                    <div className="flex gap-3">
+                        <label htmlFor={inputId} className="cursor-pointer bg-gray-800 hover:bg-gray-700 p-2.5 rounded-xl transition-colors group/btn shadow-md ring-1 ring-white/5" title="Subir Imagen">
+                            <ImageIcon className="w-5 h-5 text-gray-400 group-hover/btn:text-white" />
                             <input
                                 id={inputId}
                                 type="file"
@@ -135,13 +135,13 @@ const Slot: React.FC<{
                         </label>
                         <button 
                             onClick={() => onOpenGallery(slot.id)} 
-                            className="bg-gray-800 hover:bg-gray-700 p-3 rounded-xl transition-colors group/btn shadow-md ring-1 ring-white/5" 
+                            className="bg-gray-800 hover:bg-gray-700 p-2.5 rounded-xl transition-colors group/btn shadow-md ring-1 ring-white/5" 
                             title="Seleccionar de Galería"
                         >
-                            <GalleryIcon className="w-6 h-6 text-gray-400 group-hover/btn:text-white" />
+                            <GalleryIcon className="w-5 h-5 text-gray-400 group-hover/btn:text-white" />
                         </button>
                     </div>
-                    <span className="text-xs text-gray-600 mt-1">Arrastra o selecciona</span>
+                    <span className="text-[11px] text-gray-600">Arrastra o selecciona</span>
                 </div>
             )}
             {isDragging && (

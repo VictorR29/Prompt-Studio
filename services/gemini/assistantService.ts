@@ -72,6 +72,7 @@ TASK: Analyze ALL provided reference images thoroughly and synthesize a single, 
 ${
     hasUserInstructions
         ? `USER INSTRUCTIONS (SELECTIVE FUSION): "${feedback}"
+The user may refer to inputs as Ref 1, Ref 2, Ref 3 — these correspond to [Input 1], [Input 2], [Input 3] in order.
 The user has specified what elements to take from each reference image. Follow their instructions precisely when selecting which visual features from each image to include in the final output.`
         : `BLEND ALL IMAGES: Extract the most prominent visual features from EVERY provided image and merge them into one unified description. The result should be a coherent blend of all inputs — not a list or comparison.`
 }
