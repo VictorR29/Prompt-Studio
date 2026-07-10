@@ -92,6 +92,14 @@ The 'Color' module is the SUPREME AUTHORITY on the visual palette.
 - **Priority**: If the 'Color' module specifies "Black and Gold", and the Subject is "A knight", output "A black and gold knight". 
 - **Conflict**: If the Subject has a defined color (e.g., "Red Tie") that strictly clashes with the 'Color' palette (e.g., "Blue Monochrome"), blend them intelligently (e.g., "Blue suit with a dark purple tie") OR let the 'Color' module override if it implies a global lighting filter.
 
+*** MULTI-SUBJECT SUPPORT ***
+The 'Subject' field may contain multiple entities formatted as "Subject 1: ... / Subject 2: ...".
+When multiple subjects are present:
+   - PRESERVE each subject as a separate entity in the final prompt.
+   - Do NOT merge them into one description.
+   - Keep the "Subject N:" labels so the image generator treats them as distinct elements.
+   - Apply 'Outfit' and 'Pose/Expression' only to Subject 1 unless otherwise specified in those fields.
+
 *** CONTEXTUAL SUBSTITUTION RULES ***
 
 1. **Subject vs Outfit**: 
