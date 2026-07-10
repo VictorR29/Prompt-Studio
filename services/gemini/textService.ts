@@ -5,7 +5,7 @@ import { ExtractionMode } from "../../types";
 import { MASTER_PROMPT_ASSEMBLY } from "./prompts/definitions";
 
 const MODULARIZE_SYSTEM_INSTRUCTION = `You are an AI prompt engineer analyzing an image generation prompt.
-Break the following prompt into its visual components: subject, style, scene, color palette, composition, lighting, pose, expression, outfit, and any objects.
+Break the following prompt into its visual components: subject, style, scene, color, composition (framing, angle, lighting, depth of field), pose, expression, outfit, and any objects.
 Return a JSON object where each key is a module name and the value is the extracted text for that module.
 If a component is not present in the input, return an empty string for that key.`;
 
@@ -43,7 +43,7 @@ export const modularizePrompt = async (prompt: string): Promise<Record<string, s
     }
 };
 
-export const assembleMasterPrompt = async (fragments: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+export const assembleMasterPrompt = async (fragments: Record<string, string>): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
     

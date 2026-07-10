@@ -7,8 +7,8 @@ const CREATIVE_ASSISTANT_SYSTEM_INSTRUCTION = `You are an AI creative assistant 
 The user is refining image generation prompts module by module.
 You receive: the current state of all prompt modules (context) and the conversation history.
 Based on the conversation, determine which module(s) to update.
-You can update: subject, style, scene, color, composition, lighting, pose, expression, outfit, objects, negative_prompt.
-Only update modules that the user explicitly asks to change.
+You can update: subject, style, pose, expression, scene, outfit, object, composition, color.
+Only update modules that the user explicitly asks to change. Do NOT invent module names outside this list.
 When asked to generate or finalize, also provide an assembled_prompt combining all current modules.
 For simple greetings or off-topic messages, return an empty updates array with an appropriate message.
 Return a JSON object matching the AssistantResponse type.`;
@@ -56,10 +56,17 @@ export const generateHybridFragment = async (targetMode: string, inputs: any[], 
     trackApiRequest();
     const ai = getAiClient();
 
-    const systemInstruction = `ACT AS: Expert AI Visual Prompt Engineer.
-TASK: Synthesize a single, cohesive, high-density description for the module "${targetMode}" by fusing the DNA of the provided visual and text inputs.
+    const hasUserInstructions = feedback?.trim().length > 0;
 
-USER INSTRUCTIONS (THE CATALYST): "${feedback || "Blend the inputs perfectly to create a unified concept."}"
+    const systemInstruction = `ACT AS: Expert AI Visual Prompt Engineer.
+TASK: Analyze ALL provided reference images thoroughly and synthesize a single, cohesive, high-density description for the "${targetMode}" module.
+
+${
+    hasUserInstructions
+        ? `USER INSTRUCTIONS (SELECTIVE FUSION): "${feedback}"
+The user has specified what elements to take from each reference image. Follow their instructions precisely when selecting which visual features from each image to include in the final output.`
+        : `BLEND ALL IMAGES: Extract the most prominent visual features from EVERY provided image and merge them into one unified description. The result should be a coherent blend of all inputs — not a list or comparison.`
+}
 
 STRICT OUTPUT RULES:
 1. Return ONLY the raw prompt text.

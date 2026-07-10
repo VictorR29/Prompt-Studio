@@ -304,7 +304,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
                     <div className="bg-gray-900/50 p-4 rounded-xl border border-white/5">
                         <label className="block text-sm font-bold text-gray-300 mb-3 uppercase tracking-wide">1. Objetivo de Fusión</label>
                         <div className="grid grid-cols-3 gap-2">
-                            {EXTRACTION_MODES.filter(m => m.id !== 'negative').map(mode => (
+                            {EXTRACTION_MODES.map(mode => (
                                 <button
                                     key={mode.id}
                                     onClick={() => setTargetModule(mode.id)}

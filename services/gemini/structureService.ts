@@ -1,7 +1,6 @@
 
 import { Type } from "@google/genai";
 import { defaultModelConfig, getAiClient, trackApiRequest } from "./config";
-import { ExtractionMode } from "../../types";
 import { JSON_OPTIMIZATION_SYSTEM_PROMPT } from "./prompts/definitions";
 
 /**
@@ -32,7 +31,7 @@ const cleanEmptyKeys = (obj: any): any => {
     return obj;
 };
 
-export const assembleOptimizedJson = async (modules: Partial<Record<ExtractionMode, string>>): Promise<string> => {
+export const assembleOptimizedJson = async (modules: Record<string, string>): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
     
@@ -88,7 +87,7 @@ export const createJsonTemplate = async (json: string): Promise<string> => {
     }
 };
 
-export const mergeModulesIntoJsonTemplate = async (fragments: Partial<Record<ExtractionMode, string>>, template: string): Promise<string> => {
+export const mergeModulesIntoJsonTemplate = async (fragments: Record<string, string>, template: string): Promise<string> => {
     trackApiRequest();
     const ai = getAiClient();
     const response = await ai.models.generateContent({
@@ -147,7 +146,7 @@ export const generateAndModularizePrompt = async (input: { idea: string, style: 
         model: 'gemini-3-flash-preview',
         contents: { role: "user", parts },
         config: {
-            systemInstruction: "You are an AI prompt engineer. Generate a detailed image generation prompt based on the user's idea and style, then break it into modular components: subject, style, scene, color, composition, lighting, pose, expression, outfit, and objects. Return a JSON object with each component as a key.",
+            systemInstruction: "You are an AI prompt engineer. Generate a detailed image generation prompt based on the user's idea and style, then break it into modular components: subject, style, scene, color, composition (framing, angle, lighting, depth of field), pose, expression, outfit, and objects. Return a JSON object with each component as a key.",
             ...defaultModelConfig('extraction'),
             responseMimeType: "application/json",
             responseSchema: {

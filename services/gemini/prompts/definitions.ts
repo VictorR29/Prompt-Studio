@@ -11,6 +11,7 @@ export const IMAGE_ANALYSIS_PROMPT = (mode: string) => {
             specificInstructions = `CRITICAL FOR 'subject' MODE:
             - DETAILED VISUALS: Describe physical traits (age, race, skin texture, body build), hair (style, color), and distinctive features (scars, tattoos, makeup).
             - ESSENTIAL CONTEXT: Include immediate context if it defines the subject (e.g., 'holding a glowing staff', 'sitting on a throne').
+            - MULTIPLE IMAGES: If multiple images are provided, describe EACH subject individually in the prompt (e.g., 'a young boy with brown hair and a young girl with pigtails'). Do NOT fuse them into a single entity.
             - GOAL: Provide enough detail to replicate the exact character identity.
             - IGNORE: Art style, camera settings, or background scenery.`;
             break;
@@ -18,6 +19,7 @@ export const IMAGE_ANALYSIS_PROMPT = (mode: string) => {
             specificInstructions = `CRITICAL FOR 'style' MODE:
             - VISUAL DNA: Extract the medium (oil painting, 3D render, polaroid), rendering engine (Unreal 5, Octane), texture quality (film grain, brushwork), and artistic school.
             - LIGHTING & ATMOSPHERE: Describe the specific lighting mood (volumetric, noir, studio softbox) and color grading style.
+            - MULTIPLE IMAGES: If multiple images are provided, synthesize the common visual thread across ALL images into a single style description. Do NOT describe each image separately.
             - IGNORE: The actual subject matter or scene content.`;
             break;
         case 'pose':
@@ -60,10 +62,6 @@ export const IMAGE_ANALYSIS_PROMPT = (mode: string) => {
             - VALUES: Describe saturation levels and contrast (high-key, low-key, faded).
             - IGNORE: Shapes or specific objects.`;
             break;
-        case 'negative':
-             specificInstructions = `CRITICAL FOR 'negative' MODE:
-             - FLAWS: Identify visual defects to avoid (blur, artifacts, bad anatomy, watermark, text, chromatic aberration).`;
-             break;
         default:
             specificInstructions = `Focus EXCLUSIVELY on the '${mode}' aspect. Describe it with high fidelity to replicate the image.`;
     }

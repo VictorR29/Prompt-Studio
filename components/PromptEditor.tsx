@@ -136,10 +136,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                  addToast("No se detectaron módulos claros. Se cargó como texto base.", 'warning');
             } else {
                  setFragments(prev => ({ ...initialFragments, ...modularized }));
-                 if (modularized?.negative) {
-                    setNegativePrompt(modularized.negative);
-                    setShowNegativeSection(true);
-                }
+                  const negativeFromMod = (modularized as Record<string, string>)?.['negative'];
+                  if (negativeFromMod) {
+                     setNegativePrompt(negativeFromMod);
+                     setShowNegativeSection(true);
+                 }
             }
             setViewMode('editor');
         } catch (err) {
@@ -196,8 +197,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
                     } else {
                         // Cast safely
                         setFragments(modularized as Record<ExtractionMode, string>);
-                        if (modularized?.negative) {
-                            setNegativePrompt(modularized.negative);
+                        const negativeFromMod2 = (modularized as Record<string, string>)?.['negative'];
+                        if (negativeFromMod2) {
+                            setNegativePrompt(negativeFromMod2);
                             setShowNegativeSection(true);
                         }
                     }
@@ -532,7 +534,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         setGlobalLoader({ active: true, message: 'Ensamblando prompt de texto...' });
         
         const fragmentsToAssemble = { ...fragments };
-        if (negativePrompt) fragmentsToAssemble.negative = negativePrompt;
+        if (negativePrompt) (fragmentsToAssemble as Record<string, string>)['negative'] = negativePrompt;
 
         try {
             const result = String(await assembleMasterPrompt(fragmentsToAssemble));
@@ -605,13 +607,13 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
             if (typeof value === 'string' && value.trim() !== '') {
-                acc[key as ExtractionMode] = value;
+                acc[key] = value;
             }
             return acc;
-        }, {} as Partial<Record<ExtractionMode, string>>);
+        }, {} as Record<string, string>);
         
         if (negativePrompt.trim()) {
-            activeFragments.negative = negativePrompt;
+            activeFragments['negative'] = negativePrompt;
         }
 
         try {
@@ -647,13 +649,13 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         
         const activeFragments = Object.entries(fragments).reduce((acc, [key, value]) => {
             if (typeof value === 'string' && value.trim() !== '') {
-                acc[key as ExtractionMode] = value;
+                acc[key] = value;
             }
             return acc;
-        }, {} as Partial<Record<ExtractionMode, string>>);
+        }, {} as Record<string, string>);
         
         if (negativePrompt.trim()) {
-            activeFragments.negative = negativePrompt;
+            activeFragments['negative'] = negativePrompt;
         }
 
         try {

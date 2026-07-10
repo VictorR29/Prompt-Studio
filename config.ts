@@ -18,7 +18,6 @@ export const EXTRACTION_MODES: ModeConfig[] = [
   { id: 'object', label: 'Objeto', description: 'Objeto o elemento aislado', badgeClassName: 'bg-indigo-500/20 text-indigo-300 ring-indigo-500/30 hover:bg-indigo-500/30' },
   { id: 'composition', label: 'Composición', description: 'Encuadre, ángulo y foco', badgeClassName: 'bg-cyan-500/20 text-cyan-300 ring-cyan-500/30 hover:bg-cyan-500/30' },
   { id: 'color', label: 'Color', description: 'Esquema, tonos y contraste', badgeClassName: 'bg-orange-500/20 text-orange-300 ring-orange-500/30 hover:bg-orange-500/30' },
-  { id: 'negative', label: 'Negativo', description: 'Elementos a evitar', badgeClassName: 'bg-red-900/20 text-red-400 ring-red-500/30 hover:bg-red-500/30' },
 ];
 
 

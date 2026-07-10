@@ -1,5 +1,5 @@
 
-export type ExtractionMode = 'style' | 'subject' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'object' | 'negative';
+export type ExtractionMode = 'style' | 'subject' | 'pose' | 'expression' | 'scene' | 'outfit' | 'composition' | 'color' | 'object';
 
 export interface SavedPrompt {
   id: string;

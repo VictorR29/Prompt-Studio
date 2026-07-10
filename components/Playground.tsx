@@ -57,7 +57,7 @@ const initialFragments: Partial<Record<ExtractionMode, string>> = {
 };
 
 // Fallback map to handle common AI hallucinations (Spanish keys or capitalization)
-const MODULE_FALLBACK_MAP: Record<string, ExtractionMode> = {
+const MODULE_FALLBACK_MAP: Record<string, string> = {
     'estilo': 'style',
     'sujeto': 'subject',
     'personaje': 'subject',
@@ -185,13 +185,19 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                     // Normalize the module key (lowercase, strip whitespace)
                     let moduleKey = op.module.toLowerCase().trim();
                     
+                    // Handle negative prompt separately (not an extraction mode)
+                    if (moduleKey === 'negative' || moduleKey === 'negative_prompt' || moduleKey === 'negativo') {
+                        newFragments['negative' as keyof typeof newFragments] = op.value;
+                        return;
+                    }
+                    
                     // Check fallback map if the exact key isn't a valid mode
                     if (!EXTRACTION_MODE_MAP[moduleKey as ExtractionMode] && MODULE_FALLBACK_MAP[moduleKey]) {
                         moduleKey = MODULE_FALLBACK_MAP[moduleKey];
                     }
 
-                    // Only apply if it's a valid mode now
-                    if (EXTRACTION_MODE_MAP[moduleKey as ExtractionMode] || moduleKey === 'negative') {
+                    // Only apply if it's a valid extraction mode
+                    if (EXTRACTION_MODE_MAP[moduleKey as ExtractionMode]) {
                         newFragments[moduleKey as ExtractionMode] = op.value;
                         nextUpdatedModules.add(moduleKey as ExtractionMode);
                     }
