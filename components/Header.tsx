@@ -25,11 +25,11 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
   const inactiveClasses = "text-gray-300 hover:bg-white/10";
 
   const navButtons = [
-    { view: 'editor', label: 'Editor', icon: <PencilIcon className="w-5 h-5" />, tourId: 'nav-editor' },
-    { view: 'playground', label: 'Refinador IA', icon: <SparklesIcon className="w-5 h-5" />, tourId: 'nav-playground' },
-    { view: 'fusion', label: 'Fusión', icon: <BeakerIcon className="w-5 h-5" />, tourId: 'nav-fusion' },
-    { view: 'extractor', label: 'Extractor', icon: <ExtractorIcon />, tourId: 'nav-extractor' },
-    { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" />, tourId: 'nav-gallery' },
+    { view: 'editor', label: 'Editor', icon: <PencilIcon className="w-5 h-5" />, tourId: 'nav-editor', ariaLabel: 'Editor de prompts' },
+    { view: 'playground', label: 'Refinador IA', icon: <SparklesIcon className="w-5 h-5" />, tourId: 'nav-playground', ariaLabel: 'Refinador con inteligencia artificial' },
+    { view: 'fusion', label: 'Fusión', icon: <BeakerIcon className="w-5 h-5" />, tourId: 'nav-fusion', ariaLabel: 'Laboratorio de fusión de prompts' },
+    { view: 'extractor', label: 'Extractor', icon: <ExtractorIcon />, tourId: 'nav-extractor', ariaLabel: 'Extractor de estilos desde imágenes' },
+    { view: 'gallery', label: 'Galería', icon: <GalleryIcon className="w-5 h-5" />, tourId: 'nav-gallery', ariaLabel: 'Galería de prompts guardados' },
   ];
   
 
@@ -48,6 +48,8 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
                     onClick={() => setView(button.view as View)}
                     className={`${navButtonClasses} ${view === button.view ? activeClasses : inactiveClasses}`}
                     data-tour-id={button.tourId}
+                    aria-label={button.ariaLabel}
+                    aria-current={view === button.view ? 'page' : undefined}
                 >
                     {button.icon}
                     <span>{button.label}</span>
@@ -78,9 +80,10 @@ export const Header: React.FC<HeaderProps> = ({ view, setView, onOpenSettings })
                 className={`flex items-center justify-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 ${
                   isActive 
                   ? 'bg-teal-600 text-white shadow-lg px-3 py-2 space-x-1' 
-                  : 'text-gray-400 hover:text-teal-300 w-10 h-10'
+                  : 'text-gray-400 hover:text-teal-300 min-w-[44px] min-h-[44px] flex items-center justify-center'
                 }`}
-                aria-current={isActive}
+                aria-label={button.ariaLabel}
+                aria-current={isActive ? 'page' : undefined}
                 data-tour-id={`${button.tourId}-mobile`}
               >
                 {React.cloneElement(button.icon, { className: `w-5 h-5 flex-shrink-0` })}

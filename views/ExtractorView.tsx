@@ -137,7 +137,7 @@ const ExtractorView: React.FC<ExtractorViewProps> = ({ addToast, setGlobalLoader
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-slide-in-up">
-      <div className="flex flex-col space-y-6 glass-pane p-6 rounded-2xl">
+      <div className="flex flex-col space-y-6 panel panel-accent-teal p-6 rounded-2xl">
         <ExtractorModeSelector mode={extractionMode} setMode={setExtractionMode} />
         <div key={extractionMode} className="flex flex-col space-y-6 animate-fade-slide-in-up">
           <ImageUploader
@@ -155,7 +155,7 @@ const ExtractorView: React.FC<ExtractorViewProps> = ({ addToast, setGlobalLoader
           </button>
         </div>
       </div>
-      <div className="glass-pane rounded-2xl p-6 shadow-2xl">
+      <div className="panel panel-accent-teal rounded-2xl p-6 shadow-2xl">
         <PromptDisplay
           prompt={prompt}
           isLoading={isLoading}

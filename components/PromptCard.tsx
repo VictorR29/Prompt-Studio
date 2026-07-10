@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SavedPrompt } from '../types';
 import { PROMPT_TYPE_CONFIG } from '../config';
 import { CheckIcon } from './icons/CheckIcon';
@@ -53,6 +53,8 @@ export const PromptCard: React.FC<PromptCardProps> = ({
   
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress = useRef(false);
+  const firstMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
 
   const isHybrid = promptData.isHybrid || promptData.type === 'hybrid';
   const isImported = promptData.category === 'Imported' || (promptData.creator && promptData.creator !== 'Anon');
@@ -88,6 +90,42 @@ export const PromptCard: React.FC<PromptCardProps> = ({
           timerRef.current = null;
       }
   }, []);
+
+  // Focus first menu button when menu opens
+  useEffect(() => {
+      if (isContextMenuOpen && firstMenuButtonRef.current) {
+          firstMenuButtonRef.current.focus();
+      }
+  }, [isContextMenuOpen]);
+
+  // Keyboard handler for the entire card
+  const handleCardKeyDown = useCallback((e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !isContextMenuOpen) {
+          e.preventDefault();
+          if (onSetActiveContextMenu) onSetActiveContextMenu(promptData.id);
+      } else if (e.key === 'Escape' && isContextMenuOpen) {
+          e.preventDefault();
+          closeMenu();
+      } else if (isContextMenuOpen && (e.key === 'ArrowDown' || e.key === 'ArrowRight')) {
+          e.preventDefault();
+          const buttons = menuContainerRef.current?.querySelectorAll('button');
+          if (buttons && buttons.length > 0) {
+              const current = document.activeElement;
+              const idx = Array.from(buttons).indexOf(current as HTMLButtonElement);
+              const next = idx < buttons.length - 1 ? idx + 1 : 0;
+              buttons[next].focus();
+          }
+      } else if (isContextMenuOpen && (e.key === 'ArrowUp' || e.key === 'ArrowLeft')) {
+          e.preventDefault();
+          const buttons = menuContainerRef.current?.querySelectorAll('button');
+          if (buttons && buttons.length > 0) {
+              const current = document.activeElement;
+              const idx = Array.from(buttons).indexOf(current as HTMLButtonElement);
+              const prev = idx > 0 ? idx - 1 : buttons.length - 1;
+              buttons[prev].focus();
+          }
+      }
+  }, [isContextMenuOpen, onSetActiveContextMenu, promptData.id]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
       // CRITICAL: Prevent default browser context menu (save image, open in new tab)
@@ -165,9 +203,13 @@ export const PromptCard: React.FC<PromptCardProps> = ({
   return (
     <div
       className="group cursor-pointer mb-3 md:mb-6 break-inside-avoid relative select-none touch-manipulation"
+      tabIndex={0}
+      role="button"
+      aria-label={`${promptData.title}. Presioná Enter para ver opciones.`}
       onClick={(e) => {
           if (!isLongPress.current) onClick();
       }}
+      onKeyDown={handleCardKeyDown}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
@@ -236,18 +278,35 @@ export const PromptCard: React.FC<PromptCardProps> = ({
 
         {/* Pinterest-Style Context Menu Overlay */}
         {isContextMenuOpen && (
-            <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-[2px] animate-fade-in flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <div 
+                className="absolute inset-0 z-50 bg-black/80 backdrop-blur-[2px] animate-fade-in flex items-center justify-center" 
+                onClick={(e) => e.stopPropagation()}
+                role="menu"
+                aria-label="Opciones de la tarjeta"
+                ref={menuContainerRef}
+                onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        closeMenu();
+                    }
+                }}
+            >
                 {/* Close area (click outside buttons) */}
-                <div className="absolute inset-0" onClick={(e) => closeMenu(e)}></div>
+                <div className="absolute inset-0" onClick={(e) => closeMenu(e)} tabIndex={-1}></div>
                 
                 {/* Radial Buttons Container */}
                 <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
                      {/* Edit - Top Left (Position Wrapper) */}
                      <div className="absolute -translate-x-16 -translate-y-12">
                          <button 
+                            ref={firstMenuButtonRef}
                             onClick={handleQuickEdit}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeMenu(); } }}
                             className="w-14 h-14 bg-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
                             style={{ animationDelay: '0ms' }}
+                            role="menuitem"
+                            aria-label="Editar prompt"
+                            tabIndex={0}
                          >
                             <PencilIcon className="w-6 h-6 text-white" />
                          </button>
@@ -257,8 +316,12 @@ export const PromptCard: React.FC<PromptCardProps> = ({
                      <div className="absolute translate-x-16 -translate-y-12">
                          <button 
                             onClick={handleQuickShare}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeMenu(); } }}
                             className="w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
                             style={{ animationDelay: '50ms' }}
+                            role="menuitem"
+                            aria-label={isCopied ? "Copiado" : "Compartir prompt"}
+                            tabIndex={0}
                          >
                             {isCopied ? <CheckIcon className="w-6 h-6 text-green-300" /> : <ShareIcon className="w-6 h-6 text-white" />}
                          </button>
@@ -268,8 +331,12 @@ export const PromptCard: React.FC<PromptCardProps> = ({
                      <div className="absolute translate-y-16">
                          <button 
                             onClick={handleQuickDelete}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeMenu(); } }}
                             className="w-14 h-14 bg-red-600 rounded-full flex items-center justify-center shadow-lg shadow-red-900/50 pointer-events-auto hover:scale-110 active:scale-95 animate-scale-up"
                             style={{ animationDelay: '100ms' }}
+                            role="menuitem"
+                            aria-label="Eliminar prompt"
+                            tabIndex={0}
                          >
                             <TrashIcon className="w-6 h-6 text-white" />
                          </button>
@@ -277,19 +344,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({
                 </div>
             </div>
         )}
-      </div>
-      <style>{`
-        @keyframes scale-up {
-            from { transform: scale(0); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-            animation: scale-up 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-        .animate-fade-in {
-            animation: fade-in 0.2s ease-out forwards;
-        }
-      `}</style>
+    </div>
     </div>
   );
 };

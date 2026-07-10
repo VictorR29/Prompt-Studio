@@ -30,6 +30,24 @@ body {
   border: 1px solid var(--glass-border);
 }
 
+/* Solid panel — for main view content (less blur, more hierarchy) */
+.panel {
+  background-color: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.panel:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* View accent colors — subtle top border glow */
+.panel-accent-teal { border-top: 2px solid rgba(20, 184, 166, 0.4); }
+.panel-accent-violet { border-top: 2px solid rgba(139, 92, 246, 0.4); }
+.panel-accent-emerald { border-top: 2px solid rgba(16, 185, 129, 0.4); }
+.panel-accent-amber { border-top: 2px solid rgba(245, 158, 11, 0.4); }
+.panel-accent-cyan { border-top: 2px solid rgba(6, 182, 212, 0.4); }
+
 /* Scrollbar styles for webkit browsers */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;

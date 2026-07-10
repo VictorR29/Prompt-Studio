@@ -765,7 +765,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
 
     if (viewMode === 'selection') {
         return (
-            <div className="glass-pane p-6 md:p-8 rounded-2xl max-w-5xl mx-auto animate-fade-slide-in-up">
+            <div className="panel panel-accent-violet p-6 md:p-8 rounded-2xl max-w-5xl mx-auto animate-fade-slide-in-up">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500">
                         Editor Hub
@@ -975,7 +975,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
             {/* Right Panel (Output) */}
             <div className="mt-6 lg:mt-0 lg:col-span-5" id="editor-output-section">
                 <div className="lg:sticky lg:top-[90px]">
-                    <div className="glass-pane p-6 rounded-2xl space-y-4" data-tour-id="editor-output-section">
+                    <div className="panel p-6 rounded-2xl space-y-4" data-tour-id="editor-output-section">
                         <h2 className="text-xl font-bold text-white">Salida y Ensamblaje</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button

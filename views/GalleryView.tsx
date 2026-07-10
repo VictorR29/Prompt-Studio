@@ -12,7 +12,7 @@ interface GalleryViewProps {
 }
 
 const GalleryView: React.FC<GalleryViewProps> = ({ prompts, onSelect, onDelete, onEdit, onShare }) => (
-  <div className="animate-fade-slide-in-up">
+  <div className="animate-fade-slide-in-up panel panel-accent-emerald p-6 rounded-2xl">
     <Gallery prompts={prompts} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} onShare={onShare} />
   </div>
 );

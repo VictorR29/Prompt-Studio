@@ -289,7 +289,7 @@ export const FusionLab: React.FC<FusionLabProps> = ({ onSavePrompt, addToast, se
     };
 
     return (
-        <div className="glass-pane p-6 md:p-8 rounded-2xl max-w-5xl mx-auto animate-fade-slide-in-up min-h-[calc(100vh-140px)] flex flex-col">
+        <div className="panel panel-accent-amber p-6 md:p-8 rounded-2xl max-w-5xl mx-auto animate-fade-slide-in-up min-h-[calc(100vh-140px)] flex flex-col">
             <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 flex items-center justify-center gap-3">
                     <span className="text-4xl">🧪</span> Laboratorio de Fusión

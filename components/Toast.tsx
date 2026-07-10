@@ -88,21 +88,6 @@ export const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
           <CloseIcon className="w-4 h-4" />
         </button>
       </div>
-       <style>{`
-        @keyframes slide-in-right {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in-right {
-          animation: slide-in-right 0.3s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
-        }
-      `}</style>
     </>
   );
 };

@@ -289,7 +289,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
 
     if (viewState === 'setup') {
         return (
-            <div className="glass-pane p-6 md:p-8 rounded-2xl max-w-4xl mx-auto animate-fade-slide-in-up">
+            <div className="panel panel-accent-cyan p-6 md:p-8 rounded-2xl max-w-4xl mx-auto animate-fade-slide-in-up">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">
                         Refinador IA
@@ -397,7 +397,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
 
             <div className="flex-grow flex flex-col lg:flex-row gap-6 overflow-hidden relative">
                 {/* Left Panel: Fragments (Read Only / Context) - Hidden on Mobile */}
-                <div className="hidden lg:flex w-full lg:w-1/3 flex-col glass-pane rounded-2xl overflow-hidden shadow-2xl border border-white/5">
+                <div className="hidden lg:flex w-full lg:w-1/3 flex-col panel rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                     <div className="p-4 border-b border-white/10 bg-gray-900/50 flex justify-between items-center flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <h2 className="font-bold text-gray-200">Estado del Prompt</h2>
@@ -429,7 +429,7 @@ export const Playground: React.FC<PlaygroundProps> = ({ initialPrompt, savedProm
                 </div>
 
                 {/* Right Panel: Chat - Full width on mobile */}
-                <div className="flex w-full lg:w-2/3 flex-col glass-pane rounded-2xl overflow-hidden shadow-2xl border border-white/5">
+                <div className="flex w-full lg:w-2/3 flex-col panel rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                     <div className="flex-grow overflow-y-auto p-6 space-y-6 custom-scrollbar">
                         {messages.map((msg, index) => (
                             <div key={index} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''} animate-fade-slide-in-up`}>

@@ -213,19 +213,38 @@ export const Gallery: React.FC<GalleryProps> = ({ prompts = [], onSelect, select
       </div>
 
       {prompts.length === 0 && (
-        <div className="text-center text-gray-500 py-20 flex flex-col items-center">
-            <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 opacity-50">
-                <SearchIcon className="w-8 h-8" />
+        <div className="text-center py-24 px-6">
+            <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-teal-500/20 to-cyan-500/10 border border-teal-500/20 flex items-center justify-center">
+                <svg className="w-12 h-12 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                </svg>
             </div>
-            <h2 className="text-xl font-bold mb-2 text-gray-400">Tu galería está vacía</h2>
-            <p className="text-sm">Guarda tus primeros prompts para verlos aquí.</p>
+            <h2 className="text-xl font-bold text-gray-200 mb-2">Tu galería está vacía</h2>
+            <p className="text-sm text-gray-400 mb-6 max-w-sm mx-auto">Empezá a crear prompts con el Editor o el Extractor y guardalos acá para tenerlos siempre a mano.</p>
+            <div className="flex gap-3 justify-center">
+                <button
+                    onClick={() => {}}
+                    className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-teal-500/20"
+                >
+                    Abrir Editor
+                </button>
+                <button
+                    onClick={() => {}}
+                    className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 text-sm font-semibold rounded-lg border border-white/10 transition-all duration-200"
+                >
+                    Ir al Extractor
+                </button>
+            </div>
         </div>
       )}
 
       {prompts.length > 0 && filteredPrompts.length === 0 && (
-        <div className="text-center text-gray-500 py-20">
-            <h2 className="text-xl font-bold mb-2 text-gray-400">Sin resultados</h2>
-            <p className="text-sm">Intenta ajustar tus filtros de búsqueda.</p>
+        <div className="text-center py-20">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800/50 flex items-center justify-center">
+                <SearchIcon className="w-7 h-7 text-gray-500" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-400 mb-1">Sin resultados</h2>
+            <p className="text-sm text-gray-500">Probá ajustando los filtros o el término de búsqueda.</p>
         </div>
       )}
 
