@@ -93,7 +93,7 @@ describe('API Tracking — service files call trackApiCall after generateContent
       mockGenerateContent.mockResolvedValue({ ...BASE_RESPONSE, text: 'master prompt' });
       await assembleMasterPrompt({ style: 'test' });
       expect(mockTrackApiCall).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gemini-2.5-flash' })
+        expect.objectContaining({ model: 'gemini-3-flash-preview' })
       );
     });
   });

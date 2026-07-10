@@ -47,7 +47,7 @@ export const assembleOptimizedJson = async (modules: Record<string, string>): Pr
 
     const _start = performance.now();
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: { role: "user", parts: [{ text: `INPUT DATA (FRAGMENTS): ${jsonModules}` }] },
         config: {
             systemInstruction: JSON_OPTIMIZATION_SYSTEM_PROMPT,
@@ -57,7 +57,7 @@ export const assembleOptimizedJson = async (modules: Record<string, string>): Pr
     });
     const _latency = Math.round(performance.now() - _start);
     trackApiCall({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
         responseTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
         latencyMs: _latency,
