@@ -91,16 +91,34 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
  * Handles drops from browser tabs (Pinterest, Google Images, etc.)
  */
 function getImageUrlFromDataTransfer(dt: DataTransfer): string | null {
-    // Try text/uri-list first (most reliable for browser image drags)
+    // Try text/uri-list first
     if (dt.types.includes('text/uri-list')) {
         const url = dt.getData('text/uri-list')?.trim();
-        if (url && (url.startsWith('http://') || url.startsWith('https://'))) return url;
+        if (url) {
+            // Google Images: extract imgurl parameter from search URL
+            const imgurlMatch = url.match(/[?&]imgurl=([^&]+)/);
+            if (imgurlMatch) {
+                return decodeURIComponent(imgurlMatch[1]);
+            }
+            // Direct image URL (Pinterest, etc.)
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                return url;
+            }
+        }
     }
     // Try text/html - parse for <img> src
     if (dt.types.includes('text/html')) {
         const html = dt.getData('text/html');
         const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-        if (match && match[1]) return match[1];
+        if (match && match[1]) {
+            const src = match[1];
+            // Google Images imgurl in the src
+            const imgurlMatch = src.match(/[?&]imgurl=([^&]+)/);
+            if (imgurlMatch) {
+                return decodeURIComponent(imgurlMatch[1]);
+            }
+            return src;
+        }
     }
     return null;
 }
