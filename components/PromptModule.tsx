@@ -8,6 +8,7 @@ import { SaveIcon } from './icons/SaveIcon';
 import { ImageIcon } from './icons/ImageIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { generateImageFromPrompt } from '../services/gemini';
+import { extractFilesFromDrop } from '../utils/imageUtils';
 
 console.warn('🔴 PromptModule.tsx — MODULE LOADED');
 
@@ -123,59 +124,28 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             }
         };
         
-        const onDrop = (e: DragEvent) => {
+        const onDrop = async (e: DragEvent) => {
             e.preventDefault();
             e.stopPropagation();
             setIsDragging(false);
             
             console.warn(`[PromptModule] 🎯 DROP EVENT FIRED for ${modeRef.current}!`);
-            console.warn(`[PromptModule] dataTransfer.files length:`, e.dataTransfer?.files?.length);
-            console.warn(`[PromptModule] dataTransfer.items length:`, e.dataTransfer?.items?.length);
             console.warn(`[PromptModule] drop target:`, (e.target as HTMLElement)?.className);
             
             const currentMode = modeRef.current;
             const currentImages = imagesRef.current;
             const max = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
             
-            console.log(`[PromptModule] handleDrop - mode: ${currentMode}, images.length: ${currentImages.length}, maxImages: ${max}`);
-            
-            let files = Array.from(e.dataTransfer?.files || []);
-            console.log(`[PromptModule] files from dataTransfer.files: ${files.length}`);
-            
-            if (files.length === 0 && e.dataTransfer?.items) {
-                console.log(`[PromptModule] trying dataTransfer.items fallback, items: ${e.dataTransfer.items.length}`);
-                const itemFiles: File[] = [];
-                for (let i = 0; i < e.dataTransfer.items.length; i++) {
-                    const item = e.dataTransfer.items[i];
-                    console.log(`[PromptModule] item[${i}]: kind="${item.kind}", type="${item.type}"`);
-                    if (item.kind === 'file') {
-                        const file = item.getAsFile();
-                        if (file) itemFiles.push(file);
-                    }
-                }
-                files = itemFiles;
-                console.log(`[PromptModule] items fallback got: ${files.length} files`);
-                
-                // If still no files, try getting string data from URI-list (dragging image from web page)
-                if (files.length === 0) {
-                    for (let i = 0; i < e.dataTransfer.items.length; i++) {
-                        const item = e.dataTransfer.items[i];
-                        if (item.kind === 'string') {
-                            item.getAsString((s) => {
-                                console.log(`[PromptModule] item[${i}] string data:`, s.substring(0, 200));
-                            });
-                        }
-                    }
-                }
-            }
+            const files = await extractFilesFromDrop(e.dataTransfer);
+            console.log(`[PromptModule] extractFilesFromDrop returned ${files.length} files`);
             
             if (files.length > 0 && currentImages.length < max) {
                 console.log(`[PromptModule] calling onImageUpload with ${files.length} files for ${currentMode}`);
                 onImageUploadRef.current(currentMode, files);
             } else if (files.length === 0) {
-                console.warn('[PromptModule] Drop event fired but no files found in dataTransfer');
+                console.warn('[PromptModule] No files could be extracted from the drop');
             } else if (currentImages.length >= max) {
-                console.warn(`[PromptModule] Cannot upload more, images.length=${currentImages.length} >= maxImages=${max}`);
+                console.warn(`[PromptModule] Cannot upload more, images.length=${currentImages.length} >= max=${max}`);
             }
         };
         

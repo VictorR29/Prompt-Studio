@@ -86,6 +86,88 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
     return canvas.toDataURL('image/jpeg', 0.6);
 };
 
+/**
+ * Attempt to extract image URL from dataTransfer string items.
+ * Handles drops from browser tabs (Pinterest, Google Images, etc.)
+ */
+function getImageUrlFromDataTransfer(dt: DataTransfer): string | null {
+    // Try text/uri-list first (most reliable for browser image drags)
+    if (dt.types.includes('text/uri-list')) {
+        const url = dt.getData('text/uri-list')?.trim();
+        if (url && (url.startsWith('http://') || url.startsWith('https://'))) return url;
+    }
+    // Try text/html - parse for <img> src
+    if (dt.types.includes('text/html')) {
+        const html = dt.getData('text/html');
+        const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (match && match[1]) return match[1];
+    }
+    return null;
+}
+
+/**
+ * Fetch an image URL and convert to a File object using canvas (handles CORS).
+ */
+function urlToFile(url: string, filename: string): Promise<File> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject(new Error('Canvas context unavailable'));
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(new File([blob], filename, { type: blob.type }));
+                } else {
+                    reject(new Error('Failed to convert image to blob'));
+                }
+            });
+        };
+        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+        img.src = url;
+    });
+}
+
+/**
+ * Extract File objects from a DataTransfer (DragEvent.dataTransfer).
+ * Handles both file system drops and browser tab drops (Pinterest, Google Images, etc.).
+ */
+export async function extractFilesFromDrop(dt: DataTransfer | null | undefined): Promise<File[]> {
+    if (!dt) return [];
+
+    // 1. Direct files from dataTransfer.files (file system drops)
+    if (dt.files?.length) {
+        return Array.from(dt.files);
+    }
+
+    // 2. Files from dataTransfer.items (kind === 'file')
+    if (dt.items) {
+        const itemFiles: File[] = [];
+        for (let i = 0; i < dt.items.length; i++) {
+            const item = dt.items[i];
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) itemFiles.push(file);
+            }
+        }
+        if (itemFiles.length > 0) return itemFiles;
+    }
+
+    // 3. Extract URL from text/uri-list or text/html (browser tab drops)
+    const url = getImageUrlFromDataTransfer(dt);
+    if (url) {
+        console.log('[extractFilesFromDrop] Found image URL:', url);
+        const file = await urlToFile(url, 'dropped-image.' + (url.match(/\.(\w+)(?:\?|$)/)?.[1] || 'png'));
+        return [file];
+    }
+
+    return [];
+}
+
 export const resizeImageFile = (file: File, maxWidth = 800): Promise<{ base64: string; mimeType: string; url: string }> => {
     return new Promise((resolve, reject) => {
         const img = new Image();

@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { CloseIcon } from './icons/CloseIcon';
+import { extractFilesFromDrop } from '../utils/imageUtils';
 
 interface ImageUploaderProps {
   onImagesUpload: (files: File[]) => void;
@@ -28,12 +29,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImagesUpload, on
     }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    if (e.dataTransfer.files) {
-      onImagesUpload(Array.from(e.dataTransfer.files));
+    const files = await extractFilesFromDrop(e.dataTransfer);
+    if (files.length > 0) {
+      onImagesUpload(files);
     }
   }, [onImagesUpload]);
 

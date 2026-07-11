@@ -4,7 +4,7 @@ import { ExtractionMode, SavedPrompt } from '../types';
 import { EXTRACTION_MODE_MAP, EXTRACTION_MODES } from '../config';
 import { generateHybridFragment, generateImageFromPrompt } from '../services/gemini';
 import { fileToBase64 } from '../utils/fileUtils';
-import { createImageCollage } from '../utils/imageUtils';
+import { createImageCollage, extractFilesFromDrop } from '../utils/imageUtils';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -49,12 +49,13 @@ const Slot: React.FC<{
         e.target.value = ''; // Reset
     };
 
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            onUpload(slot.id, e.dataTransfer.files[0]);
+        const files = await extractFilesFromDrop(e.dataTransfer);
+        if (files.length > 0) {
+            onUpload(slot.id, files[0]);
         }
     };
 
