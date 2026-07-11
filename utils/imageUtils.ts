@@ -121,15 +121,26 @@ function getImageUrlFromDataTransfer(dt: DataTransfer): string | null {
     return null;
 }
 
+/** Check if running on localhost (no Vercel API available). */
+function isLocalhost(): boolean {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 /**
  * Fetch an image URL and convert to a File object using canvas.
  * Tries direct load first (for CORS-enabled URLs), then falls back to CORS proxies.
  */
 function urlToFile(url: string, filename: string): Promise<File> {
-    const CORS_PROXIES = [
+    const CORS_PROXIES: string[] = [];
+    // Our own Vercel proxy — same origin, most reliable
+    if (!isLocalhost()) {
+        CORS_PROXIES.push('/api/proxy-image?url=');
+    }
+    // External fallback proxies
+    CORS_PROXIES.push(
         'https://corsproxy.io/?',
         'https://api.allorigins.win/raw?url=',
-    ];
+    );
     
     function attempt(targetUrl: string): Promise<File> {
         return new Promise((resolve, reject) => {
