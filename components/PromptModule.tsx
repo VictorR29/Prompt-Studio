@@ -62,7 +62,11 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     addToast,
     setGlobalLoader
 }) => {
+    console.log(`[PromptModule] RENDER ${mode}`);
     const [isDragging, setIsDragging] = useState(false);
+    const renderCount = React.useRef(0);
+    renderCount.current++;
+    console.log(`[PromptModule] RENDER #${renderCount.current} for ${mode}, isDragging: ${isDragging}`);
     const inputId = React.useRef(`file-upload-${mode}-${Math.random().toString(36).substring(7)}`);
     const cardRef = React.useRef<HTMLDivElement>(null);
     
@@ -84,7 +88,14 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     // Bypasses React's event system which drops listeners during re-render
     useEffect(() => {
         const el = cardRef.current;
+        console.log(`[PromptModule] useEffect ${mode} - cardRef:`, el ? 'EXISTS' : 'NULL');
         if (!el) return;
+        
+        // DIAGNOSTIC: catch drops at document level to see if event fires anywhere
+        const docOnDrop = (e: DragEvent) => {
+            console.log(`[PromptModule] DOCUMENT drop captured! target:`, e.target, 'currentTarget:', e.currentTarget);
+        };
+        document.addEventListener('drop', docOnDrop, true); // capture phase
         
         const onDragOver = (e: DragEvent) => {
             e.preventDefault();
@@ -100,10 +111,12 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
         
         const onDragLeave = (e: DragEvent) => {
             e.preventDefault();
+            console.warn(`[PromptModule] dragleave fired for ${modeRef.current}`);
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             const x = e.clientX;
             const y = e.clientY;
             if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+                console.warn(`[PromptModule] dragleave BOUNDARY CROSSED - hiding overlay`);
                 setIsDragging(false);
             }
         };
@@ -112,6 +125,11 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             e.preventDefault();
             e.stopPropagation();
             setIsDragging(false);
+            
+            console.warn(`[PromptModule] 🎯 DROP EVENT FIRED for ${modeRef.current}!`);
+            console.warn(`[PromptModule] dataTransfer.files length:`, e.dataTransfer?.files?.length);
+            console.warn(`[PromptModule] dataTransfer.items length:`, e.dataTransfer?.items?.length);
+            console.warn(`[PromptModule] drop target:`, (e.target as HTMLElement)?.className);
             
             const currentMode = modeRef.current;
             const currentImages = imagesRef.current;
@@ -146,16 +164,24 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             }
         };
         
+        const onDragEnd = () => {
+            console.warn(`[PromptModule] dragend fired for ${modeRef.current}`);
+            setIsDragging(false);
+        };
+        
         el.addEventListener('dragover', onDragOver);
         el.addEventListener('dragenter', onDragEnter);
         el.addEventListener('dragleave', onDragLeave);
         el.addEventListener('drop', onDrop);
+        el.addEventListener('dragend', onDragEnd);
         
         return () => {
             el.removeEventListener('dragover', onDragOver);
             el.removeEventListener('dragenter', onDragEnter);
             el.removeEventListener('dragleave', onDragLeave);
             el.removeEventListener('drop', onDrop);
+            el.removeEventListener('dragend', onDragEnd);
+            document.removeEventListener('drop', docOnDrop, true);
         };
     }, []); // Empty deps — attached once, refs handle latest values
     
