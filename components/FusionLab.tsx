@@ -72,7 +72,12 @@ const Slot: React.FC<{
     const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        setIsDragging(false);
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+        if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+            setIsDragging(false);
+        }
     };
 
     return (

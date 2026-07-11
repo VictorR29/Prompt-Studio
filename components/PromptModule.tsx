@@ -144,7 +144,13 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        setIsDragging(false);
+        // Only hide overlay when leaving the card, not child elements
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+        if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+            setIsDragging(false);
+        }
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -184,7 +190,14 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
     };
 
     return (
-        <div className="glass-pane p-4 rounded-xl flex flex-col space-y-3" data-tour-id={`editor-module-${mode}`}>
+        <div 
+            className="glass-pane p-4 rounded-xl flex flex-col space-y-3" 
+            data-tour-id={`editor-module-${mode}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+        >
             <h3 className={`font-semibold text-lg ${config.badgeClassName.replace('bg-', 'text-').replace('/20', '')}`}>{config.label}</h3>
             
             {images.length > 0 && (
@@ -205,13 +218,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 </div>
             )}
 
-            <div 
-                className="relative flex-grow"
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-            >
+            <div className="relative flex-grow">
                 <textarea
                     value={value}
                     onChange={(e) => onChange(mode, e.target.value)}
