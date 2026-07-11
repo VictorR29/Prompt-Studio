@@ -106,29 +106,40 @@ function getImageUrlFromDataTransfer(dt: DataTransfer): string | null {
 }
 
 /**
- * Fetch an image URL and convert to a File object using canvas (handles CORS).
+ * Fetch an image URL and convert to a File object using canvas.
+ * Tries direct load first (for CORS-enabled URLs), then falls back to a CORS proxy.
  */
 function urlToFile(url: string, filename: string): Promise<File> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return reject(new Error('Canvas context unavailable'));
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    resolve(new File([blob], filename, { type: blob.type }));
-                } else {
-                    reject(new Error('Failed to convert image to blob'));
-                }
-            });
-        };
-        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-        img.src = url;
+    const CORS_PROXY = 'https://corsproxy.io/?';
+    
+    function attempt(targetUrl: string): Promise<File> {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject(new Error('Canvas context unavailable'));
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(new File([blob], filename, { type: blob.type }));
+                    } else {
+                        reject(new Error('Failed to convert image to blob'));
+                    }
+                });
+            };
+            img.onerror = () => reject(new Error(`Failed to load image: ${targetUrl}`));
+            img.src = targetUrl;
+        });
+    }
+    
+    // Try direct first, fallback to CORS proxy
+    return attempt(url).catch(() => {
+        console.warn('[urlToFile] Direct load failed, retrying via CORS proxy');
+        return attempt(CORS_PROXY + encodeURIComponent(url));
     });
 }
 
