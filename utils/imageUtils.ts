@@ -91,33 +91,31 @@ export const createImageCollage = async (images: { base64: string; mimeType: str
  * Handles drops from browser tabs (Pinterest, Google Images, etc.)
  */
 function getImageUrlFromDataTransfer(dt: DataTransfer): string | null {
-    // Try text/uri-list first
-    if (dt.types.includes('text/uri-list')) {
-        const url = dt.getData('text/uri-list')?.trim();
-        if (url) {
-            // Google Images: extract imgurl parameter from search URL
-            const imgurlMatch = url.match(/[?&]imgurl=([^&]+)/);
-            if (imgurlMatch) {
-                return decodeURIComponent(imgurlMatch[1]);
-            }
-            // Direct image URL (Pinterest, etc.)
-            if (url.startsWith('http://') || url.startsWith('https://')) {
-                return url;
-            }
-        }
-    }
-    // Try text/html - parse for <img> src
+    // Priority 1: text/html — parse for <img> tag (most reliable for real image URL)
     if (dt.types.includes('text/html')) {
         const html = dt.getData('text/html');
         const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
         if (match && match[1]) {
             const src = match[1];
-            // Google Images imgurl in the src
+            // Google Images: extract imgurl parameter from nested search URL
             const imgurlMatch = src.match(/[?&]imgurl=([^&]+)/);
             if (imgurlMatch) {
                 return decodeURIComponent(imgurlMatch[1]);
             }
-            return src;
+            // If it starts with http, it's an image URL
+            if (src.startsWith('http://') || src.startsWith('https://')) {
+                return src;
+            }
+        }
+    }
+    // Priority 2: text/uri-list — Google Images search URL with imgurl parameter
+    if (dt.types.includes('text/uri-list')) {
+        const url = dt.getData('text/uri-list')?.trim();
+        if (url) {
+            const imgurlMatch = url.match(/[?&]imgurl=([^&]+)/);
+            if (imgurlMatch) {
+                return decodeURIComponent(imgurlMatch[1]);
+            }
         }
     }
     return null;
