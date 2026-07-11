@@ -123,10 +123,13 @@ function getImageUrlFromDataTransfer(dt: DataTransfer): string | null {
 
 /**
  * Fetch an image URL and convert to a File object using canvas.
- * Tries direct load first (for CORS-enabled URLs), then falls back to a CORS proxy.
+ * Tries direct load first (for CORS-enabled URLs), then falls back to CORS proxies.
  */
 function urlToFile(url: string, filename: string): Promise<File> {
-    const CORS_PROXY = 'https://corsproxy.io/?';
+    const CORS_PROXIES = [
+        'https://corsproxy.io/?',
+        'https://api.allorigins.win/raw?url=',
+    ];
     
     function attempt(targetUrl: string): Promise<File> {
         return new Promise((resolve, reject) => {
@@ -152,11 +155,23 @@ function urlToFile(url: string, filename: string): Promise<File> {
         });
     }
     
-    // Try direct first, fallback to CORS proxy
+    // Try direct first
     return attempt(url).catch(() => {
-        console.warn('[urlToFile] Direct load failed, retrying via CORS proxy');
-        return attempt(CORS_PROXY + encodeURIComponent(url));
+        console.warn('[urlToFile] Direct load failed, retrying via CORS proxies');
+        return tryProxies(0);
     });
+    
+    function tryProxies(index: number): Promise<File> {
+        if (index >= CORS_PROXIES.length) {
+            throw new Error('All CORS proxies failed for: ' + url);
+        }
+        const proxyUrl = CORS_PROXIES[index] + encodeURIComponent(url);
+        console.warn(`[urlToFile] Trying proxy ${index + 1}/${CORS_PROXIES.length}:`, proxyUrl.substring(0, 100));
+        return attempt(proxyUrl).catch(() => {
+            console.warn(`[urlToFile] Proxy ${index + 1} failed`);
+            return tryProxies(index + 1);
+        });
+    }
 }
 
 /**
