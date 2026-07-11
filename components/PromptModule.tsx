@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExtractionMode, SavedPrompt } from '../types';
 import { ModeConfig } from '../config';
 import { SparklesIcon } from './icons/SparklesIcon';
@@ -64,9 +64,101 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const inputId = React.useRef(`file-upload-${mode}-${Math.random().toString(36).substring(7)}`);
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    
+    // Refs to keep reactive values available in native event listeners without re-attaching
+    const modeRef = React.useRef(mode);
+    const imagesRef = React.useRef(images);
+    const onImageUploadRef = React.useRef(onImageUpload);
+    const addToastRef = React.useRef(addToast);
     const maxImages = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
     const canUploadMore = images.length < maxImages;
-
+    
+    // Sync refs on every render so native listeners always see latest values
+    modeRef.current = mode;
+    imagesRef.current = images;
+    onImageUploadRef.current = onImageUpload;
+    addToastRef.current = addToast;
+    
+    // Native drag/drop event listeners — attached once via useEffect([], [])
+    // Bypasses React's event system which drops listeners during re-render
+    useEffect(() => {
+        const el = cardRef.current;
+        if (!el) return;
+        
+        const onDragOver = (e: DragEvent) => {
+            e.preventDefault();
+        };
+        
+        const onDragEnter = (e: DragEvent) => {
+            e.preventDefault();
+            const max = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
+            if (imagesRef.current.length < max) {
+                setIsDragging(true);
+            }
+        };
+        
+        const onDragLeave = (e: DragEvent) => {
+            e.preventDefault();
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+            if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+                setIsDragging(false);
+            }
+        };
+        
+        const onDrop = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+            
+            const currentMode = modeRef.current;
+            const currentImages = imagesRef.current;
+            const max = config.id === 'style' ? 5 : config.id === 'subject' ? 3 : 1;
+            
+            console.log(`[PromptModule] handleDrop - mode: ${currentMode}, images.length: ${currentImages.length}, maxImages: ${max}`);
+            
+            let files = Array.from(e.dataTransfer?.files || []);
+            console.log(`[PromptModule] files from dataTransfer.files: ${files.length}`);
+            
+            if (files.length === 0 && e.dataTransfer?.items) {
+                console.log(`[PromptModule] trying dataTransfer.items fallback, items: ${e.dataTransfer.items.length}`);
+                const itemFiles: File[] = [];
+                for (let i = 0; i < e.dataTransfer.items.length; i++) {
+                    const item = e.dataTransfer.items[i];
+                    if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        if (file) itemFiles.push(file);
+                    }
+                }
+                files = itemFiles;
+                console.log(`[PromptModule] items fallback got: ${files.length} files`);
+            }
+            
+            if (files.length > 0 && currentImages.length < max) {
+                console.log(`[PromptModule] calling onImageUpload with ${files.length} files for ${currentMode}`);
+                onImageUploadRef.current(currentMode, files);
+            } else if (files.length === 0) {
+                console.warn('[PromptModule] Drop event fired but no files found in dataTransfer');
+            } else if (currentImages.length >= max) {
+                console.warn(`[PromptModule] Cannot upload more, images.length=${currentImages.length} >= maxImages=${max}`);
+            }
+        };
+        
+        el.addEventListener('dragover', onDragOver);
+        el.addEventListener('dragenter', onDragEnter);
+        el.addEventListener('dragleave', onDragLeave);
+        el.addEventListener('drop', onDrop);
+        
+        return () => {
+            el.removeEventListener('dragover', onDragOver);
+            el.removeEventListener('dragenter', onDragEnter);
+            el.removeEventListener('dragleave', onDragLeave);
+            el.removeEventListener('drop', onDrop);
+        };
+    }, []); // Empty deps — attached once, refs handle latest values
+    
     const handleImageUploadClick = () => {
         const inputElement = document.getElementById(inputId.current);
         if (inputElement) {
@@ -118,66 +210,6 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
             setGlobalLoader({ active: false, message: '' });
         }
     };
-    
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-        console.log(`[PromptModule] handleDrop - mode: ${mode}, images.length: ${images.length}, maxImages: ${maxImages}`);
-        
-        // Attempt to get files from dataTransfer.files (file system drops)
-        let files = Array.from(e.dataTransfer.files || []);
-        console.log(`[PromptModule] files from dataTransfer.files: ${files.length}`);
-        
-        // Fallback: extract files from dataTransfer.items (some browsers/contexts)
-        if (files.length === 0 && e.dataTransfer.items) {
-            console.log(`[PromptModule] trying dataTransfer.items fallback, items: ${e.dataTransfer.items.length}`);
-            const itemFiles: File[] = [];
-            for (let i = 0; i < e.dataTransfer.items.length; i++) {
-                const item = e.dataTransfer.items[i];
-                if (item.kind === 'file') {
-                    const file = item.getAsFile();
-                    if (file) itemFiles.push(file);
-                }
-            }
-            files = itemFiles;
-            console.log(`[PromptModule] items fallback got: ${files.length} files`);
-        }
-        
-        if (files.length > 0 && canUploadMore) {
-            console.log(`[PromptModule] calling onImageUpload with ${files.length} files for ${mode}`);
-            onImageUpload(mode, files);
-        } else if (files.length === 0) {
-            console.warn('[PromptModule] Drop event fired but no files found in dataTransfer');
-        } else if (!canUploadMore) {
-            console.warn(`[PromptModule] Cannot upload more, images.length=${images.length} >= maxImages=${maxImages}`);
-        }
-    };
-
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (canUploadMore) {
-            setIsDragging(true);
-        }
-    };
-    
-    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        // Only hide overlay when leaving the card, not child elements
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX;
-        const y = e.clientY;
-        if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
-            setIsDragging(false);
-        }
-    };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
         const items = e.clipboardData.items;
@@ -217,12 +249,9 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
 
     return (
         <div 
+            ref={cardRef}
             className="glass-pane p-4 rounded-xl flex flex-col space-y-3" 
             data-tour-id={`editor-module-${mode}`}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
         >
             <h3 className={`font-semibold text-lg ${config.badgeClassName.replace('bg-', 'text-').replace('/20', '')}`}>{config.label}</h3>
             
@@ -246,14 +275,6 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
 
             <div 
                 className={`relative flex-grow rounded-lg transition-all ${isDragging ? 'ring-2 ring-teal-400 bg-teal-500/10' : ''}`}
-                onDragOver={(e) => {
-                    e.preventDefault();
-                }}
-                onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleDrop(e);
-                }}
             >
                 <textarea
                     value={value}
