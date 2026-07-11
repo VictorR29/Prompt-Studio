@@ -9,6 +9,8 @@ import { ImageIcon } from './icons/ImageIcon';
 import { CloseIcon } from './icons/CloseIcon';
 import { generateImageFromPrompt } from '../services/gemini';
 
+console.warn('🔴 PromptModule.tsx — MODULE LOADED');
+
 type ImageState = { url: string; base64: string; mimeType: string; };
 
 interface PromptModuleProps {
