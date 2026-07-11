@@ -123,8 +123,34 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
-        if (e.dataTransfer.files && canUploadMore) {
-            onImageUpload(mode, Array.from(e.dataTransfer.files));
+        console.log(`[PromptModule] handleDrop - mode: ${mode}, images.length: ${images.length}, maxImages: ${maxImages}`);
+        
+        // Attempt to get files from dataTransfer.files (file system drops)
+        let files = Array.from(e.dataTransfer.files || []);
+        console.log(`[PromptModule] files from dataTransfer.files: ${files.length}`);
+        
+        // Fallback: extract files from dataTransfer.items (some browsers/contexts)
+        if (files.length === 0 && e.dataTransfer.items) {
+            console.log(`[PromptModule] trying dataTransfer.items fallback, items: ${e.dataTransfer.items.length}`);
+            const itemFiles: File[] = [];
+            for (let i = 0; i < e.dataTransfer.items.length; i++) {
+                const item = e.dataTransfer.items[i];
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    if (file) itemFiles.push(file);
+                }
+            }
+            files = itemFiles;
+            console.log(`[PromptModule] items fallback got: ${files.length} files`);
+        }
+        
+        if (files.length > 0 && canUploadMore) {
+            console.log(`[PromptModule] calling onImageUpload with ${files.length} files for ${mode}`);
+            onImageUpload(mode, files);
+        } else if (files.length === 0) {
+            console.warn('[PromptModule] Drop event fired but no files found in dataTransfer');
+        } else if (!canUploadMore) {
+            console.warn(`[PromptModule] Cannot upload more, images.length=${images.length} >= maxImages=${maxImages}`);
         }
     };
 
@@ -218,16 +244,26 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 </div>
             )}
 
-            <div className="relative flex-grow">
+            <div 
+                className={`relative flex-grow rounded-lg transition-all ${isDragging ? 'ring-2 ring-teal-400 bg-teal-500/10' : ''}`}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDrop(e);
+                }}
+            >
                 <textarea
                     value={value}
                     onChange={(e) => onChange(mode, e.target.value)}
                     onPaste={handlePaste}
                     placeholder={config.description}
-                    className="w-full h-full min-h-[100px] bg-gray-900/70 rounded-lg p-3 text-gray-300 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner resize-none custom-scrollbar"
+                    className={`w-full h-full min-h-[100px] bg-gray-900/70 rounded-lg p-3 text-gray-300 ring-1 ring-white/10 focus:ring-2 focus:ring-teal-500 focus:outline-none text-sm transition-all shadow-inner resize-none custom-scrollbar ${isDragging ? 'opacity-40' : ''}`}
                 />
-                 {isDragging && (
-                    <div className="absolute inset-0 bg-teal-500/20 border-2 border-dashed border-teal-400 rounded-lg flex flex-col items-center justify-center pointer-events-none transition-opacity">
+                {isDragging && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                         <ImageIcon className="w-8 h-8 text-teal-300 mb-2" />
                         <p className="text-sm font-semibold text-teal-300">Suelta para analizar</p>
                     </div>

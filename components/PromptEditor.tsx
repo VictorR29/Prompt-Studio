@@ -439,17 +439,23 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ initialPrompt, onSav
         try {
             const newImagesData = await Promise.all(
                 Array.from(files).map(async file => {
+                    console.log(`[handleImageUpload] Processing file: ${file.name}, type: ${file.type}, size: ${file.size}`);
                     const resized = await resizeImageFile(file);
-                    return { ...resized, url: URL.createObjectURL(file) };
+                    const url = URL.createObjectURL(file);
+                    console.log(`[handleImageUpload] Resized OK, url: ${url}`);
+                    return { ...resized, url };
                 })
             );
             
             const allImages = [...currentImages, ...newImagesData];
+            console.log(`[handleImageUpload] Setting images for ${mode}:`, allImages.length, 'images');
             setImagesByModule(prev => ({ ...prev, [mode]: allImages }));
             await analyzeImagesForModule(mode, allImages);
 
         } catch (err) {
-            addToast('Error al procesar imágenes.', 'error');
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error('[handleImageUpload] Error:', msg);
+            addToast(`Error al procesar imágenes: ${msg}`, 'error');
         }
     }, [imagesByModule, analyzeImagesForModule, addToast]);
     
