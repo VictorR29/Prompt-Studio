@@ -147,6 +147,7 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 const itemFiles: File[] = [];
                 for (let i = 0; i < e.dataTransfer.items.length; i++) {
                     const item = e.dataTransfer.items[i];
+                    console.log(`[PromptModule] item[${i}]: kind="${item.kind}", type="${item.type}"`);
                     if (item.kind === 'file') {
                         const file = item.getAsFile();
                         if (file) itemFiles.push(file);
@@ -154,6 +155,18 @@ export const PromptModule: React.FC<PromptModuleProps> = ({
                 }
                 files = itemFiles;
                 console.log(`[PromptModule] items fallback got: ${files.length} files`);
+                
+                // If still no files, try getting string data from URI-list (dragging image from web page)
+                if (files.length === 0) {
+                    for (let i = 0; i < e.dataTransfer.items.length; i++) {
+                        const item = e.dataTransfer.items[i];
+                        if (item.kind === 'string') {
+                            item.getAsString((s) => {
+                                console.log(`[PromptModule] item[${i}] string data:`, s.substring(0, 200));
+                            });
+                        }
+                    }
+                }
             }
             
             if (files.length > 0 && currentImages.length < max) {
