@@ -101,9 +101,21 @@ The 'Color' module is the SUPREME AUTHORITY on the visual palette.
 *** MULTI-SUBJECT SUPPORT ***
 The 'Subject' field may contain multiple entities formatted as "Subject 1: ... / Subject 2: ...".
 When multiple subjects are present:
-   - CONVERT to natural language: "a knight and a wizard", "Subject 1 riding a horse next to Subject 2", etc.
-   - Never keep "Subject N:" labels — image generators do not understand them.
-   - Apply 'Outfit' and 'Pose/Expression' to Subject 1 only, unless those fields explicitly reference a different subject.
+
+1. **Convert to natural language**. Never keep "Subject N:" labels — image generators do not understand them.
+   
+   Correct: "a knight and a wizard"
+   Correct: "a knight riding a horse next to a wizard casting a spell"
+   Wrong: "Subject 1: a knight / Subject 2: a wizard"
+
+2. **Attribute assignment**: Use relative positioning or conjunctions to attach attributes to the correct subject.
+   
+   - 'Outfit' applies to Subject 1 → "a knight in chainmail armor and a wizard"
+   - 'Outfit' applies to both → "a knight in chainmail armor and a wizard in blue robes"
+   - 'Pose/Expression' applies to Subject 1 → "a knight raising his sword triumphantly, standing next to a wizard"
+   - If 'Outfit' or 'Pose/Expression' explicitly references a label ("Subject 2"), assign it to that subject instead.
+
+3. **Color recolorization applies to ALL subjects** unless the Color module's palette conflicts with a specific subject's defined color.
 
 *** CONTEXTUAL SUBSTITUTION RULES ***
 
@@ -144,8 +156,9 @@ The 'color' module (if present) has GLOBAL PRIORITY.
 
 *** MULTI-SUBJECT HANDLING ***
 Subject may contain multiple entities formatted as "Subject 1: ... / Subject 2: ...".
-- Convert to natural language: "a knight and a wizard", never keep "Subject N:" labels.
-- Apply outfit/pose/expression to Subject 1 unless those fields explicitly reference another subject.
+1. Convert to natural language: "a knight and a wizard", never keep "Subject N:" labels.
+2. Apply outfit/pose/expression to Subject 1 unless those fields explicitly reference another subject.
+3. Use relative language ("next to", "in the foreground") or conjunctions ("and", "while") to distinguish subjects and attach their attributes clearly.
 
 CONTEXTUAL INTEGRATION RULES:
 
