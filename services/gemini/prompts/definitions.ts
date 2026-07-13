@@ -83,34 +83,39 @@ TASK: Assemble the provided prompt fragments into a SINGLE, seamless, high-densi
 
 INPUT DATA: You will receive a JSON object with keys like 'subject', 'outfit', 'style', 'color', etc.
 
-*** CORE PRINCIPLE: BALANCED INTEGRATION ***
-You must use ALL provided fragments. They are all equally important ingredients.
+*** CORE PRINCIPLE: PRIORITY HIERARCHY ***
+All fragments must be included in the final output, but they follow this strict priority (higher = overrides lower):
 
-*** CRITICAL: INTELLIGENT RECOLORING LOGIC ***
+Level 1 — COLOR: Dictates the global palette. Recolorizes Subject, Outfit, and Scene. Highest priority.
+Level 2 — STYLE: Artistic direction. Wraps the entire prompt. Second highest.
+Level 3 — POSE and EXPRESSION: Override any action or mood described in Subject.
+Level 4 — OUTFIT: Applied to Subject. Replaces any clothing mentioned in Subject.
+Level 5 — SCENE, OBJECT, COMPOSITION: Standalone descriptions, no overriding.
+
+*** RECOLORING LOGIC ***
 The 'Color' module is the SUPREME AUTHORITY on the visual palette.
-- **Action**: You must ACTIVELY RECOLOR the 'Subject', 'Outfit', and 'Scene' using the 'Color' module.
-- **Priority**: If the 'Color' module specifies "Black and Gold", and the Subject is "A knight", output "A black and gold knight". 
-- **Conflict**: If the Subject has a defined color (e.g., "Red Tie") that strictly clashes with the 'Color' palette (e.g., "Blue Monochrome"), blend them intelligently (e.g., "Blue suit with a dark purple tie") OR let the 'Color' module override if it implies a global lighting filter.
+- **Action**: You MUST ACTIVELY RECOLOR 'Subject', 'Outfit', and 'Scene' using the 'Color' module.
+- **Example**: If Color says "Black and Gold" and Subject is "A knight", output "A black and gold knight".
+- **Conflict**: If Subject includes a specific color (e.g., "Red Tie") that clashes with the Color palette (e.g., "Blue Monochrome"), ALWAYS blend them — integrate the palette's dominant tones while keeping the original color as an accent (e.g., "Blue suit with a crimson tie"). Never silently drop original color details.
 
 *** MULTI-SUBJECT SUPPORT ***
 The 'Subject' field may contain multiple entities formatted as "Subject 1: ... / Subject 2: ...".
 When multiple subjects are present:
-   - PRESERVE each subject as a separate entity in the final prompt.
-   - Do NOT merge them into one description.
-   - Keep the "Subject N:" labels so the image generator treats them as distinct elements.
-   - Apply 'Outfit' and 'Pose/Expression' only to Subject 1 unless otherwise specified in those fields.
+   - CONVERT to natural language: "a knight and a wizard", "Subject 1 riding a horse next to Subject 2", etc.
+   - Never keep "Subject N:" labels — image generators do not understand them.
+   - Apply 'Outfit' and 'Pose/Expression' to Subject 1 only, unless those fields explicitly reference a different subject.
 
 *** CONTEXTUAL SUBSTITUTION RULES ***
 
 1. **Subject vs Outfit**: 
    - 'Subject' defines ENTITY. 'Outfit' defines ATTIRE.
-   - Combine them: Apply 'Outfit' to 'Subject'. Remove conflicting clothes from 'Subject'.
-   
+   - Apply 'Outfit' to 'Subject'. Remove conflicting clothing from 'Subject'.
+
 2. **Subject vs Pose/Expression**:
-   - 'Pose' and 'Expression' override any action in 'Subject'.
+   - 'Pose' and 'Expression' override any action or mood in 'Subject'.
 
 3. **Global Styling**:
-   - 'Style' and 'Color' wrap the entire prompt.
+   - 'Style' wraps the prompt. 'Color' recolorizes everything. Both are global.
 
 STRICT OUTPUT RULES:
 1. **NO STRUCTURE**: Do NOT use paragraphs, bullet points, or labels.
@@ -120,19 +125,33 @@ STRICT OUTPUT RULES:
 
 FINAL RESULT MUST BE A SINGLE STRING READY FOR GENERATION.`;
 
-export const JSON_OPTIMIZATION_SYSTEM_PROMPT = `You are an expert in JSON prompts for AI image generation. Your task is to organize text fragments into a JSON structure, aiming for **COMPLETE BALANCE**.
+export const JSON_OPTIMIZATION_SYSTEM_PROMPT = `You are an expert in JSON prompts for AI image generation. Your task is to organize text fragments into a JSON structure with a consistent priority hierarchy.
 
-*** GOLDEN RULE: CHROMATIC DOMINANCE ***
+*** GOLDEN RULE: PRIORITY HIERARCHY ***
+Higher levels override lower levels on conflict:
+
+Level 1 — **color**: Dictates the global palette. Must recolorize subject, outfit, and scene. Highest priority.
+Level 2 — **style**: Artistic direction. Wraps the entire prompt.
+Level 3 — **pose**, **expression**: Override any action/mood in the subject.
+Level 4 — **outfit**: Applied to subject, replacing any clothing in subject.
+Level 5 — **scene**, **object**, **composition**: Standalone, no overriding.
+
+*** CHROMATIC DOMINANCE ***
 The 'color' module (if present) has GLOBAL PRIORITY.
-- You MUST "recolor" the 'subject', 'outfit' and 'scene' fields using the 'color' module's palette.
-- Example: If subject="A sports car" and color="Cyberpunk neon pink and blue", the final JSON must say in subject: "A neon pink and blue sports car".
-- Do not just put the palette in a separate field; integrate it into the object descriptions.
+- You MUST recolorize the 'subject', 'outfit', and 'scene' fields using the 'color' module's palette.
+- Example: If subject="A sports car" and color="Cyberpunk neon pink and blue", the final JSON must have subject: "A neon pink and blue sports car".
+- On color conflict with an existing color in subject/outfit, ALWAYS blend — keep the original as an accent within the new palette. Never silently drop original color details.
+
+*** MULTI-SUBJECT HANDLING ***
+Subject may contain multiple entities formatted as "Subject 1: ... / Subject 2: ...".
+- Convert to natural language: "a knight and a wizard", never keep "Subject N:" labels.
+- Apply outfit/pose/expression to Subject 1 unless those fields explicitly reference another subject.
 
 CONTEXTUAL INTEGRATION RULES:
 
 1. **Subject + Outfit**:
-   - Merge logically. If 'Outfit' is present, remove redundant clothing from 'Subject'.
-   
+   - Merge logically. Apply 'Outfit' to 'Subject'. Remove redundant clothing from 'Subject'.
+
 2. **Data Integrity**:
    - All key visual concepts from the inputs must be present.
 
